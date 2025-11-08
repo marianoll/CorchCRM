@@ -16,14 +16,14 @@ const CrystalSchema = z.object({
   fact: z.string().describe('The single, atomized statement of fact. This should be a concise and clear statement. For example: "A 20% discount was offered on Product XYZ." or "Customer is not happy with the current price."'),
 });
 
-export const CrystallizeTextInputSchema = z.object({
+const CrystallizeTextInputSchema = z.object({
   text: z.string().describe('The unstructured text to be crystallized (e.g., email body, voice note transcription).'),
   source: z.string().describe("The type of source, e.g., 'email', 'voice note'."),
   sourceIdentifier: z.string().describe('A reference to the source, e.g., email subject or meeting title.'),
 });
 export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
 
-export const CrystallizeTextOutputSchema = z.object({
+const CrystallizeTextOutputSchema = z.object({
   crystals: z.array(CrystalSchema).describe('A list of atomized facts (crystals) extracted from the text.'),
 });
 export type CrystallizeTextOutput = z.infer<typeof CrystallizeTextOutputSchema>;
