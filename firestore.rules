@@ -91,6 +91,14 @@ service cloud.firestore {
     }
 
     /**
+     * @description Manages emails associated with a specific user.
+     * @path /users/{userId}/emails/{emailId}
+     */
+    match /users/{userId}/emails/{emailId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    /**
      * @description Manages tasks associated with a specific user.
      * @path /users/{userId}/tasks/{taskId}
      * @allow (create) Authenticated user can create a task under their user id.

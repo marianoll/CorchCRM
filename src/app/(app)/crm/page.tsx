@@ -119,16 +119,18 @@ export default function CrmPage() {
         try {
             const batch = writeBatch(firestore);
 
-            const [companiesRes, contactsRes, dealsRes] = await Promise.all([
+            const [companiesRes, contactsRes, dealsRes, emailsRes] = await Promise.all([
                 fetch('/companies_seed.csv'),
                 fetch('/contacts_seed.csv'),
-                fetch('/deals_seed.csv')
+                fetch('/deals_seed.csv'),
+                fetch('/emails_seed.csv')
             ]);
 
-            const [companiesCsv, contactsCsv, dealsCsv] = await Promise.all([
+            const [companiesCsv, contactsCsv, dealsCsv, emailsCsv] = await Promise.all([
                 companiesRes.text(),
                 contactsRes.text(),
-                dealsRes.text()
+                dealsRes.text(),
+                emailsRes.text()
             ]);
 
             const parseCsv = (csvText: string): Record<string, string>[] => {
@@ -175,6 +177,16 @@ export default function CrmPage() {
                     if (dealData.close_date) dealData.close_date = new Date(dealData.close_date);
                     if (dealData.last_interaction_at) dealData.last_interaction_at = new Date(dealData.last_interaction_at);
                     batch.set(dealRef, dealData);
+                }
+            });
+
+            const emailsData = parseCsv(emailsCsv);
+            emailsData.forEach(emailObj => {
+                if (emailObj.id) {
+                    const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
+                    const emailData: any = { ...emailObj };
+                    if (emailData.ts) emailData.ts = new Date(emailData.ts);
+                    batch.set(emailRef, emailData);
                 }
             });
             
@@ -356,7 +368,9 @@ export default function CrmPage() {
 
     <CreateContactForm open={isCreateContactOpen} onOpenChange={closeContactForm} contact={editingContact} companies={companies || []}/>
     <CreateDealForm open={isCreateDealOpen} onOpenChange={closeDealForm} contacts={contacts || []} companies={companies || []} deal={editingDeal} />
-    <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={closeCompanyForm} company={editingCompany} />
+    <CreateCompanyForm open={isCreateCompanyOpen} onOpenchaIge={closeCompanyForm} company={editingCompany} />
     </>
   );
 }
+
+    

@@ -362,6 +362,60 @@
         "created_at",
         "updated_at"
       ]
+    },
+     "Email": {
+      "title": "Email",
+      "description": "Each row is an email within a thread. Used for intent analysis, summaries, and synchronization with Gmail API.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the message (msg_xxxxxxxx)."
+        },
+        "thread_id": {
+          "type": "string",
+          "description": "Identifier for the conversational thread."
+        },
+        "company_id": {
+          "type": "string",
+          "description": "Associated company."
+        },
+        "deal_id": {
+          "type": "string",
+          "description": "Deal to which the exchange belongs."
+        },
+        "from_email": {
+          "type": "string",
+          "description": "Sender's email."
+        },
+        "to_email": {
+          "type": "string",
+          "description": "Recipient's email."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["inbound", "outbound"],
+          "description": "Direction of the email ('inbound' or 'outbound')."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject of the email."
+        },
+        "body_excerpt": {
+          "type": "string",
+          "description": "Brief excerpt of the body (clean text without signature)."
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the email was sent or received."
+        },
+        "labels": {
+          "type": "string",
+          "description": "AI/manual labels (e.g., 'proposal;followup;pricing')."
+        }
+      },
+      "required": ["id", "thread_id", "from_email", "to_email", "direction", "subject", "ts"]
     }
   },
   "auth": {
@@ -447,6 +501,26 @@
           ]
         }
       },
+       {
+        "path": "/users/{userId}/emails/{emailId}",
+        "definition": {
+          "entityName": "Email",
+          "schema": {
+            "$ref": "#/backend/entities/Email"
+          },
+          "description": "Emails associated with a specific user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "emailId",
+              "description": "The unique identifier for the email."
+            }
+          ]
+        }
+      },
       {
         "path": "/users/{userId}/gmailIntegrations/{gmailIntegrationId}",
         "definition": {
@@ -504,7 +578,8 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support a click-free CRM where data automatically flows from voice, emails, and meetings. It prioritizes authorization independence, clarity, and scalability. We are incorporating a Gmail integration and a new 'infotopes' collection for atomic facts.\n\n**Authorization Independence & QAPs:**\n\n*   **Users Collection:** Each user has their own private data nested under `/users/{userId}`. This path-based ownership provides Authorization Independence because access control is determined directly by the path, avoiding the need for `get()` calls to parent documents.  QAPs are supported because listing operations are scoped to the user's own data, ensuring secure access.\n*   **Denormalization:**  For `deals` and `tasks`, the `userId` is included within each document.  This allows direct access control based on `request.auth.uid == resource.data.userId` without needing to query a parent `user` document.\n*   **Gmail Integration:** Gmail integrations are stored under the user's document, ensuring only the user can access their integration details.\n*   **Infotopes:** The new `infotopes` collection is nested under the user's document, inheriting the same path-based ownership and security model.\n\n**Structure Overview:**\n\nThe structure uses path-based ownership for user data and denormalization of ownership for child collections.  This removes the necessity for complex rules involving `get()` operations, improving security and scalability.\n\n**Justification of Paths:**\n\n*   `/users/{userId}`:  Root for all user-specific data.  Path-based ownership is the primary security mechanism.\n*   `/users/{userId}/deals/{dealId}`: Deals owned by the user. The `userId` is denormalized into the deal document for authorization independence.\n*   `/users/{userId}/contacts/{contactId}`: Contacts owned by the user.\n*   `/users/{userId}/tasks/{taskId}`: Tasks owned by the user. The `userId` is denormalized into the task document for authorization independence.\n*   `/users/{userId}/gmailIntegrations/{gmailIntegrationId}`: Gmail integration details associated with the user.  Since the document is nested under the `/users/{userId}` path, only the user can access it.\n*   `/users/{userId}/infotopes/{infotopeId}`: Stores atomic facts (infotopes) related to the user's other entities, secured by the user-specific path.\n\nThis design ensures that security rules are simple, robust, and easily auditable, aligning with the core design principles."
+    "reasoning": "The Firestore structure is designed to support a click-free CRM where data automatically flows from voice, emails, and meetings. It prioritizes authorization independence, clarity, and scalability. We are incorporating a Gmail integration and a new 'infotopes' collection for atomic facts.\n\n**Authorization Independence & QAPs:**\n\n*   **Users Collection:** Each user has their own private data nested under `/users/{userId}`. This path-based ownership provides Authorization Independence because access control is determined directly by the path, avoiding the need for `get()` calls to parent documents.  QAPs are supported because listing operations are scoped to the user's own data, ensuring secure access.\n*   **Denormalization:**  For `deals` and `tasks`, the `userId` is included within each document.  This allows direct access control based on `request.auth.uid == resource.data.userId` without needing to query a parent `user` document.\n*   **Gmail Integration:** Gmail integrations are stored under the user's document, ensuring only the user can access their integration details.\n*   **Infotopes:** The new `infotopes` collection is nested under the user's document, inheriting the same path-based ownership and security model.\n\n**Structure Overview:**\n\nThe structure uses path-based ownership for user data and denormalization of ownership for child collections.  This removes the necessity for complex rules involving `get()` operations, improving security and scalability.\n\n**Justification of Paths:**\n\n*   `/users/{userId}`:  Root for all user-specific data.  Path-based ownership is the primary security mechanism.\n*   `/users/{userId}/deals/{dealId}`: Deals owned by the user. The `userId` is denormalized into the deal document for authorization independence.\n*   `/users/{userId}/contacts/{contactId}`: Contacts owned by the user.\n*   `/users/{userId}/tasks/{taskId}`: Tasks owned by the user. The `userId` is denormalized into the task document for authorization independence.\n*   `/users/{userId}/emails/{emailId}`: Emails owned by the user.\n*   `/users/{userId}/gmailIntegrations/{gmailIntegrationId}`: Gmail integration details associated with the user.  Since the document is nested under the `/users/{userId}` path, only the user can access it.\n*   `/users/{userId}/infotopes/{infotopeId}`: Stores atomic facts (infotopes) related to the user's other entities, secured by the user-specific path.\n\nThis design ensures that security rules are simple, robust, and easily auditable, aligning with the core design principles."
   }
 }
+
     
