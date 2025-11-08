@@ -95,9 +95,13 @@ service cloud.firestore {
      * @path /users/{userId}/emails/{emailId}
      */
     match /users/{userId}/emails/{emailId} {
-        allow read, write: if isSignedIn() && isOwner(userId);
+      allow get, write: if isSignedIn() && isOwner(userId);
     }
 
+    match /users/{userId}/emails {
+      allow list: if isSignedIn() && isOwner(userId);
+    }
+    
     /**
      * @description Manages tasks associated with a specific user.
      * @path /users/{userId}/tasks/{taskId}
@@ -190,5 +194,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
