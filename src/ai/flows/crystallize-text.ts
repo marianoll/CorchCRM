@@ -72,7 +72,7 @@ const crystallizeTextFlow = ai.defineFlow(
     outputSchema: CrystallizeTextOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    return output!;
+    const response = await prompt(input);
+    return response.output()!;
   }
 );
