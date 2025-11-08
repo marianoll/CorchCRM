@@ -1,0 +1,32 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "infotopes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "entity_key", "order": "ASCENDING" },
+        { "fieldPath": "observed_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "infotopes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "entity_key", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "observed_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "infotopes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "entity_key", "order": "ASCENDING" },
+        { "fieldPath": "observed_at", "order": "DESCENDING" },
+        { "fieldPath": "source.kind", "order": "ASCENDING" }
+      ]
+    }
+  ]
+}
+
+    

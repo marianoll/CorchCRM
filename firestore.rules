@@ -108,6 +108,16 @@ service cloud.firestore {
     }
 
     /**
+     * @description Manages atomic facts (infotopes) for a user.
+     * @path /users/{userId}/infotopes/{infotopeId}
+     * @allow (read, write) Authenticated user can manage infotopes under their own user id.
+     * @principle Enforces path-based user ownership.
+     */
+    match /users/{userId}/infotopes/{infotopeId} {
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    /**
      * @description Manages Gmail integrations for a user.
      * @path /users/{userId}/gmailIntegrations/{gmailIntegrationId}
      * @allow (create) Authenticated user can create a Gmail integration under their user id.
@@ -172,3 +182,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

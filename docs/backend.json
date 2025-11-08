@@ -274,6 +274,94 @@
         "entity_id",
         "table"
       ]
+    },
+    "Infotope": {
+      "title": "Infotope",
+      "description": "An append-mostly atomic fact linked to an existing Company, Contact, or Deal.",
+      "type": "object",
+      "properties": {
+        "entity_type": {
+          "type": "string",
+          "enum": ["company", "contact", "deal"],
+          "description": "The type of the entity this fact is linked to."
+        },
+        "entity_id": {
+          "type": "string",
+          "description": "The Firestore ID of the target entity."
+        },
+        "entity_key": {
+          "type": "string",
+          "description": "Concatenation of '${entity_type}:${entity_id}' used for indexed lookups."
+        },
+        "fact_text": {
+          "type": "string",
+          "description": "The atomic fact text."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional tags for categorization."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "done", "invalid", "superseded"],
+          "description": "The status of the fact."
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the fact was first detected."
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["email", "call", "note", "meeting"]
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": ["kind"]
+        },
+        "supersedes_id": {
+          "type": ["string", "null"],
+          "description": "The ID of an infotope that this one supersedes."
+        },
+        "author": {
+          "type": "string",
+          "description": "Identifier for the human or pipeline that created the fact."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score of the extracted fact."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-side timestamp of when the document was created."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-side timestamp of when the document was last updated."
+        }
+      },
+      "required": [
+        "entity_type",
+        "entity_id",
+        "entity_key",
+        "fact_text",
+        "status",
+        "observed_at",
+        "created_at",
+        "updated_at"
+      ]
     }
   },
   "auth": {
@@ -394,9 +482,29 @@
             }
           ]
         }
+      },
+      {
+        "path": "/users/{userId}/infotopes/{infotopeId}",
+        "definition": {
+          "entityName": "Infotope",
+          "schema": {
+            "$ref": "#/backend/entities/Infotope"
+          },
+          "description": "Atomic facts related to a user's companies, contacts, or deals.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "infotopeId",
+              "description": "The unique identifier for the infotope."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support a click-free CRM where data automatically flows from voice, emails, and meetings. It prioritizes authorization independence, clarity, and scalability. We are incorporating a Gmail integration.\n\n**Authorization Independence & QAPs:**\n\n*   **Users Collection:** Each user has their own private data nested under `/users/{userId}`. This path-based ownership provides Authorization Independence because access control is determined directly by the path, avoiding the need for `get()` calls to parent documents.  QAPs are supported because listing operations are scoped to the user's own data, ensuring secure access.\n*   **Denormalization:**  For `deals` and `tasks`, the `userId` is included within each document.  This allows direct access control based on `request.auth.uid == resource.data.userId` without needing to query a parent `user` document.\n*   **Gmail Integration:** Gmail integrations are stored under the user's document, ensuring only the user can access their integration details.\n\n**Structure Overview:**\n\nThe structure uses path-based ownership for user data and denormalization of ownership for child collections.  This removes the necessity for complex rules involving `get()` operations, improving security and scalability.\n\n**Justification of Paths:**\n\n*   `/users/{userId}`:  Root for all user-specific data.  Path-based ownership is the primary security mechanism.\n*   `/users/{userId}/deals/{dealId}`: Deals owned by the user. The `userId` is denormalized into the deal document for authorization independence.\n*   `/users/{userId}/contacts/{contactId}`: Contacts owned by the user.\n*   `/users/{userId}/tasks/{taskId}`: Tasks owned by the user. The `userId` is denormalized into the task document for authorization independence.\n*   `/users/{userId}/gmailIntegrations/{gmailIntegrationId}`: Gmail integration details associated with the user.  Since the document is nested under the `/users/{userId}` path, only the user can access it.\n\nThis design ensures that security rules are simple, robust, and easily auditable, aligning with the core design principles."
+    "reasoning": "The Firestore structure is designed to support a click-free CRM where data automatically flows from voice, emails, and meetings. It prioritizes authorization independence, clarity, and scalability. We are incorporating a Gmail integration and a new 'infotopes' collection for atomic facts.\n\n**Authorization Independence & QAPs:**\n\n*   **Users Collection:** Each user has their own private data nested under `/users/{userId}`. This path-based ownership provides Authorization Independence because access control is determined directly by the path, avoiding the need for `get()` calls to parent documents.  QAPs are supported because listing operations are scoped to the user's own data, ensuring secure access.\n*   **Denormalization:**  For `deals` and `tasks`, the `userId` is included within each document.  This allows direct access control based on `request.auth.uid == resource.data.userId` without needing to query a parent `user` document.\n*   **Gmail Integration:** Gmail integrations are stored under the user's document, ensuring only the user can access their integration details.\n*   **Infotopes:** The new `infotopes` collection is nested under the user's document, inheriting the same path-based ownership and security model.\n\n**Structure Overview:**\n\nThe structure uses path-based ownership for user data and denormalization of ownership for child collections.  This removes the necessity for complex rules involving `get()` operations, improving security and scalability.\n\n**Justification of Paths:**\n\n*   `/users/{userId}`:  Root for all user-specific data.  Path-based ownership is the primary security mechanism.\n*   `/users/{userId}/deals/{dealId}`: Deals owned by the user. The `userId` is denormalized into the deal document for authorization independence.\n*   `/users/{userId}/contacts/{contactId}`: Contacts owned by the user.\n*   `/users/{userId}/tasks/{taskId}`: Tasks owned by the user. The `userId` is denormalized into the task document for authorization independence.\n*   `/users/{userId}/gmailIntegrations/{gmailIntegrationId}`: Gmail integration details associated with the user.  Since the document is nested under the `/users/{userId}` path, only the user can access it.\n*   `/users/{userId}/infotopes/{infotopeId}`: Stores atomic facts (infotopes) related to the user's other entities, secured by the user-specific path.\n\nThis design ensures that security rules are simple, robust, and easily auditable, aligning with the core design principles."
   }
 }
     
