@@ -23,9 +23,9 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, type Firestore } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -35,12 +35,19 @@ const formSchema = z.object({
   website: z.string().url('Invalid URL.').optional().or(z.literal('')),
 });
 
+type Company = {
+    id: string;
+    name: string;
+    website?: string;
+};
+
 type CreateCompanyFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  company?: Company | null;
 };
 
-export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps) {
+export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompanyFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -51,6 +58,17 @@ export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps
       website: '',
     },
   });
+
+  const isEditing = !!company;
+
+  useEffect(() => {
+    if (isEditing) {
+        form.reset(company);
+    } else {
+        form.reset({ name: '', website: '' });
+    }
+  }, [company, isEditing, form]);
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore) {
@@ -63,36 +81,54 @@ export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps
     }
     setIsSubmitting(true);
     
-    const companiesCollection = collection(firestore, 'companies');
-    addDoc(companiesCollection, values)
-      .then(() => {
-        toast({
-          title: 'Company Created',
-          description: `${values.name} has been added to your companies.`,
-        });
+    try {
+        if (isEditing) {
+            const companyRef = doc(firestore, 'companies', company.id);
+            setDoc(companyRef, values, { merge: true })
+              .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: companyRef.path,
+                  operation: 'update',
+                  requestResourceData: values,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
+            toast({
+              title: 'Company Updated',
+              description: `${values.name} has been updated.`,
+            });
+        } else {
+            const companiesCollection = collection(firestore, 'companies');
+            addDoc(companiesCollection, values)
+              .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: companiesCollection.path,
+                  operation: 'create',
+                  requestResourceData: values,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
+            toast({
+              title: 'Company Created',
+              description: `${values.name} has been added to your companies.`,
+            });
+        }
         form.reset();
         onOpenChange(false);
-      })
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: companiesCollection.path,
-          operation: 'create',
-          requestResourceData: values,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
+    } catch (error) {
+        // Errors are handled by the permission error emitter
+    } finally {
         setIsSubmitting(false);
-      });
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Company</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Company' : 'Create New Company'}</DialogTitle>
           <DialogDescription>
-            Fill in the details below to add a new company.
+            {isEditing ? 'Update the details below.' : 'Fill in the details below to add a new company.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -129,7 +165,7 @@ export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-                Save Company
+                {isEditing ? 'Save Changes' : 'Save Company'}
               </Button>
             </DialogFooter>
           </form>

@@ -23,9 +23,9 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -36,12 +36,21 @@ const formSchema = z.object({
   company: z.string().optional(),
 });
 
+type Contact = {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    companyId?: string;
+};
+
 type CreateContactFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contact?: Contact | null;
 };
 
-export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps) {
+export function CreateContactForm({ open, onOpenChange, contact }: CreateContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -55,6 +64,21 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
     },
   });
 
+  const isEditing = !!contact;
+
+  useEffect(() => {
+    if (isEditing) {
+        form.reset({
+            name: contact.name,
+            email: contact.email,
+            phone: contact.phone,
+            company: contact.companyId || '',
+        });
+    } else {
+        form.reset({ name: '', email: '', phone: '', company: '' });
+    }
+  }, [contact, isEditing, form]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore) {
         toast({
@@ -66,42 +90,61 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
     }
     setIsSubmitting(true);
     
-    const contactsCollection = collection(firestore, 'contacts');
     const dataToSave = {
       name: values.name,
       email: values.email,
       phone: values.phone,
+      companyId: values.company || ''
     };
 
-    addDoc(contactsCollection, dataToSave)
-      .then(() => {
-        toast({
-          title: 'Contact Created',
-          description: `${values.name} has been added to your contacts.`,
-        });
+    try {
+        if (isEditing) {
+            const contactRef = doc(firestore, 'contacts', contact.id);
+            setDoc(contactRef, dataToSave, { merge: true })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: contactRef.path,
+                    operation: 'update',
+                    requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
+            toast({
+                title: 'Contact Updated',
+                description: `${values.name} has been updated.`,
+            });
+        } else {
+            const contactsCollection = collection(firestore, 'contacts');
+            addDoc(contactsCollection, dataToSave)
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: contactsCollection.path,
+                    operation: 'create',
+                    requestResourceData: dataToSave,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
+            toast({
+              title: 'Contact Created',
+              description: `${values.name} has been added to your contacts.`,
+            });
+        }
         form.reset();
         onOpenChange(false);
-      })
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: contactsCollection.path,
-            operation: 'create',
-            requestResourceData: dataToSave,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
+    } catch(e) {
+        // Errors handled by permission error emitter
+    } finally {
         setIsSubmitting(false);
-      });
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Contact</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Contact' : 'Create New Contact'}</DialogTitle>
           <DialogDescription>
-            Fill in the details below to add a new contact.
+            {isEditing ? 'Update the details below.' : 'Fill in the details below to add a new contact.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -164,7 +207,7 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-                Save Contact
+                {isEditing ? 'Save Changes' : 'Save Contact'}
               </Button>
             </DialogFooter>
           </form>

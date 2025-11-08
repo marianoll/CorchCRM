@@ -4,15 +4,14 @@ import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Pencil } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
 import { useCollection } from '@/firebase';
-import { collection, query, orderBy, where, Firestore } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useMemo } from 'react';
 
@@ -58,19 +57,58 @@ export default function CrmPage() {
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
     const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
+    
+    const [editingContact, setEditingContact] = useState<Contact | null>(null);
+    const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+    const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
-    const contactsQuery = useMemo(() => firestore ? query(collection(firestore as Firestore, 'contacts'), orderBy('name')) : null, [firestore]);
+    const contactsQuery = useMemo(() => firestore ? query(collection(firestore, 'contacts'), orderBy('name')) : null, [firestore]);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemo(() => firestore ? query(collection(firestore as Firestore, 'deals'), orderBy('name')) : null, [firestore]);
+    const dealsQuery = useMemo(() => firestore ? query(collection(firestore, 'deals'), orderBy('name')) : null, [firestore]);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemo(() => firestore ? query(collection(firestore as Firestore, 'companies'), orderBy('name')) : null, [firestore]);
+    const companiesQuery = useMemo(() => firestore ? query(collection(firestore, 'companies'), orderBy('name')) : null, [firestore]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
     const getContactName = (contactId: string) => {
         return contacts?.find(c => c.id === contactId)?.name || 'Unknown Contact';
     }
+
+    const handleEditContact = (contact: Contact) => {
+        setEditingContact(contact);
+        setCreateContactOpen(true);
+    };
+
+    const handleEditDeal = (deal: Deal) => {
+        setEditingDeal(deal);
+        setCreateDealOpen(true);
+    };
+
+    const handleEditCompany = (company: Company) => {
+        setEditingCompany(company);
+        setCreateCompanyOpen(true);
+    };
+
+    const closeContactForm = (open: boolean) => {
+        if (!open) {
+            setEditingContact(null);
+        }
+        setCreateContactOpen(open);
+    }
+    const closeDealForm = (open: boolean) => {
+        if (!open) {
+            setEditingDeal(null);
+        }
+        setCreateDealOpen(open);
+    }
+    const closeCompanyForm = (open: boolean) => {
+        if (!open) {
+            setEditingCompany(null);
+        }
+        setCreateCompanyOpen(open);
+    }
+
 
   return (
     <>
@@ -103,18 +141,24 @@ export default function CrmPage() {
                         <TableHead>Contact</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Stage</TableHead>
+                        <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {dealsLoading && <TableRow><TableCell colSpan={4}>Loading...</TableCell></TableRow>}
+                    {dealsLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
                     {deals?.map(deal => (
                         <TableRow key={deal.id}>
-                        <TableCell className="font-medium">{deal.name}</TableCell>
-                        <TableCell>{getContactName(deal.contactId)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(deal.amount)}</TableCell>
-                        <TableCell>
-                            <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
-                        </TableCell>
+                            <TableCell className="font-medium">{deal.name}</TableCell>
+                            <TableCell>{getContactName(deal.contactId)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(deal.amount)}</TableCell>
+                            <TableCell>
+                                <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditDeal(deal)}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
@@ -129,10 +173,11 @@ export default function CrmPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
+                        <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {contactsLoading && <TableRow><TableCell colSpan={3}>Loading...</TableCell></TableRow>}
+                    {contactsLoading && <TableRow><TableCell colSpan={4}>Loading...</TableCell></TableRow>}
                     {contacts?.map(contact => (
                         <TableRow key={contact.id}>
                             <TableCell>
@@ -143,8 +188,13 @@ export default function CrmPage() {
                                     <span className="font-medium">{contact.name}</span>
                                 </div>
                             </TableCell>
-                        <TableCell>{contact.email}</TableCell>
-                        <TableCell>{contact.phone}</TableCell>
+                            <TableCell>{contact.email}</TableCell>
+                            <TableCell>{contact.phone}</TableCell>
+                            <TableCell>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditContact(contact)}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
@@ -158,14 +208,20 @@ export default function CrmPage() {
                         <TableRow>
                             <TableHead>Company Name</TableHead>
                             <TableHead>Website</TableHead>
+                            <TableHead className="w-[80px]">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {companiesLoading && <TableRow><TableCell colSpan={2}>Loading...</TableCell></TableRow>}
+                        {companiesLoading && <TableRow><TableCell colSpan={3}>Loading...</TableCell></TableRow>}
                         {companies?.map(company => (
                             <TableRow key={company.id}>
-                            <TableCell className="font-medium">{company.name}</TableCell>
-                            <TableCell><a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a></TableCell>
+                                <TableCell className="font-medium">{company.name}</TableCell>
+                                <TableCell><a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a></TableCell>
+                                <TableCell>
+                                    <Button variant="ghost" size="icon" onClick={() => handleEditCompany(company)}>
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                </TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
@@ -176,9 +232,9 @@ export default function CrmPage() {
       </div>
     </main>
 
-    <CreateContactForm open={isCreateContactOpen} onOpenChange={setCreateContactOpen} />
-    <CreateDealForm open={isCreateDealOpen} onOpenChange={setCreateDealOpen} contacts={contacts || []} companies={companies || []} />
-    <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={setCreateCompanyOpen} />
+    <CreateContactForm open={isCreateContactOpen} onOpenChange={closeContactForm} contact={editingContact} />
+    <CreateDealForm open={isCreateDealOpen} onOpenChange={closeDealForm} contacts={contacts || []} companies={companies || []} deal={editingDeal} />
+    <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={closeCompanyForm} company={editingCompany} />
     </>
   );
 }

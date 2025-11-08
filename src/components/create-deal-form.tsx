@@ -30,9 +30,9 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
@@ -61,14 +61,25 @@ type Company = {
     name: string;
 };
 
+type Deal = {
+    id: string;
+    name: string;
+    amount: number;
+    stage: 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
+    contactId: string;
+    companyId?: string;
+    creationDate?: { seconds: number; nanoseconds: number } | Date;
+};
+
 type CreateDealFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contacts: Contact[];
   companies: Company[];
+  deal?: Deal | null;
 };
 
-export function CreateDealForm({ open, onOpenChange, contacts, companies }: CreateDealFormProps) {
+export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }: CreateDealFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -82,6 +93,31 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
     },
   });
 
+  const isEditing = !!deal;
+
+  useEffect(() => {
+    if (isEditing) {
+        let creationDate = new Date();
+        if (deal.creationDate) {
+            if (deal.creationDate instanceof Date) {
+                creationDate = deal.creationDate;
+            } else if (deal.creationDate && typeof deal.creationDate.seconds === 'number') {
+                creationDate = new Date(deal.creationDate.seconds * 1000);
+            }
+        }
+        form.reset({ ...deal, creationDate });
+    } else {
+        form.reset({
+            name: '',
+            amount: 0,
+            stage: 'lead',
+            creationDate: new Date(),
+            contactId: undefined,
+            companyId: undefined,
+        });
+    }
+  }, [deal, isEditing, form]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore) {
         toast({
@@ -93,37 +129,54 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
     }
     setIsSubmitting(true);
     
-    const dealsCollection = collection(firestore, 'deals');
-
-    addDoc(dealsCollection, values)
-      .then(() => {
-        toast({
-          title: 'Deal Created',
-          description: `The deal "${values.name}" has been successfully created.`,
-        });
+    try {
+        if (isEditing) {
+            const dealRef = doc(firestore, 'deals', deal.id);
+            setDoc(dealRef, values, { merge: true })
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: dealRef.path,
+                    operation: 'update',
+                    requestResourceData: values,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
+            toast({
+              title: 'Deal Updated',
+              description: `The deal "${values.name}" has been successfully updated.`,
+            });
+        } else {
+            const dealsCollection = collection(firestore, 'deals');
+            addDoc(dealsCollection, values)
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: dealsCollection.path,
+                    operation: 'create',
+                    requestResourceData: values,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
+            toast({
+              title: 'Deal Created',
+              description: `The deal "${values.name}" has been successfully created.`,
+            });
+        }
         form.reset();
         onOpenChange(false);
-      })
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: dealsCollection.path,
-            operation: 'create',
-            requestResourceData: values,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
+    } catch(e) {
+        // Errors are handled by permission error emitter
+    } finally {
         setIsSubmitting(false);
-      });
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Deal</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Deal' : 'Create New Deal'}</DialogTitle>
           <DialogDescription>
-            Fill in the details below to add a new deal.
+            {isEditing ? 'Update the details below.' : 'Fill in the details below to add a new deal.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -147,7 +200,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
                 render={({ field }) => (
                     <FormItem>
                         <FormLabel>Company</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a company" />
@@ -169,7 +222,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
                 render={({ field }) => (
                     <FormItem>
                         <FormLabel>Contact</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a contact" />
@@ -245,7 +298,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stage</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a stage" />
@@ -270,7 +323,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-                Save Deal
+                {isEditing ? 'Save Changes' : 'Save Deal'}
               </Button>
             </DialogFooter>
           </form>
