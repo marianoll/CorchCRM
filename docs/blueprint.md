@@ -12,9 +12,9 @@
 
 ## Style Guidelines:
 
-- Primary color: Deep blue (#2962FF) to convey trust, intelligence, and efficiency.
-- Background color: Light blue (#E6F0FF), a desaturated variant of the primary, for a clean, professional look.
-- Accent color: Purple (#9D4EDD) to highlight calls to action and important information. It's analogous to blue but contrasts with it for clear visual separation.
+- Primary color: Mint Green (#61D8C4) to convey trust, intelligence, and efficiency.
+- Background color: White(#FFFFF), a desaturated variant of the primary, for a clean, professional look.
+- Accent color: Dark Orange (#C88225) to highlight calls to action and important information. It's analogous to blue but contrasts with it for clear visual separation.
 - Body and headline font: 'Inter', a grotesque-style sans-serif with a modern look.
 - Use a consistent set of minimalist icons to represent different CRM functions (contacts, deals, tasks, settings).
 - Employ a clean, card-based layout for displaying information, ensuring clarity and ease of use. Favor left-aligned text and controls.
