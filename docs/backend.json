@@ -9,10 +9,6 @@
           "type": "string",
           "description": "The name of the contact."
         },
-        "company": {
-          "type": "string",
-          "description": "The company the contact works for."
-        },
         "email": {
           "type": "string",
           "format": "email",
@@ -21,6 +17,9 @@
         "phone": {
           "type": "string",
           "description": "The phone number of the contact."
+        },
+        "companyId": {
+          "$ref": "#/backend/entities/company"
         }
       },
       "required": ["name", "email"]
@@ -45,6 +44,9 @@
         },
         "contactId": {
           "$ref": "#/backend/entities/contact"
+        },
+        "companyId": {
+          "$ref": "#/backend/entities/company"
         }
       },
       "required": ["name", "stage", "contactId"]
@@ -70,6 +72,23 @@
         }
       },
       "required": ["displayName", "email"]
+    },
+    "company": {
+      "title": "Company",
+      "description": "A business or organization.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the company."
+        },
+        "website": {
+          "type": "string",
+          "format": "uri",
+          "description": "The company's website."
+        }
+      },
+      "required": ["name"]
     }
   },
   "auth": {
@@ -93,6 +112,12 @@
         "$ref": "#/backend/entities/deal"
       },
       "description": "Stores deal and opportunity information."
+    },
+    "/companies/{companyId}": {
+      "schema": {
+        "$ref": "#/backend/entities/company"
+      },
+      "description": "Stores company information."
     }
   }
 }
