@@ -67,12 +67,20 @@ export default function LoginPage() {
 
       toast({ title: "Successfully signed in!" });
     } catch (error: any) {
-      console.error("Authentication Error:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Authentication Failed',
-        description: error.message || 'Could not sign in with Google. Please try again.',
-      });
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast({
+            variant: 'destructive',
+            title: 'Sign-in cancelled',
+            description: 'You closed the sign-in window. Please try again.',
+        });
+      } else {
+        console.error("Authentication Error:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Authentication Failed',
+            description: error.message || 'Could not sign in with Google. Please try again.',
+        });
+      }
     }
   };
 
