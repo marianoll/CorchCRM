@@ -128,8 +128,8 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
     if (!firestore || !user) {
         toast({
             variant: 'destructive',
-            title: 'Authentication Error',
-            description: 'User or database is not available. Please try again.',
+            title: 'Connection Error',
+            description: 'Could not connect to the database. Please try again.',
         });
         setIsSubmitting(false);
         return;

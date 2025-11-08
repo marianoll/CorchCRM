@@ -76,13 +76,13 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     setIsSubmitting(true);
     
     if (!firestore || !user) {
-      toast({
-        variant: 'destructive',
-        title: 'Authentication Error',
-        description: 'User or database is not available. Please try again.',
-      });
-      setIsSubmitting(false);
-      return;
+        toast({
+            variant: "destructive",
+            title: "Connection Error",
+            description: "Could not connect to the database. Please try again.",
+        });
+        setIsSubmitting(false);
+        return;
     }
     
     const batch = writeBatch(firestore);

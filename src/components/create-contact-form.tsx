@@ -89,8 +89,8 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     if (!firestore || !user) {
       toast({
         variant: 'destructive',
-        title: 'Authentication Error',
-        description: 'User or database is not available. Please try again.',
+        title: 'Connection Error',
+        description: 'Could not connect to the database. Please try again.',
       });
       setIsSubmitting(false);
       return;
