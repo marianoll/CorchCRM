@@ -73,10 +73,10 @@ export function EmailProcessor() {
   };
 
   const handleSaveCrystals = async () => {
-    if (!crystalsResult || !crystalsResult.results || !firestore) return;
+    if (!crystalsResult || !crystalsResult.infotopes || !firestore) return;
 
     setIsSaving(true);
-    const factsToSave = crystalsResult.results.filter(c => c.type === 'Fact');
+    const factsToSave = crystalsResult.infotopes;
     if (factsToSave.length === 0) {
         toast({ title: "No facts to save." });
         setIsSaving(false);
@@ -160,19 +160,19 @@ export function EmailProcessor() {
             </AlertDescription>
           </Alert>
         )}
-         {crystalsResult && crystalsResult.results && crystalsResult.results.length > 0 && (
+         {crystalsResult && (crystalsResult.infotopes.length > 0 || crystalsResult.orchestrators.length > 0) && (
           <Alert>
             <Gem className="h-4 w-4" />
             <AlertTitle className='flex justify-between items-center'>
                 <span>Generated Crystals</span>
-                 <Button size="sm" onClick={handleSaveCrystals} disabled={isSaving}>
+                 <Button size="sm" onClick={handleSaveCrystals} disabled={isSaving || crystalsResult.infotopes.length === 0}>
                     {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                     Save Facts
                 </Button>
             </AlertTitle>
             <AlertDescription className="space-y-2 mt-2">
                 <div className='font-mono text-xs bg-slate-100 dark:bg-slate-800 p-2 rounded'>
-                    <pre>{JSON.stringify(crystalsResult.results, null, 2)}</pre>
+                    <pre>{JSON.stringify(crystalsResult, null, 2)}</pre>
                 </div>
             </AlertDescription>
           </Alert>

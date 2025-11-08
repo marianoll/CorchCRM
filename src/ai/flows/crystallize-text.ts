@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview The Crystallizer AI agent.
- * This flow takes unstructured text and transforms it into structured "Facts" (to be saved as Infotopes) and "Orchestrator" commands.
+ * This flow takes unstructured text and transforms it into structured "Infotopes" (facts) and "Orchestrators" (commands).
  *
  * - crystallizeText - A function that handles the crystallization process.
  * - CrystallizeTextInput - The input type for the crystallizeText function.
@@ -13,56 +13,60 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
+// Schema for a single extracted item
 const CrystallizationResultSchema = z.object({
-  type: z.enum(['Fact', 'Orchestrator']).describe('The type of output. "Fact" is an atomic piece of information. "Orchestrator" is a command to the system.'),
+  type: z.enum(['Infotope', 'Orchestrator']).describe('The type of output. "Infotope" is an atomic piece of information. "Orchestrator" is a command to the system.'),
   text: z.string().describe('The fact text or the orchestrator command.'),
   entity: z.string().describe('The entity this fact or command relates to, e.g., "John Doe [john@example.com]" or "Acme Corp".'),
 });
 
+// Input schema for the flow
 const CrystallizeTextInputSchema = z.object({
   content: z.string().describe('The unstructured text content to be crystallized.'),
 });
 export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
 
+// Output schema for the flow, separating Infotopes and Orchestrators
 const CrystallizeTextOutputSchema = z.object({
-  results: z.array(CrystallizationResultSchema),
+  infotopes: z.array(CrystallizationResultSchema.extend({type: z.literal('Infotope')})).describe("An array of atomic facts extracted from the text."),
+  orchestrators: z.array(CrystallizationResultSchema.extend({type: z.literal('Orchestrator')})).describe("An array of system commands extracted from the text."),
 });
 export type CrystallizeTextOutput = z.infer<typeof CrystallizeTextOutputSchema>;
 
 
+/**
+ * The main exported function that clients call. It wraps the Genkit flow.
+ */
 export async function crystallizeText(input: CrystallizeTextInput): Promise<CrystallizeTextOutput> {
-  const result = await crystallizeTextFlow(input);
-  // Ensure we always return an object with a 'results' array.
-  if (Array.isArray(result)) {
-    return { results: result };
-  }
-  return result || { results: [] };
+  return crystallizeTextFlow(input);
 }
+
 
 const prompt = ai.definePrompt({
   name: 'crystallizeTextPrompt',
   input: { schema: CrystallizeTextInputSchema },
   output: { schema: CrystallizeTextOutputSchema },
-  system: `You are an expert AI assistant. Your task is to extract key information from unstructured text and convert it into a structured JSON array of "Facts" and "Orchestrator" commands.
+  system: `You are an expert AI assistant. Your task is to extract key information from unstructured text and convert it into a structured JSON object containing two arrays: "infotopes" and "orchestrators".
 
-- A "Fact" is a single, atomized statement of fact about a Company, Contact, or Deal.
-- An "Orchestrator" is a command to the system to perform an action, like creating a deal or sending a notification.
+- An "Infotope" is a single, atomized statement of fact about a Company, Contact, or Deal. It represents a piece of knowledge.
+- An "Orchestrator" is a command to the system to perform an action, like creating a deal, sending an email, or scheduling a task.
 
-For each item, identify the related entity.
+For each item, identify and name the related entity. Classify each item correctly as either 'Infotope' or 'Orchestrator' and place it in the corresponding array.
 
-The final output must be a JSON object with a single key "results" which contains an array of "Fact" and "Orchestrator" objects.
-
-Examples of good output:
+Example:
+Input Text: "Just spoke with Jane from Acme. She needs a proposal for the Q3 project by Friday. I'll also create a new deal for this called 'Q3 Proposal'."
 {
-  "results": [
-    { "type": "Fact", "text": "He does not want to continue the service.", "entity": "John [John@mail.com]" },
-    { "type": "Fact", "text": "A 20% discount was offered.", "entity": "Deal: WeGOTBrands" },
-    { "type": "Orchestrator", "text": "create deal 'WeGOTBrands' for company 'Branders'", "entity": "Branders" }
+  "infotopes": [
+    { "type": "Infotope", "text": "Needs a proposal for the Q3 project by Friday.", "entity": "Jane @ Acme" }
+  ],
+  "orchestrators": [
+    { "type": "Orchestrator", "text": "create deal 'Q3 Proposal'", "entity": "Acme" },
+    { "type": "Orchestrator", "text": "create task 'Send proposal for Q3 project'", "entity": "Jane @ Acme" }
   ]
 }
 
 Do not create items for conversational filler, greetings, or information that is not a core fact or command.
-Generate a JSON object based on the text.`,
+Generate the JSON object based on the user's text.`,
   user: `Text to be crystallized:\n'''\n{{{content}}}\n'''`,
 });
 
@@ -73,11 +77,15 @@ const crystallizeTextFlow = ai.defineFlow(
     outputSchema: CrystallizeTextOutputSchema,
   },
   async (input) => {
-    if (!input || !input.content) {
+    // Input validation
+    if (!input || !input.content || typeof input.content !== 'string' || input.content.trim() === '') {
         console.log("Crystallize flow received empty or invalid input.");
-        return { results: [] };
+        return { infotopes: [], orchestrators: [] };
     }
+
     const { output } = await prompt(input);
-    return output!;
+    
+    // Ensure we always return an object with the correct shape.
+    return output || { infotopes: [], orchestrators: [] };
   }
 );
