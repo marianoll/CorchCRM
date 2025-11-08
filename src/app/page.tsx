@@ -2,16 +2,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 const Logo = () => (
     <a href="#" className="flex items-center gap-3">
-        {/* Logo mark: cork plugging funnel (placeholder) */}
-        <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 8h24v14c0 4.418-7.163 8-16 8s-16-3.582-16-8V8h8z" fill="#ffb757"/>
-            <path d="M12 8h40" stroke="#0f172a" strokeWidth="4" strokeLinecap="round"/>
-            <path d="M14 40c0-6 7.163-10 18-10s18 4 18 10v4c0 6-7.163 10-18 10s-18-4-18-10v-4z" fill="#61d8c4"/>
-            <rect x="20" y="8" width="24" height="10" rx="2" fill="#d5963a" opacity=".25"/>
-        </svg>
+        <Image src="/icon.png" alt="CorchCRM logo" width="28" height="28" />
         <span className="font-bold text-lg tracking-tight text-ink">CorchCRM</span>
     </a>
 );
