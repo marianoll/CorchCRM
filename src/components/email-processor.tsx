@@ -51,7 +51,7 @@ export function EmailProcessor() {
       try {
         const [analysisRes, crystalsRes] = await Promise.all([
             emailToCRM({ emailContent }),
-            crystallizeText(emailContent)
+            crystallizeText({ content: emailContent })
         ]);
 
         setAnalysisResult(analysisRes);
@@ -73,10 +73,10 @@ export function EmailProcessor() {
   };
 
   const handleSaveCrystals = async () => {
-    if (!crystalsResult || !firestore) return;
+    if (!crystalsResult || !crystalsResult.results || !firestore) return;
 
     setIsSaving(true);
-    const factsToSave = crystalsResult.filter(c => c.type === 'Fact');
+    const factsToSave = crystalsResult.results.filter(c => c.type === 'Fact');
     if (factsToSave.length === 0) {
         toast({ title: "No facts to save." });
         setIsSaving(false);
@@ -160,7 +160,7 @@ export function EmailProcessor() {
             </AlertDescription>
           </Alert>
         )}
-         {crystalsResult && crystalsResult.length > 0 && (
+         {crystalsResult && crystalsResult.results && crystalsResult.results.length > 0 && (
           <Alert>
             <Gem className="h-4 w-4" />
             <AlertTitle className='flex justify-between items-center'>
@@ -172,7 +172,7 @@ export function EmailProcessor() {
             </AlertTitle>
             <AlertDescription className="space-y-2 mt-2">
                 <div className='font-mono text-xs bg-slate-100 dark:bg-slate-800 p-2 rounded'>
-                    <pre>{JSON.stringify(crystalsResult, null, 2)}</pre>
+                    <pre>{JSON.stringify(crystalsResult.results, null, 2)}</pre>
                 </div>
             </AlertDescription>
           </Alert>
