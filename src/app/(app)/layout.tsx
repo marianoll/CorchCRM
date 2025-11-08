@@ -26,6 +26,7 @@ import {
   Settings,
   ChevronDown,
   Gem,
+  History,
 } from 'lucide-react';
 import {
   FirebaseClientProvider,
@@ -34,6 +35,7 @@ import {
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
+  { href: '/history', label: 'History', icon: History },
   { href: '/crystals', label: 'Crystals', icon: Gem },
   { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
@@ -90,7 +92,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               )}
               <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
                 <span className="font-medium">Admin User</span>
-                <span className="text-xs text-muted-foreground">admin@corchcrm.com</span>
+                <span className="text-sm text-muted-foreground">admin@corchcrm.com</span>
               </div>
               <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>

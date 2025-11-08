@@ -135,6 +135,58 @@
         }
       },
       "required": ["fact", "source", "status", "createdAt"]
+    },
+    "audit_log": {
+        "title": "Audit Log",
+        "description": "A record of a change made to an entity in the database.",
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp of the logged action."
+          },
+          "actor_type": {
+            "type": "string",
+            "enum": ["user", "system_ai", "system_job"],
+            "description": "The type of actor that performed the action."
+          },
+          "actor_id": {
+            "type": "string",
+            "description": "The ID of the actor (e.g., user UID)."
+          },
+          "action": {
+            "type": "string",
+            "enum": ["create", "update", "delete", "restore"],
+            "description": "The CRUD action performed."
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "The type of entity that was changed (e.g., 'company', 'contact')."
+          },
+          "entity_id": {
+            "type": "string",
+            "description": "The ID of the document that was changed."
+          },
+          "table": {
+            "type": "string",
+            "description": "The UI-friendly name of the table/collection (e.g., 'companies')."
+          },
+          "source": {
+            "type": "string",
+            "enum": ["voice", "email", "meeting", "ui", "import", "api"],
+            "description": "The source of the change."
+          },
+          "before_snapshot": {
+            "type": "object",
+            "description": "A snapshot of the entity's data before the change."
+          },
+          "after_snapshot": {
+            "type": "object",
+            "description": "A snapshot of the entity's data after the change."
+          }
+        },
+        "required": ["ts", "actor_type", "action", "entity_type", "entity_id", "table", "source"]
     }
   },
   "auth": {
@@ -166,10 +218,16 @@
       "description": "Stores company information."
     },
     "/crystals/{crystalId}": {
-        "schema": {
-          "$ref": "#/backend/entities/crystal"
-        },
-        "description": "Stores atomized facts (crystals) extracted from various sources."
-      }
+      "schema": {
+        "$ref": "#/backend/entities/crystal"
+      },
+      "description": "Stores atomized facts (crystals) extracted from various sources."
+    },
+    "/audit_logs/{logId}": {
+      "schema": {
+        "$ref": "#/backend/entities/audit_log"
+      },
+      "description": "Stores a log of all changes made to database entities for auditing purposes."
+    }
   }
 }

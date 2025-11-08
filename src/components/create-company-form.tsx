@@ -24,8 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useFirestore } from '@/firebase';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, addDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -51,6 +51,8 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -62,12 +64,12 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
   const isEditing = !!company;
 
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing && company) {
         form.reset(company);
     } else {
         form.reset({ name: '', website: '' });
     }
-  }, [company, isEditing, form]);
+  }, [company, isEditing, form, open]);
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -82,41 +84,67 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     setIsSubmitting(true);
     
     try {
-        if (isEditing) {
+        const batch = writeBatch(firestore);
+
+        if (isEditing && company) {
             const companyRef = doc(firestore, 'companies', company.id);
-            setDoc(companyRef, values, { merge: true })
-              .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                  path: companyRef.path,
-                  operation: 'update',
-                  requestResourceData: values,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-              });
+            batch.set(companyRef, values, { merge: true });
+
+            const logRef = doc(collection(firestore, 'audit_logs'));
+            batch.set(logRef, {
+                ts: new Date().toISOString(),
+                actor_type: 'user',
+                actor_id: user?.uid || null,
+                action: 'update',
+                entity_type: 'company',
+                entity_id: company.id,
+                table: 'companies',
+                source: 'ui',
+                before_snapshot: company,
+                after_snapshot: values,
+            });
+            
             toast({
               title: 'Company Updated',
               description: `${values.name} has been updated.`,
             });
         } else {
-            const companiesCollection = collection(firestore, 'companies');
-            addDoc(companiesCollection, values)
-              .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                  path: companiesCollection.path,
-                  operation: 'create',
-                  requestResourceData: values,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-              });
+            const companyRef = doc(collection(firestore, 'companies'));
+            batch.set(companyRef, values);
+
+            const logRef = doc(collection(firestore, 'audit_logs'));
+            batch.set(logRef, {
+                ts: new Date().toISOString(),
+                actor_type: 'user',
+                actor_id: user?.uid || null,
+                action: 'create',
+                entity_type: 'company',
+                entity_id: companyRef.id,
+                table: 'companies',
+                source: 'ui',
+                after_snapshot: values,
+            });
+
             toast({
               title: 'Company Created',
               description: `${values.name} has been added to your companies.`,
             });
         }
+        
+        await batch.commit().catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+              path: isEditing ? `companies/${company?.id}` : 'companies',
+              operation: isEditing ? 'update' : 'create',
+              requestResourceData: values,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+
         form.reset();
         onOpenChange(false);
     } catch (error) {
-        // Errors are handled by the permission error emitter
+        // Errors are handled by the permission error emitter, or caught in the batch commit.
     } finally {
         setIsSubmitting(false);
     }
