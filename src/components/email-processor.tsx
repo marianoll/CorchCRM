@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -9,7 +10,7 @@ import { emailToCRM, type EmailToCRMOutput } from '@/ai/flows/email-to-crm';
 import { crystallizeText, type CrystallizeTextOutput } from '@/ai/flows/crystallize-text';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -33,6 +34,7 @@ export function EmailProcessor() {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const handleProcessEmail = () => {
     if (!emailContent) {
@@ -73,7 +75,7 @@ export function EmailProcessor() {
   };
 
   const handleSaveCrystals = async () => {
-    if (!crystalsResult || !crystalsResult.infotopes || !firestore) return;
+    if (!crystalsResult || !crystalsResult.infotopes || !firestore || !user) return;
 
     setIsSaving(true);
     const factsToSave = crystalsResult.infotopes;
@@ -83,15 +85,17 @@ export function EmailProcessor() {
         return;
     }
 
-    const crystalsCollection = collection(firestore, 'crystals');
+    const crystalsCollection = collection(firestore, 'users', user.uid, 'infotopes');
 
     const savePromises = factsToSave.map(fact => {
         const crystalData = {
-            fact: fact.text,
-            source: 'email',
-            sourceIdentifier: 'Manually Processed Email', // Simplified for now
-            status: 'active',
-            createdAt: new Date().toISOString(),
+            fact_text: fact.text,
+            entity_key: fact.entity,
+            source: { kind: 'email' },
+            status: 'open',
+            observed_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
         };
         return addDoc(crystalsCollection, crystalData)
             .catch(async (serverError) => {

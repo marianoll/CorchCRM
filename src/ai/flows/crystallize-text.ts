@@ -13,18 +13,18 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
+// Input schema for the flow
+const CrystallizeTextInputSchema = z.object({
+  content: z.string().describe('The unstructured text content to be crystallized.'),
+});
+export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
+
 // Schema for a single extracted item
 const CrystallizationResultSchema = z.object({
   type: z.enum(['Infotope', 'Orchestrator']).describe('The type of output. "Infotope" is an atomic piece of information. "Orchestrator" is a command to the system.'),
   text: z.string().describe('The fact text or the orchestrator command.'),
   entity: z.string().describe('The entity this fact or command relates to, e.g., "John Doe [john@example.com]" or "Acme Corp".'),
 });
-
-// Input schema for the flow
-const CrystallizeTextInputSchema = z.object({
-  content: z.string().describe('The unstructured text content to be crystallized.'),
-});
-export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
 
 // Output schema for the flow, separating Infotopes and Orchestrators
 const CrystallizeTextOutputSchema = z.object({
