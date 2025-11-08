@@ -29,8 +29,6 @@ import {
   LogOut,
 } from 'lucide-react';
 import {
-  FirebaseClientProvider,
-  initializeFirebase,
   useUser,
   useAuth
 } from '@/firebase';
@@ -180,14 +178,10 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const firebaseApp = initializeFirebase();
-
   return (
-    <FirebaseClientProvider>
       <ProtectedLayout>
         {children}
       </ProtectedLayout>
-    </FirebaseClientProvider>
   );
 }
 
