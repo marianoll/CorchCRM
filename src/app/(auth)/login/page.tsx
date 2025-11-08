@@ -3,11 +3,14 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { useAuth, useUser } from '@/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 function GoogleIcon() {
     return (
@@ -22,6 +25,7 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -34,14 +38,33 @@ export default function LoginPage() {
   }, [user, isUserLoading, router]);
 
   const handleSignIn = async () => {
-    if (!auth) {
+    if (!auth || !firestore) {
         toast({ variant: 'destructive', title: 'Authentication service not available.' });
         return;
     }
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-      // The useEffect above will handle the redirect on successful sign-in.
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Create or update user document in Firestore
+      const userRef = doc(firestore, 'users', user.uid);
+      const userData = {
+          id: user.uid,
+          email: user.email,
+          firstName: user.displayName?.split(' ')[0] || '',
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+      };
+      
+      setDoc(userRef, userData, { merge: true }).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'write',
+            requestResourceData: userData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+
       toast({ title: "Successfully signed in!" });
     } catch (error: any) {
       console.error("Authentication Error:", error);
@@ -82,5 +105,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
