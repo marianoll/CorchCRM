@@ -26,6 +26,7 @@ import {
   Search,
   Settings,
   ChevronDown,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -34,6 +35,7 @@ const navItems = [
   { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/search', label: 'Search', icon: Search },
+  { href: '/logs', label: 'Logs', icon: ScrollText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

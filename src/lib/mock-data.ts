@@ -31,6 +31,15 @@ export type Suggestion = {
   raw: Record<string, any>;
 };
 
+export type Log = {
+  id: string;
+  timestamp: string;
+  eventType: 'Voice Input' | 'Email Parsed' | 'Contact Created' | 'Deal Updated' | 'Task Assigned';
+  client: string;
+  description: string;
+  keyInfo: string[];
+};
+
 export const contactData: Contact[] = [
   { id: 'c1', name: 'Elena Rodriguez', email: 'elena.r@example.com', company: 'Innovate Corp', phone: '+1 234 567 890', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d' },
   { id: 'c2', name: 'Javier Gomez', email: 'javier.g@example.com', company: 'Tech Solutions', phone: '+1 345 678 901', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026705d' },
@@ -82,4 +91,48 @@ export const recentActivityData = [
   { id: 'a2', description: 'Voice note "Follow-up with Tech Solutions" transcribed.', time: '5 hours ago', icon: 'Mic' },
   { id: 'a3', description: 'New deal "Data Dynamics Analytics Platform" created.', time: '1 day ago', icon: 'Briefcase' },
   { id: 'a4', description: 'Contact Sofia Fernandez updated.', time: '2 days ago', icon: 'User' },
+];
+
+
+export const logData: Log[] = [
+  {
+    id: 'log1',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    eventType: 'Email Parsed',
+    client: 'Elena Rodriguez',
+    description: 'Extracted new contact and task from email.',
+    keyInfo: ['contact:Elena Rodriguez', 'task:Follow up on proposal'],
+  },
+  {
+    id: 'log2',
+    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    eventType: 'Voice Input',
+    client: 'Javier Gomez',
+    description: 'Transcribed voice note regarding cloud migration.',
+    keyInfo: ['deal:Tech Solutions', 'action:Send Proposal'],
+  },
+  {
+    id: 'log3',
+    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    eventType: 'Deal Updated',
+    client: 'Sofia Fernandez',
+    description: 'Deal stage changed to "Won".',
+    keyInfo: ['deal:Future Systems', 'stage:Won', 'amount:60000'],
+  },
+  {
+    id: 'log4',
+    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    eventType: 'Contact Created',
+    client: 'Carlos Martinez',
+    description: 'New contact created from email signature.',
+    keyInfo: ['contact:Carlos Martinez', 'company:Data Dynamics'],
+  },
+  {
+    id: 'log5',
+    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    eventType: 'Task Assigned',
+    client: 'Admin User',
+    description: 'Task assigned to follow up on demo.',
+    keyInfo: ['task:Schedule Demo', 'assignee:Admin'],
+  },
 ];
