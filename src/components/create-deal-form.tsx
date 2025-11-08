@@ -29,16 +29,24 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { LoaderCircle } from 'lucide-react';
+import { CalendarIcon, LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Deal name must be at least 2 characters.'),
   contactId: z.string().min(1, 'Please select a contact.'),
+  companyId: z.string().optional(),
   amount: z.coerce.number().positive('Amount must be a positive number.'),
   stage: z.enum(['lead', 'contacted', 'proposal', 'negotiation', 'won', 'lost']),
+  creationDate: z.date({
+    required_error: 'A creation date is required.',
+  }),
 });
 
 type Contact = {
@@ -46,13 +54,19 @@ type Contact = {
   name: string;
 };
 
+type Company = {
+    id: string;
+    name: string;
+};
+
 type CreateDealFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contacts: Contact[];
+  companies: Company[];
 };
 
-export function CreateDealForm({ open, onOpenChange, contacts }: CreateDealFormProps) {
+export function CreateDealForm({ open, onOpenChange, contacts, companies }: CreateDealFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -62,6 +76,7 @@ export function CreateDealForm({ open, onOpenChange, contacts }: CreateDealFormP
       name: '',
       amount: 0,
       stage: 'lead',
+      creationDate: new Date(),
     },
   });
 
@@ -141,6 +156,69 @@ export function CreateDealForm({ open, onOpenChange, contacts }: CreateDealFormP
                         <FormMessage />
                     </FormItem>
                 )}
+            />
+            <FormField
+                control={form.control}
+                name="companyId"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Company</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a company" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {companies.map(company => (
+                                    <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+             <FormField
+              control={form.control}
+              name="creationDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Creation Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
             <FormField
               control={form.control}

@@ -177,7 +177,7 @@ export default function CrmPage() {
     </main>
 
     <CreateContactForm open={isCreateContactOpen} onOpenChange={setCreateContactOpen} />
-    <CreateDealForm open={isCreateDealOpen} onOpenChange={setCreateDealOpen} contacts={contacts || []} />
+    <CreateDealForm open={isCreateDealOpen} onOpenChange={setCreateDealOpen} contacts={contacts || []} companies={companies || []} />
     <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={setCreateCompanyOpen} />
     </>
   );
