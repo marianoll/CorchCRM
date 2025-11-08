@@ -1,12 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, orderBy, query } from 'firebase/firestore';
+import { collection, orderBy, query, writeBatch, doc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Mail, ArrowRight } from 'lucide-react';
+import { Mail, ArrowRight, Database, LoaderCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+
 
 type Email = {
     id: string;
@@ -27,6 +31,8 @@ const directionVariant: { [key: string]: 'default' | 'secondary' } = {
 export default function EmailHistoryPage() {
     const firestore = useFirestore();
     const { user } = useUser();
+    const { toast } = useToast();
+    const [isSeeding, setIsSeeding] = useState(false);
 
     const emailsQuery = useMemoFirebase(() => 
         firestore && user
@@ -36,7 +42,62 @@ export default function EmailHistoryPage() {
 
     const { data: emails, loading: emailsLoading } = useCollection<Email>(emailsQuery);
 
+    const handleSeedEmails = async () => {
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
+            return;
+        }
+        setIsSeeding(true);
+        toast({ title: 'Seeding Emails...', description: 'Please wait while we populate your email history.' });
+
+        try {
+            const batch = writeBatch(firestore);
+
+            const emailsRes = await fetch('/emails_seed.csv');
+            const emailsCsv = await emailsRes.text();
+
+            const parseCsv = (csvText: string): Record<string, string>[] => {
+                const lines = csvText.trim().replace(/\r/g, '').split('\n');
+                if (lines.length < 2) return [];
+                const headerLine = lines.shift();
+                if (!headerLine) return [];
+                const headers = headerLine.split(',');
+
+                return lines.map(line => {
+                    if (!line.trim()) return null;
+                    const values = line.split(',');
+                    const obj: Record<string, string> = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = values[index];
+                    });
+                    return obj;
+                }).filter((obj): obj is Record<string, string> => obj !== null);
+            };
+
+            const emailsData = parseCsv(emailsCsv);
+            emailsData.forEach(emailObj => {
+                if (emailObj.id) {
+                    const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
+                    const emailData: any = { ...emailObj };
+                    if (emailData.ts) emailData.ts = new Date(emailData.ts);
+                    batch.set(emailRef, emailData);
+                }
+            });
+            
+            await batch.commit();
+
+            toast({ title: 'Email Database Seeded!', description: 'Your email history has been populated with sample data.' });
+        } catch (error) {
+            console.error("Seeding error:", error);
+            toast({ variant: 'destructive', title: 'Seeding Failed', description: 'Could not populate the email data. Check console for details.' });
+        } finally {
+            setIsSeeding(false);
+        }
+    };
+
+
     const renderLabels = (labels: string) => {
+        if (!labels) return null;
         return labels.split(';').map(label => (
             <Badge key={label} variant="outline" className="mr-1 mb-1">{label}</Badge>
         ));
@@ -45,12 +106,18 @@ export default function EmailHistoryPage() {
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
-            <Mail className="h-7 w-7" />
-            Email History
-          </h1>
-          <p className="text-muted-foreground">A log of all emails processed by the system.</p>
+        <div className="flex items-center justify-between mb-6">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
+                    <Mail className="h-7 w-7" />
+                    Email History
+                </h1>
+                <p className="text-muted-foreground">A log of all emails processed by the system.</p>
+            </div>
+             <Button onClick={handleSeedEmails} disabled={isSeeding}>
+                {isSeeding ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                 Seed Database
+            </Button>
         </div>
         <Card>
             <CardHeader>
@@ -100,5 +167,3 @@ export default function EmailHistoryPage() {
     </main>
   );
 }
-
-    
