@@ -1,22 +1,31 @@
 'use client';
 
 import { useState, useTransition, useRef } from 'react';
-import { Mic, Square, LoaderCircle, Sparkles } from 'lucide-react';
+import { Mic, Square, LoaderCircle, Sparkles, Gem, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { voiceToCRM, type VoiceToCRMOutput } from '@/ai/flows/voice-to-crm';
+import { crystallizeText, type CrystallizeTextOutput } from '@/ai/flows/crystallize-text';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { useFirestore } from '@/firebase';
+import { addDoc, collection } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 type RecordingState = 'idle' | 'recording' | 'loading' | 'success';
 
 export function VoiceRecorder() {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
-  const [result, setResult] = useState<VoiceToCRMOutput | null>(null);
+  const [transcriptionResult, setTranscriptionResult] = useState<VoiceToCRMOutput | null>(null);
+  const [crystalsResult, setCrystalsResult] = useState<CrystallizeTextOutput | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const startRecording = async () => {
     try {
@@ -43,7 +52,8 @@ export function VoiceRecorder() {
 
       mediaRecorderRef.current.start();
       setRecordingState('recording');
-      setResult(null);
+      setTranscriptionResult(null);
+      setCrystalsResult(null);
     } catch (err) {
       console.error("Error accessing microphone:", err);
       toast({
@@ -64,12 +74,22 @@ export function VoiceRecorder() {
   const processAudio = (audioDataUri: string) => {
     startTransition(async () => {
       try {
-        const res = await voiceToCRM({ audioDataUri });
-        setResult(res);
+        // 1. Get transcription
+        const transcriptionRes = await voiceToCRM({ audioDataUri });
+        setTranscriptionResult(transcriptionRes);
+
+        // 2. Use transcription to get crystals
+        const crystalsRes = await crystallizeText({ 
+            text: transcriptionRes.transcription, 
+            source: 'voice', 
+            sourceIdentifier: `Voice Note - ${new Date().toLocaleString()}` 
+        });
+        setCrystalsResult(crystalsRes);
+
         setRecordingState('success');
         toast({
           title: 'Voice Note Processed',
-          description: 'Your voice note has been transcribed and analyzed.',
+          description: 'Your voice note has been transcribed and crystallized.',
         });
       } catch (error) {
         console.error(error);
@@ -82,6 +102,50 @@ export function VoiceRecorder() {
       }
     });
   };
+
+  const handleSaveCrystals = async () => {
+    if (!crystalsResult || !firestore) return;
+
+    setIsSaving(true);
+    const crystalsCollection = collection(firestore, 'crystals');
+
+    const savePromises = crystalsResult.crystals.map(crystal => {
+        const crystalData = {
+            fact: crystal.fact,
+            source: 'voice',
+            sourceIdentifier: `Voice Note - ${new Date().toLocaleString()}`,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+        };
+        return addDoc(crystalsCollection, crystalData)
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: crystalsCollection.path,
+                  operation: 'create',
+                  requestResourceData: crystalData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError; // throw to stop Promise.all
+            });
+    });
+
+    try {
+        await Promise.all(savePromises);
+        toast({
+            title: 'Crystals Saved',
+            description: `${crystalsResult.crystals.length} crystals have been saved to the log.`
+        });
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Error Saving Crystals',
+            description: 'Could not save crystals to the database.'
+        })
+    } finally {
+        setIsSaving(false);
+    }
+  }
+
 
   const handleRecord = () => {
     if (recordingState === 'idle') {
@@ -108,7 +172,8 @@ export function VoiceRecorder() {
   const getButtonAction = () => {
     if (recordingState === 'success') {
         setRecordingState('idle');
-        setResult(null);
+        setTranscriptionResult(null);
+        setCrystalsResult(null);
         return;
     }
     handleRecord();
@@ -118,22 +183,32 @@ export function VoiceRecorder() {
     <Card>
       <CardHeader>
         <CardTitle>Voice-to-CRM</CardTitle>
-        <CardDescription>Record a voice note. AI will transcribe and update CRM records automatically.</CardDescription>
+        <CardDescription>Record a voice note. AI will transcribe, crystallize, and suggest CRM updates.</CardDescription>
       </CardHeader>
-      <CardContent>
-        {recordingState === 'success' && result && (
+      <CardContent className="space-y-4">
+        {recordingState === 'success' && transcriptionResult && (
           <Alert>
             <Sparkles className="h-4 w-4" />
-            <AlertTitle>AI Analysis Complete</AlertTitle>
+            <AlertTitle>Transcription</AlertTitle>
             <AlertDescription className="space-y-2">
-              <div>
-                <h3 className="font-semibold">Transcription:</h3>
-                <p className="text-sm text-muted-foreground">{result.transcription}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold">Suggested CRM Updates:</h3>
-                <p className="text-sm text-muted-foreground">{result.crmUpdates}</p>
-              </div>
+                <p className="text-sm text-muted-foreground">{transcriptionResult.transcription}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+        {crystalsResult && crystalsResult.crystals.length > 0 && (
+          <Alert>
+            <Gem className="h-4 w-4" />
+            <AlertTitle className='flex justify-between items-center'>
+                <span>Generated Crystals</span>
+                 <Button size="sm" onClick={handleSaveCrystals} disabled={isSaving}>
+                    {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                    Save Crystals
+                </Button>
+            </AlertTitle>
+            <AlertDescription className="space-y-2 mt-2">
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {crystalsResult.crystals.map((crystal, i) => <li key={i}>{crystal.fact}</li>)}
+                </ul>
             </AlertDescription>
           </Alert>
         )}

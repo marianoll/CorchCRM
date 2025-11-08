@@ -1,9 +1,9 @@
 'use server';
 
 /**
- * @fileOverview An AI agent for transcribing voice notes and updating CRM records.
+ * @fileOverview An AI agent for transcribing voice notes.
  *
- * - voiceToCRM - A function that handles the voice note transcription and CRM update process.
+ * - voiceToCRM - A function that handles the voice note transcription process.
  * - VoiceToCRMInput - The input type for the voiceToCRM function.
  * - VoiceToCRMOutput - The return type for the voiceToCRM function.
  */
@@ -22,7 +22,6 @@ export type VoiceToCRMInput = z.infer<typeof VoiceToCRMInputSchema>;
 
 const VoiceToCRMOutputSchema = z.object({
   transcription: z.string().describe('The transcription of the voice note.'),
-  crmUpdates: z.string().describe('A description of the CRM records updated.'),
 });
 export type VoiceToCRMOutput = z.infer<typeof VoiceToCRMOutputSchema>;
 
@@ -34,14 +33,13 @@ const voiceToCRMPrompt = ai.definePrompt({
   name: 'voiceToCRMPrompt',
   input: {schema: VoiceToCRMInputSchema},
   output: {schema: VoiceToCRMOutputSchema},
-  prompt: `You are an AI assistant that transcribes voice notes and updates CRM records.
+  prompt: `You are an AI assistant that transcribes voice notes.
 
-  Transcribe the following voice note and identify any relevant CRM updates (contacts, deals, tasks).
+  Transcribe the following voice note.
 
   Voice Note: {{media url=audioDataUri}}
 
-  Transcription:
-  CRM Updates:`,
+  Transcription:`,
 });
 
 const voiceToCRMFlow = ai.defineFlow(
