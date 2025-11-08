@@ -80,7 +80,7 @@ export function VoiceRecorder() {
         const transcriptionRes = await voiceToCRM({ audioDataUri });
         setTranscriptionResult(transcriptionRes);
 
-        // 2. Use transcription to get crystals, passing it as an object
+        // 2. Use transcription to get crystals
         const crystalsRes = await crystallizeText({ content: transcriptionRes.transcription });
         setCrystalsResult(crystalsRes);
 

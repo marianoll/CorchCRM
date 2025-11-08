@@ -77,9 +77,9 @@ const crystallizeTextFlow = ai.defineFlow(
     outputSchema: CrystallizeTextOutputSchema,
   },
   async (input) => {
-    // Input validation
+    // Input validation to prevent crashes.
     if (!input || !input.content || typeof input.content !== 'string' || input.content.trim() === '') {
-        console.log("Crystallize flow received empty or invalid input.");
+        console.log("Crystallize flow received empty or invalid input. Aborting.", { input });
         return { infotopes: [], orchestrators: [] };
     }
 
