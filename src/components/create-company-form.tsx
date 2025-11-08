@@ -76,18 +76,23 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     setIsSubmitting(true);
     
     if (!firestore || !user) {
-      // This will be handled by the Firestore error emitter if the batch fails
-      // No need for a separate error message here.
+      toast({
+          variant: 'destructive',
+          title: 'Connection Error',
+          description: 'Could not connect to the database. Please try again.',
+      });
+      setIsSubmitting(false);
+      return;
     }
     
-    const batch = writeBatch(firestore!);
+    const batch = writeBatch(firestore);
 
     try {
         if (isEditing && company) {
-            const companyRef = doc(firestore!, 'companies', company.id);
-            batch.set(companyRef, values, { merge: true });
+            const companyRef = doc(firestore, 'users', user.uid, 'companies', company.id);
+            batch.update(companyRef, values);
 
-            const logRef = doc(collection(firestore!, 'audit_logs'));
+            const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -102,10 +107,10 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
             });
             
         } else {
-            const companyRef = doc(collection(firestore!, 'companies'));
+            const companyRef = doc(collection(firestore, 'users', user.uid, 'companies'));
             batch.set(companyRef, values);
 
-            const logRef = doc(collection(firestore!, 'audit_logs'));
+            const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -129,8 +134,9 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
         form.reset();
         onOpenChange(false);
     } catch (error) {
-        // The permission error will be caught by the global listener
-        if (!(error instanceof FirestorePermissionError)) {
+        if (error instanceof FirestorePermissionError) {
+             errorEmitter.emit('permission-error', error);
+        } else {
              toast({
                 variant: 'destructive',
                 title: 'Submission Error',

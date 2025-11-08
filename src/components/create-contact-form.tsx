@@ -88,17 +88,23 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     setIsSubmitting(true);
 
     if (!firestore || !user) {
-      // This will be handled by the Firestore error emitter if the batch fails
+        toast({
+            variant: 'destructive',
+            title: 'Authentication Error',
+            description: 'User or database is not available. Please try again.',
+        });
+        setIsSubmitting(false);
+        return;
     }
     
-    const batch = writeBatch(firestore!);
+    const batch = writeBatch(firestore);
 
     try {
         if (isEditing && contact) {
-            const contactRef = doc(firestore!, 'contacts', contact.id);
-            batch.set(contactRef, values, { merge: true });
+            const contactRef = doc(firestore, 'users', user.uid, 'contacts', contact.id);
+            batch.update(contactRef, values);
 
-            const logRef = doc(collection(firestore!, 'audit_logs'));
+            const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -112,10 +118,10 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 after_snapshot: values,
             });
         } else {
-            const contactRef = doc(collection(firestore!, 'contacts'));
+            const contactRef = doc(collection(firestore, 'users', user.uid, 'contacts'));
             batch.set(contactRef, values);
 
-            const logRef = doc(collection(firestore!, 'audit_logs'));
+            const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -139,7 +145,9 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
         form.reset();
         onOpenChange(false);
     } catch(error) {
-        if (!(error instanceof FirestorePermissionError)) {
+        if (error instanceof FirestorePermissionError) {
+             errorEmitter.emit('permission-error', error);
+        } else {
              toast({
                 variant: 'destructive',
                 title: 'Submission Error',

@@ -10,7 +10,7 @@ import { PlusCircle, Pencil } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 
 // Define types based on backend.json
@@ -52,6 +52,7 @@ const formatCurrency = (amount: number) => {
 
 export default function CrmPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
     const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
@@ -60,14 +61,15 @@ export default function CrmPage() {
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
-    const contactsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'contacts'), orderBy('name')) : null, [firestore]);
+    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('name')) : null, [firestore, user]);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'deals'), orderBy('name')) : null, [firestore]);
+    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('name')) : null, [firestore, user]);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'companies'), orderBy('name')) : null, [firestore]);
+    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
+
 
     const getContactName = (contactId: string) => {
         return contacts?.find(c => c.id === contactId)?.name || 'Unknown Contact';
@@ -246,5 +248,3 @@ export default function CrmPage() {
     </>
   );
 }
-
-    

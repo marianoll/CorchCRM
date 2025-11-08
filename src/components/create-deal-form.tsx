@@ -126,17 +126,23 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
     setIsSubmitting(true);
 
     if (!firestore || !user) {
-       // This will be handled by the Firestore error emitter if the batch fails
+        toast({
+            variant: 'destructive',
+            title: 'Authentication Error',
+            description: 'User or database is not available. Please try again.',
+        });
+       setIsSubmitting(false);
+       return;
     }
     
-    const batch = writeBatch(firestore!);
+    const batch = writeBatch(firestore);
 
     try {
         if (isEditing && deal) {
-            const dealRef = doc(firestore!, 'deals', deal.id);
-            batch.set(dealRef, values, { merge: true });
+            const dealRef = doc(firestore, 'users', user.uid, 'deals', deal.id);
+            batch.update(dealRef, values);
 
-            const logRef = doc(collection(firestore!, 'audit_logs'));
+            const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -150,10 +156,10 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 after_snapshot: values,
             });
         } else {
-            const dealRef = doc(collection(firestore!, 'deals'));
+            const dealRef = doc(collection(firestore, 'users', user.uid, 'deals'));
             batch.set(dealRef, values);
 
-            const logRef = doc(collection(firestore!, 'audit_logs'));
+            const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -177,7 +183,9 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
         form.reset();
         onOpenChange(false);
     } catch(error) {
-        if (!(error instanceof FirestorePermissionError)) {
+        if (error instanceof FirestorePermissionError) {
+             errorEmitter.emit('permission-error', error);
+        } else {
              toast({
                 variant: 'destructive',
                 title: 'Submission Error',

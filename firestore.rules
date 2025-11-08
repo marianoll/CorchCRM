@@ -24,11 +24,7 @@ service cloud.firestore {
      * @principle All requests must be explicitly allowed by a more specific rule.
      */
     match /{document=**} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow read, write: if false;
     }
 
     /**
@@ -66,11 +62,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/deals/{dealId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId);
     }
 
     /**
@@ -87,11 +79,15 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/contacts/{contactId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    /**
+     * @description Manages companies associated with a specific user.
+     * @path /users/{userId}/companies/{companyId}
+     */
+    match /users/{userId}/companies/{companyId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
     }
 
     /**
@@ -108,11 +104,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/tasks/{taskId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId);
     }
 
     /**
@@ -129,12 +121,28 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/gmailIntegrations/{gmailIntegrationId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId);
     }
+
+    /**
+     * @description Audit logs are immutable and can only be created by authenticated users.
+     * @path /audit_logs/{logId}
+     */
+     match /audit_logs/{logId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+     }
+
+     /**
+      * @description Crystals are immutable and can only be created by authenticated users.
+      * @path /crystals/{crystalId}
+      */
+      match /crystals/{crystalId} {
+         allow read: if isSignedIn();
+         allow create: if isSignedIn();
+         allow update, delete: if false;
+      }
 
     /**
      * @description Helper function to determine if the user is signed in.
@@ -160,7 +168,7 @@ service cloud.firestore {
      * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
      */
     function isExistingOwner(userId) {
-      return isSignedIn() && isOwner(userId) && resource != null;
+      return isSignedIn() && isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
     }
   }
 }
