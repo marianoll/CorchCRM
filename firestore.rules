@@ -1,12 +1,166 @@
-
+/**
+ * @fileoverview Firestore Security Rules for AutoFlow CRM.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model where each user has complete control over their own data, and no access to other users' data.  It leverages path-based authorization and data denormalization for efficient and secure access control.
+ *
+ * Data Structure:
+ * All data is nested under /users/{userId}, ensuring clear ownership. Deals, Contacts, Tasks, and Gmail Integrations are stored as subcollections.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own data, enforced by `isOwner(userId)`.
+ * - Listing other users' data is forbidden.
+ * - Data required for authorization is denormalized onto documents to avoid expensive `get()` calls in security rules.
+ */
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: These rules are permissive and are not secure.
-    // They are intended for development purposes only.
+
+    /**
+     * @description Root match.  All requests are rejected if they do not match a more specific rule. This prevents accidental open access.
+     * @path /
+     * @allow (get) Any request to any document that is handled by a more specific rule.
+     * @deny (get) Any request to any document that is NOT handled by a more specific rule.
+     * @principle All requests must be explicitly allowed by a more specific rule.
+     */
     match /{document=**} {
-      allow read, write: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Manages user profile information.
+     * @path /users/{userId}
+     * @allow (create) Authenticated user can create their own profile.
+     * @allow (get) Authenticated user can read their own profile.
+     * @allow (update) Authenticated user can update their own profile.
+     * @allow (delete) Authenticated user can delete their own profile.
+     * @deny (create) If the user id in the path does not match the authenticated user's id.
+     * @deny (get) If the user id in the path does not match the authenticated user's id.
+     * @deny (update) If the user id in the path does not match the authenticated user's id.
+     * @deny (delete) If the user id in the path does not match the authenticated user's id.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages deals associated with a specific user.
+     * @path /users/{userId}/deals/{dealId}
+     * @allow (create) Authenticated user can create a deal under their user id.
+     * @allow (get) Authenticated user can read a deal under their user id.
+     * @allow (update) Authenticated user can update a deal under their user id.
+     * @allow (delete) Authenticated user can delete a deal under their user id.
+     * @deny (create) If the user id in the path does not match the authenticated user's id.
+     * @deny (get) If the user id in the path does not match the authenticated user's id.
+     * @deny (update) If the user id in the path does not match the authenticated user's id.
+     * @deny (delete) If the user id in the path does not match the authenticated user's id.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/deals/{dealId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages contacts associated with a specific user.
+     * @path /users/{userId}/contacts/{contactId}
+     * @allow (create) Authenticated user can create a contact under their user id.
+     * @allow (get) Authenticated user can read a contact under their user id.
+     * @allow (update) Authenticated user can update a contact under their user id.
+     * @allow (delete) Authenticated user can delete a contact under their user id.
+     * @deny (create) If the user id in the path does not match the authenticated user's id.
+     * @deny (get) If the user id in the path does not match the authenticated user's id.
+     * @deny (update) If the user id in the path does not match the authenticated user's id.
+     * @deny (delete) If the user id in the path does not match the authenticated user's id.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/contacts/{contactId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages tasks associated with a specific user.
+     * @path /users/{userId}/tasks/{taskId}
+     * @allow (create) Authenticated user can create a task under their user id.
+     * @allow (get) Authenticated user can read a task under their user id.
+     * @allow (update) Authenticated user can update a task under their user id.
+     * @allow (delete) Authenticated user can delete a task under their user id.
+     * @deny (create) If the user id in the path does not match the authenticated user's id.
+     * @deny (get) If the user id in the path does not match the authenticated user's id.
+     * @deny (update) If the user id in the path does not match the authenticated user's id.
+     * @deny (delete) If the user id in the path does not match the authenticated user's id.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/tasks/{taskId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages Gmail integrations for a user.
+     * @path /users/{userId}/gmailIntegrations/{gmailIntegrationId}
+     * @allow (create) Authenticated user can create a Gmail integration under their user id.
+     * @allow (get) Authenticated user can read a Gmail integration under their user id.
+     * @allow (update) Authenticated user can update a Gmail integration under their user id.
+     * @allow (delete) Authenticated user can delete a Gmail integration under their user id.
+     * @deny (create) If the user id in the path does not match the authenticated user's id.
+     * @deny (get) If the user id in the path does not match the authenticated user's id.
+     * @deny (update) If the user id in the path does not match the authenticated user's id.
+     * @deny (delete) If the user id in the path does not match the authenticated user's id.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/gmailIntegrations/{gmailIntegrationId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Helper function to determine if the user is signed in.
+     * @param {void}
+     * @return {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Helper function to determine if the user is the owner of the resource.
+     * @param {string} userId The user ID to check against the request.
+     * @return {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Helper function to determine if the user is the owner of the resource and if the resource exists.
+     * @param {string} userId The user ID to check against the resource.
+     * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isSignedIn() && isOwner(userId) && resource != null;
     }
   }
 }

@@ -1,233 +1,306 @@
 {
   "entities": {
-    "contact": {
+    "Contact": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Contact",
-      "description": "A person who is a business contact.",
       "type": "object",
+      "description": "Represents a contact in the CRM.",
       "properties": {
-        "name": {
+        "id": {
           "type": "string",
-          "description": "The name of the contact."
+          "description": "Unique identifier for the Contact entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the contact."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the contact."
         },
         "email": {
           "type": "string",
-          "format": "email",
-          "description": "The email address of the contact."
+          "description": "Email address of the contact.",
+          "format": "email"
         },
         "phone": {
           "type": "string",
-          "description": "The phone number of the contact."
+          "description": "Phone number of the contact."
         },
-        "companyId": {
-          "$ref": "#/backend/entities/company"
+        "company": {
+          "type": "string",
+          "description": "Company the contact works for."
+        },
+        "dealIds": {
+          "type": "array",
+          "description": "References to Deals associated with this contact. (Relationship: Contact N:N Deal)",
+          "items": {
+            "type": "string"
+          }
         }
       },
-      "required": ["name", "email"]
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email"
+      ]
     },
-    "deal": {
+    "Deal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Deal",
-      "description": "A business deal or opportunity.",
       "type": "object",
+      "description": "Represents a deal or opportunity in the CRM.",
       "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Deal entity."
+        },
         "name": {
           "type": "string",
-          "description": "The name of the deal."
-        },
-        "amount": {
-          "type": "number",
-          "description": "The value of the deal."
+          "description": "Name of the deal."
         },
         "stage": {
           "type": "string",
-          "enum": ["lead", "contacted", "proposal", "negotiation", "won", "lost"],
-          "description": "The current stage of the deal."
+          "description": "Current stage of the deal (e.g., Prospecting, Qualification, Proposal)."
         },
-        "contactId": {
-          "$ref": "#/backend/entities/contact"
+        "amount": {
+          "type": "number",
+          "description": "Potential value of the deal."
         },
-        "companyId": {
-          "$ref": "#/backend/entities/company"
+        "closeDate": {
+          "type": "string",
+          "description": "Expected close date of the deal.",
+          "format": "date-time"
+        },
+        "contactIds": {
+          "type": "array",
+          "description": "References to Contacts associated with this deal. (Relationship: Contact N:N Deal)",
+          "items": {
+            "type": "string"
+          }
         }
       },
-      "required": ["name", "stage", "contactId"]
+      "required": [
+        "id",
+        "name",
+        "stage",
+        "amount",
+        "closeDate"
+      ]
     },
-    "userProfile": {
-      "title": "User Profile",
-      "description": "Represents a user's profile information.",
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
       "type": "object",
+      "description": "Represents a task or action item in the CRM.",
       "properties": {
-        "displayName": {
+        "id": {
           "type": "string",
-          "description": "The user's display name."
+          "description": "Unique identifier for the Task entity."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the task."
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Due date for the task.",
+          "format": "date-time"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Indicates if the task is completed."
+        },
+        "contactId": {
+          "type": "string",
+          "description": "Reference to Contact. (Relationship: Contact 1:N Task)"
+        },
+        "dealId": {
+          "type": "string",
+          "description": "Reference to Deal. (Relationship: Deal 1:N Task)"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "dueDate",
+        "completed"
+      ]
+    },
+    "GmailIntegration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GmailIntegration",
+      "type": "object",
+      "description": "Stores integration details for Gmail accounts.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Gmail Integration entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N GmailIntegration)"
+        },
+        "emailAddress": {
+          "type": "string",
+          "description": "Gmail email address being integrated.",
+          "format": "email"
+        },
+        "accessToken": {
+          "type": "string",
+          "description": "Access token for the Gmail API."
+        },
+        "refreshToken": {
+          "type": "string",
+          "description": "Refresh token for the Gmail API."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "emailAddress",
+        "accessToken",
+        "refreshToken"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the AutoFlow CRM application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
         },
         "email": {
           "type": "string",
-          "format": "email",
-          "description": "The user's email address."
+          "description": "User's email address.",
+          "format": "email"
         },
-        "photoURL": {
+        "firstName": {
           "type": "string",
-          "format": "uri",
-          "description": "URL of the user's profile picture."
+          "description": "User's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name."
         }
       },
-      "required": ["displayName", "email"]
-    },
-    "company": {
-      "title": "Company",
-      "description": "A business or organization.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the company."
-        },
-        "website": {
-          "type": "string",
-          "format": "uri",
-          "description": "The company's website."
-        }
-      },
-      "required": ["name"]
-    },
-    "crystal": {
-      "title": "Crystal",
-      "description": "An atomized fact or piece of information extracted from an unstructured source.",
-      "type": "object",
-      "properties": {
-        "fact": {
-          "type": "string",
-          "description": "The atomized statement of fact."
-        },
-        "source": {
-          "type": "string",
-          "description": "The origin of the information (e.g., 'email', 'voice note', 'manual')."
-        },
-        "sourceIdentifier": {
-          "type": "string",
-          "description": "A reference to the specific source item (e.g., email subject or voice note ID)."
-        },
-        "status": {
-          "type": "string",
-          "enum": ["active", "overwritten"],
-          "description": "The current status of the crystal."
-        },
-        "overwrittenBy": {
-          "type": "string",
-          "description": "The ID of the crystal that overwrites this one, if applicable."
-        },
-        "contactId": {
-          "$ref": "#/backend/entities/contact"
-        },
-        "dealId": {
-          "$ref": "#/backend/entities/deal"
-        },
-        "companyId": {
-          "$ref": "#/backend/entities/company"
-        },
-        "createdBy": {
-          "$ref": "#/backend/entities/userProfile"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when the crystal was created."
-        }
-      },
-      "required": ["fact", "source", "status", "createdAt"]
-    },
-    "audit_log": {
-        "title": "Audit Log",
-        "description": "A record of a change made to an entity in the database.",
-        "type": "object",
-        "properties": {
-          "ts": {
-            "type": "string",
-            "format": "date-time",
-            "description": "The timestamp of the logged action."
-          },
-          "actor_type": {
-            "type": "string",
-            "enum": ["user", "system_ai", "system_job"],
-            "description": "The type of actor that performed the action."
-          },
-          "actor_id": {
-            "type": "string",
-            "description": "The ID of the actor (e.g., user UID)."
-          },
-          "action": {
-            "type": "string",
-            "enum": ["create", "update", "delete", "restore"],
-            "description": "The CRUD action performed."
-          },
-          "entity_type": {
-            "type": "string",
-            "description": "The type of entity that was changed (e.g., 'company', 'contact')."
-          },
-          "entity_id": {
-            "type": "string",
-            "description": "The ID of the document that was changed."
-          },
-          "table": {
-            "type": "string",
-            "description": "The UI-friendly name of the table/collection (e.g., 'companies')."
-          },
-          "source": {
-            "type": "string",
-            "enum": ["voice", "email", "meeting", "ui", "import", "api"],
-            "description": "The source of the change."
-          },
-          "before_snapshot": {
-            "type": "object",
-            "description": "A snapshot of the entity's data before the change."
-          },
-          "after_snapshot": {
-            "type": "object",
-            "description": "A snapshot of the entity's data after the change."
-          }
-        },
-        "required": ["ts", "actor_type", "action", "entity_type", "entity_id", "table", "source"]
+      "required": [
+        "id",
+        "email",
+        "firstName",
+        "lastName"
+      ]
     }
   },
   "auth": {
-    "providers": []
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": {
-        "$ref": "#/backend/entities/userProfile"
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information. Root for all user-specific data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
       },
-      "description": "Stores user profile information."
-    },
-    "/contacts/{contactId}": {
-      "schema": {
-        "$ref": "#/backend/entities/contact"
+      {
+        "path": "/users/{userId}/deals/{dealId}",
+        "definition": {
+          "entityName": "Deal",
+          "schema": {
+            "$ref": "#/backend/entities/Deal"
+          },
+          "description": "Deals associated with a specific user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "dealId",
+              "description": "The unique identifier for the deal."
+            }
+          ]
+        }
       },
-      "description": "Stores individual contact information."
-    },
-    "/deals/{dealId}": {
-      "schema": {
-        "$ref": "#/backend/entities/deal"
+      {
+        "path": "/users/{userId}/contacts/{contactId}",
+        "definition": {
+          "entityName": "Contact",
+          "schema": {
+            "$ref": "#/backend/entities/Contact"
+          },
+          "description": "Contacts associated with a specific user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "contactId",
+              "description": "The unique identifier for the contact."
+            }
+          ]
+        }
       },
-      "description": "Stores deal and opportunity information."
-    },
-    "/companies/{companyId}": {
-      "schema": {
-        "$ref": "#/backend/entities/company"
+      {
+        "path": "/users/{userId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Tasks associated with a specific user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "taskId",
+              "description": "The unique identifier for the task."
+            }
+          ]
+        }
       },
-      "description": "Stores company information."
-    },
-    "/crystals/{crystalId}": {
-      "schema": {
-        "$ref": "#/backend/entities/crystal"
-      },
-      "description": "Stores atomized facts (crystals) extracted from various sources."
-    },
-    "/audit_logs/{logId}": {
-      "schema": {
-        "$ref": "#/backend/entities/audit_log"
-      },
-      "description": "Stores a log of all changes made to database entities for auditing purposes."
-    }
+      {
+        "path": "/users/{userId}/gmailIntegrations/{gmailIntegrationId}",
+        "definition": {
+          "entityName": "GmailIntegration",
+          "schema": {
+            "$ref": "#/backend/entities/GmailIntegration"
+          },
+          "description": "Stores Gmail integration details for a user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "gmailIntegrationId",
+              "description": "The unique identifier for the Gmail integration."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support a click-free CRM where data automatically flows from voice, emails, and meetings. It prioritizes authorization independence, clarity, and scalability. We are incorporating a Gmail integration.\n\n**Authorization Independence & QAPs:**\n\n*   **Users Collection:** Each user has their own private data nested under `/users/{userId}`. This path-based ownership provides Authorization Independence because access control is determined directly by the path, avoiding the need for `get()` calls to parent documents.  QAPs are supported because listing operations are scoped to the user's own data, ensuring secure access.\n*   **Denormalization:**  For `deals` and `tasks`, the `userId` is included within each document.  This allows direct access control based on `request.auth.uid == resource.data.userId` without needing to query a parent `user` document.\n*   **Gmail Integration:** Gmail integrations are stored under the user's document, ensuring only the user can access their integration details.\n\n**Structure Overview:**\n\nThe structure uses path-based ownership for user data and denormalization of ownership for child collections.  This removes the necessity for complex rules involving `get()` operations, improving security and scalability.\n\n**Justification of Paths:**\n\n*   `/users/{userId}`:  Root for all user-specific data.  Path-based ownership is the primary security mechanism.\n*   `/users/{userId}/deals/{dealId}`: Deals owned by the user. The `userId` is denormalized into the deal document for authorization independence.\n*   `/users/{userId}/contacts/{contactId}`: Contacts owned by the user.\n*   `/users/{userId}/tasks/{taskId}`: Tasks owned by the user. The `userId` is denormalized into the task document for authorization independence.\n*   `/users/{userId}/gmailIntegrations/{gmailIntegrationId}`: Gmail integration details associated with the user.  Since the document is nested under the `/users/{userId}` path, only the user can access it.\n\nThis design ensures that security rules are simple, robust, and easily auditable, aligning with the core design principles."
   }
 }
