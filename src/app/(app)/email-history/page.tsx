@@ -6,11 +6,19 @@ import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Mail, ArrowRight, Database, LoaderCircle } from 'lucide-react';
+import { Mail, ArrowRight, Database, LoaderCircle, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
 
 type Email = {
     id: string;
@@ -21,6 +29,12 @@ type Email = {
     subject: string;
     body_excerpt: string;
     labels: string;
+    company_id?: string;
+};
+
+type Company = {
+    id: string;
+    name: string;
 };
 
 const directionVariant: { [key: string]: 'default' | 'secondary' } = {
@@ -40,7 +54,19 @@ export default function EmailHistoryPage() {
         : null, 
     [firestore, user]);
 
+    const companiesQuery = useMemoFirebase(() => 
+        firestore && user
+        ? query(collection(firestore, 'users', user.uid, 'companies'))
+        : null,
+    [firestore, user]);
+
     const { data: emails, loading: emailsLoading } = useCollection<Email>(emailsQuery);
+    const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
+
+    const getCompanyName = (companyId?: string) => {
+        if (!companyId || companiesLoading || !companies) return 'N/A';
+        return companies.find(c => c.id === companyId)?.name || 'Unknown';
+    }
 
     const handleSeedEmails = async () => {
         if (!firestore || !user) {
@@ -145,31 +171,55 @@ export default function EmailHistoryPage() {
                         <TableHead className="w-[180px]">Timestamp</TableHead>
                         <TableHead>Subject</TableHead>
                         <TableHead>From/To</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>AI Summary</TableHead>
                         <TableHead>Labels</TableHead>
+                        <TableHead className="w-[80px]">Action</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {emailsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading emails...</TableCell></TableRow>}
-                    {!emailsLoading && emails?.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No emails found.</TableCell></TableRow>}
+                    {(emailsLoading || companiesLoading) && <TableRow><TableCell colSpan={7} className="text-center">Loading emails...</TableCell></TableRow>}
+                    {!emailsLoading && emails?.length === 0 && <TableRow><TableCell colSpan={7} className="text-center">No emails found.</TableCell></TableRow>}
                     {emails?.map((email) => (
                     <TableRow key={email.id}>
                         <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
-                        <TableCell>
-                            <div className='flex flex-col'>
-                                <span className='font-medium'>{email.subject}</span>
-                                <span className='text-xs text-muted-foreground line-clamp-1'>{email.body_excerpt}</span>
-                            </div>
+                        <TableCell className="font-medium">
+                           <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="link" className="p-0 h-auto font-medium text-left">{email.subject}</Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-2xl">
+                                    <DialogHeader>
+                                        <DialogTitle>{email.subject}</DialogTitle>
+                                        <DialogDescription>
+                                            {email.from_email} to {email.to_email}
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto">
+                                        <p>{email.body_excerpt}</p>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="secondary">Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </TableCell>
                         <TableCell>
-                            <div className="flex items-center gap-2 text-xs">
-                                <Badge variant={directionVariant[email.direction]}>{email.direction}</Badge>
-                                <span>{email.from_email}</span>
-                                <ArrowRight className="h-3 w-3" />
-                                <span>{email.to_email}</span>
+                            <div className="flex flex-col text-xs">
+                                <Badge variant={directionVariant[email.direction]} className="mb-1 w-fit">{email.direction}</Badge>
+                                <span className='text-muted-foreground'>From: {email.from_email}</span>
+                                <span className='text-muted-foreground'>To: {email.to_email}</span>
                             </div>
                         </TableCell>
+                        <TableCell>{getCompanyName(email.company_id)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground italic line-clamp-2">{email.body_excerpt}</TableCell>
                         <TableCell>
                             {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
+                        </TableCell>
+                        <TableCell>
+                            <Button variant="ghost" size="icon" title="Automate">
+                                <Zap className="h-4 w-4" />
+                            </Button>
                         </TableCell>
                     </TableRow>
                     ))}
