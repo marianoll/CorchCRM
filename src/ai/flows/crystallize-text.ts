@@ -54,6 +54,7 @@ Examples of good output:
 ]
 
 Do not create items for conversational filler, greetings, or information that is not a core fact or command.
+Generate a JSON array of "Fact" and "Orchestrator" objects based on the text.
   `,
   user: `
   Source: {{{source}}} - {{{sourceIdentifier}}}
@@ -61,8 +62,6 @@ Do not create items for conversational filler, greetings, or information that is
   '''
   {{{text}}}
   '''
-
-  Generate a JSON array of "Fact" and "Orchestrator" objects based on the text.
   `
 });
 
