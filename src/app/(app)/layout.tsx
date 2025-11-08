@@ -86,17 +86,17 @@ function MainNav() {
         </SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/email-history'}>
+                <SidebarMenuButton asChild isActive={pathname === '/email-history'} className="text-muted-foreground">
                     <Link href="/email-history"><Mail /><span>Email History</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/changes-history'}>
+                <SidebarMenuButton asChild isActive={pathname === '/changes-history'} className="text-muted-foreground">
                     <Link href="/changes-history"><History /><span>Changes History</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/crystals'}>
+                <SidebarMenuButton asChild isActive={pathname === '/crystals'} className="text-muted-foreground">
                     <Link href="/crystals"><Gem /><span>Crystals</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
