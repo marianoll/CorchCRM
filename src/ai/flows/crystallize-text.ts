@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -72,7 +73,7 @@ const crystallizeTextFlow = ai.defineFlow(
     outputSchema: CrystallizeTextOutputSchema,
   },
   async (input) => {
-    const response = await prompt(input);
-    return response.output()!;
+    const { output } = await prompt(input);
+    return output!;
   }
 );
