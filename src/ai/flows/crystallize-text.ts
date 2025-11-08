@@ -83,9 +83,9 @@ const crystallizeTextFlow = ai.defineFlow(
         return { infotopes: [], orchestrators: [] };
     }
 
-    const { output } = await prompt(input);
+    const result = await prompt(input);
     
     // Ensure we always return an object with the correct shape.
-    return output || { infotopes: [], orchestrators: [] };
+    return result || { infotopes: [], orchestrators: [] };
   }
 );
