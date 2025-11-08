@@ -67,7 +67,7 @@ export default {
         },
         // Custom brand palette
         mint: '#61d8c4',
-        honey: '#ffb757',
+        honey: '#C88225',
         lavender: '#c2b9db',
         ink: '#0f172a'
       },
