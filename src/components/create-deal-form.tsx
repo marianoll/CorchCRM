@@ -31,8 +31,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useFirestore } from '@/firebase';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
@@ -42,8 +42,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Deal name must be at least 2 characters.'),
-  contactId: z.string().min(1, 'Please select a contact.'),
   companyId: z.string().optional(),
+  contactId: z.string().min(1, 'Please select a contact.'),
   amount: z.coerce.number().positive('Amount must be a positive number.'),
   stage: z.enum(['lead', 'contacted', 'proposal', 'negotiation', 'won', 'lost']),
   creationDate: z.date({
@@ -83,6 +83,8 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -96,71 +98,98 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
   const isEditing = !!deal;
 
   useEffect(() => {
-    if (isEditing) {
-        let creationDate = new Date();
-        if (deal.creationDate) {
-            if (deal.creationDate instanceof Date) {
-                creationDate = deal.creationDate;
-            } else if (deal.creationDate && typeof deal.creationDate.seconds === 'number') {
-                creationDate = new Date(deal.creationDate.seconds * 1000);
+    if (open) {
+        if (isEditing && deal) {
+            let creationDate = new Date();
+            if (deal.creationDate) {
+                if (deal.creationDate instanceof Date) {
+                    creationDate = deal.creationDate;
+                } else if (deal.creationDate && typeof deal.creationDate.seconds === 'number') {
+                    creationDate = new Date(deal.creationDate.seconds * 1000);
+                }
             }
+            form.reset({ ...deal, creationDate });
+        } else {
+            form.reset({
+                name: '',
+                amount: 0,
+                stage: 'lead',
+                creationDate: new Date(),
+                contactId: undefined,
+                companyId: undefined,
+            });
         }
-        form.reset({ ...deal, creationDate });
-    } else {
-        form.reset({
-            name: '',
-            amount: 0,
-            stage: 'lead',
-            creationDate: new Date(),
-            contactId: undefined,
-            companyId: undefined,
-        });
     }
-  }, [deal, isEditing, form]);
+  }, [deal, isEditing, form, open]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore) {
+    if (!firestore || !user) {
         toast({
             variant: 'destructive',
             title: 'Error',
-            description: 'Firestore is not available.',
+            description: 'Firestore or user is not available.',
         });
         return;
     }
     setIsSubmitting(true);
     
     try {
-        if (isEditing) {
+        const batch = writeBatch(firestore);
+
+        if (isEditing && deal) {
             const dealRef = doc(firestore, 'deals', deal.id);
-            setDoc(dealRef, values, { merge: true })
-            .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: dealRef.path,
-                    operation: 'update',
-                    requestResourceData: values,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-              });
+            batch.set(dealRef, values, { merge: true });
+
+            const logRef = doc(collection(firestore, 'audit_logs'));
+            batch.set(logRef, {
+                ts: new Date().toISOString(),
+                actor_type: 'user',
+                actor_id: user.uid,
+                action: 'update',
+                entity_type: 'deal',
+                entity_id: deal.id,
+                table: 'deals',
+                source: 'ui',
+                before_snapshot: deal,
+                after_snapshot: values,
+            });
+
             toast({
               title: 'Deal Updated',
               description: `The deal "${values.name}" has been successfully updated.`,
             });
         } else {
-            const dealsCollection = collection(firestore, 'deals');
-            addDoc(dealsCollection, values)
-            .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: dealsCollection.path,
-                    operation: 'create',
-                    requestResourceData: values,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-              });
+            const dealRef = doc(collection(firestore, 'deals'));
+            batch.set(dealRef, values);
+
+            const logRef = doc(collection(firestore, 'audit_logs'));
+            batch.set(logRef, {
+                ts: new Date().toISOString(),
+                actor_type: 'user',
+                actor_id: user.uid,
+                action: 'create',
+                entity_type: 'deal',
+                entity_id: dealRef.id,
+                table: 'deals',
+                source: 'ui',
+                after_snapshot: values,
+            });
+            
             toast({
               title: 'Deal Created',
               description: `The deal "${values.name}" has been successfully created.`,
             });
         }
+        
+        await batch.commit().catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: isEditing ? `deals/${deal?.id}` : 'deals',
+                operation: isEditing ? 'update' : 'create',
+                requestResourceData: values,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+
         form.reset();
         onOpenChange(false);
     } catch(e) {

@@ -24,8 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useFirestore } from '@/firebase';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -54,6 +54,8 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -67,24 +69,26 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
   const isEditing = !!contact;
 
   useEffect(() => {
-    if (isEditing) {
-        form.reset({
-            name: contact.name,
-            email: contact.email,
-            phone: contact.phone,
-            company: contact.companyId || '',
-        });
-    } else {
-        form.reset({ name: '', email: '', phone: '', company: '' });
+    if (open) {
+        if (isEditing && contact) {
+            form.reset({
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone || '',
+                company: contact.companyId || '',
+            });
+        } else {
+            form.reset({ name: '', email: '', phone: '', company: '' });
+        }
     }
-  }, [contact, isEditing, form]);
+  }, [contact, isEditing, form, open]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore) {
+    if (!firestore || !user) {
         toast({
             variant: 'destructive',
             title: 'Error',
-            description: 'Firestore is not available.',
+            description: 'Firestore or user is not available.',
         });
         return;
     }
@@ -98,37 +102,62 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     };
 
     try {
-        if (isEditing) {
+        const batch = writeBatch(firestore);
+        
+        if (isEditing && contact) {
             const contactRef = doc(firestore, 'contacts', contact.id);
-            setDoc(contactRef, dataToSave, { merge: true })
-            .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: contactRef.path,
-                    operation: 'update',
-                    requestResourceData: dataToSave,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-              });
+            batch.set(contactRef, dataToSave, { merge: true });
+
+            const logRef = doc(collection(firestore, 'audit_logs'));
+            batch.set(logRef, {
+                ts: new Date().toISOString(),
+                actor_type: 'user',
+                actor_id: user.uid,
+                action: 'update',
+                entity_type: 'contact',
+                entity_id: contact.id,
+                table: 'contacts',
+                source: 'ui',
+                before_snapshot: contact,
+                after_snapshot: dataToSave,
+            });
+
             toast({
                 title: 'Contact Updated',
                 description: `${values.name} has been updated.`,
             });
         } else {
-            const contactsCollection = collection(firestore, 'contacts');
-            addDoc(contactsCollection, dataToSave)
-            .catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: contactsCollection.path,
-                    operation: 'create',
-                    requestResourceData: dataToSave,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-              });
+            const contactRef = doc(collection(firestore, 'contacts'));
+            batch.set(contactRef, dataToSave);
+
+            const logRef = doc(collection(firestore, 'audit_logs'));
+            batch.set(logRef, {
+                ts: new Date().toISOString(),
+                actor_type: 'user',
+                actor_id: user.uid,
+                action: 'create',
+                entity_type: 'contact',
+                entity_id: contactRef.id,
+                table: 'contacts',
+                source: 'ui',
+                after_snapshot: dataToSave,
+            });
+
             toast({
               title: 'Contact Created',
               description: `${values.name} has been added to your contacts.`,
             });
         }
+
+        await batch.commit().catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: isEditing ? `contacts/${contact?.id}` : 'contacts',
+                operation: isEditing ? 'update' : 'create',
+                requestResourceData: dataToSave,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+
         form.reset();
         onOpenChange(false);
     } catch(e) {
