@@ -137,28 +137,6 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
             />
             <FormField
                 control={form.control}
-                name="contactId"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Contact</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a contact" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {contacts.map(contact => (
-                                    <SelectItem key={contact.id} value={contact.id}>{contact.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
                 name="companyId"
                 render={({ field }) => (
                     <FormItem>
@@ -172,6 +150,28 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
                             <SelectContent>
                                 {companies.map(company => (
                                     <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+            <FormField
+                control={form.control}
+                name="contactId"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Contact</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a contact" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {contacts.map(contact => (
+                                    <SelectItem key={contact.id} value={contact.id}>{contact.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
