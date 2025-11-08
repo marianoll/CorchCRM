@@ -51,7 +51,7 @@ export function EmailProcessor() {
       try {
         const [analysisRes, crystalsRes] = await Promise.all([
             emailToCRM({ emailContent }),
-            crystallizeText({ text: emailContent, source: 'email', sourceIdentifier: 'Manually Processed Email' })
+            crystallizeText(emailContent)
         ]);
 
         setAnalysisResult(analysisRes);

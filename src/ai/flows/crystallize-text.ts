@@ -11,7 +11,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const CrystallizationResultSchema = z.object({
   type: z.enum(['Fact', 'Orchestrator']).describe('The type of output. "Fact" is an atomic piece of information. "Orchestrator" is a command to the system.'),
@@ -19,25 +19,17 @@ const CrystallizationResultSchema = z.object({
   entity: z.string().describe('The entity this fact or command relates to, e.g., "John Doe [john@example.com]" or "Acme Corp".'),
 });
 
-
-const CrystallizeTextInputSchema = z.object({
-  text: z.string().describe('The unstructured text to be crystallized (e.g., email body, voice note transcription).'),
-  source: z.string().describe("The type of source, e.g., 'email', 'voice note'."),
-  sourceIdentifier: z.string().describe('A reference to the source, e.g., email subject or meeting title.'),
-});
-export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
-
 const CrystallizeTextOutputSchema = z.array(CrystallizationResultSchema);
 export type CrystallizeTextOutput = z.infer<typeof CrystallizeTextOutputSchema>;
 
 
-export async function crystallizeText(input: CrystallizeTextInput): Promise<CrystallizeTextOutput> {
+export async function crystallizeText(input: string): Promise<CrystallizeTextOutput> {
   return crystallizeTextFlow(input);
 }
 
 const prompt = ai.definePrompt({
   name: 'crystallizeTextPrompt',
-  input: { schema: CrystallizeTextInputSchema },
+  input: { schema: z.string() },
   output: { schema: CrystallizeTextOutputSchema },
   system: `You are an expert AI assistant. Your task is to extract key information from unstructured text and convert it into a structured JSON array of "Facts" and "Orchestrator" commands.
 
@@ -55,13 +47,13 @@ Examples of good output:
 
 Do not create items for conversational filler, greetings, or information that is not a core fact or command.
 Generate a JSON array of "Fact" and "Orchestrator" objects based on the text.`,
-  user: `Source: {{{source}}} - {{{sourceIdentifier}}}\nText to be crystallized:\n'''\n{{{text}}}\n'''`,
+  user: `Text to be crystallized:\n'''\n{{{input}}}\n'''`,
 });
 
 const crystallizeTextFlow = ai.defineFlow(
   {
     name: 'crystallizeTextFlow',
-    inputSchema: CrystallizeTextInputSchema,
+    inputSchema: z.string(),
     outputSchema: CrystallizeTextOutputSchema,
   },
   async (input) => {
@@ -69,4 +61,3 @@ const crystallizeTextFlow = ai.defineFlow(
     return output!;
   }
 );
-

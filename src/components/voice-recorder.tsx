@@ -79,11 +79,7 @@ export function VoiceRecorder() {
         setTranscriptionResult(transcriptionRes);
 
         // 2. Use transcription to get crystals
-        const crystalsRes = await crystallizeText({ 
-            text: transcriptionRes.transcription, 
-            source: 'voice', 
-            sourceIdentifier: `Voice Note - ${new Date().toLocaleString()}` 
-        });
+        const crystalsRes = await crystallizeText(transcriptionRes.transcription);
         setCrystalsResult(crystalsRes);
 
         setRecordingState('success');
