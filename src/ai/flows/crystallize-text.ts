@@ -19,12 +19,12 @@ const CrystallizationResultSchema = z.object({
   entity: z.string().describe('The entity this fact or command relates to, e.g., "John Doe [john@example.com]" or "Acme Corp".'),
 });
 
-export const CrystallizeTextInputSchema = z.object({
+const CrystallizeTextInputSchema = z.object({
   content: z.string().describe('The unstructured text content to be crystallized.'),
 });
 export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
 
-export const CrystallizeTextOutputSchema = z.object({
+const CrystallizeTextOutputSchema = z.object({
   results: z.array(CrystallizationResultSchema),
 });
 export type CrystallizeTextOutput = z.infer<typeof CrystallizeTextOutputSchema>;
@@ -81,4 +81,3 @@ const crystallizeTextFlow = ai.defineFlow(
     return output!;
   }
 );
-
