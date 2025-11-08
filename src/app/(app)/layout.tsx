@@ -1,9 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -27,11 +26,24 @@ import {
   ChevronDown,
   Gem,
   History,
+  LogOut,
 } from 'lucide-react';
 import {
   FirebaseClientProvider,
   initializeFirebase,
+  useUser,
+  useAuth
 } from '@/firebase';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { signOut } from 'firebase/auth';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
@@ -65,49 +77,116 @@ function MainNav() {
   );
 }
 
+function UserProfile() {
+    const { user, isUserLoading } = useUser();
+    const auth = useAuth();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        if (auth) {
+            await signOut(auth);
+            router.push('/login');
+        }
+    };
+    
+    if (isUserLoading) {
+        return (
+             <div className="flex items-center gap-3 w-full p-2">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex flex-col gap-1 w-full group-data-[collapsible=icon]:hidden">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-32" />
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <SidebarMenuButton size="lg" className="h-auto w-full justify-start p-2 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:justify-center">
+                    <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'User'} />
+                        <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
+                        <span className="font-medium">{user?.displayName}</span>
+                        <span className="text-sm text-muted-foreground">{user?.email}</span>
+                    </div>
+                    <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
+                </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+}
+
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+    const { user, isUserLoading } = useUser();
+    const router = useRouter();
+
+    useEffect(() => {
+        // If loading is finished and there's no user, redirect to login.
+        if (!isUserLoading && !user) {
+            router.replace('/login');
+        }
+    }, [user, isUserLoading, router]);
+
+    // While loading, we can show a loader or null
+    if (isUserLoading || !user) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+        );
+    }
+    
+    // If user is loaded and present, render the layout
+    return (
+        <SidebarProvider>
+            <Sidebar collapsible="icon" className="bg-card border-r">
+                <SidebarHeader className="border-b">
+                    <div className="flex w-full items-center justify-between p-2">
+                    <Logo />
+                    <SidebarTrigger className="hidden md:flex" />
+                    </div>
+                </SidebarHeader>
+                <SidebarContent>
+                    <MainNav />
+                </SidebarContent>
+                <SidebarFooter className="p-2 border-t">
+                    <UserProfile />
+                </SidebarFooter>
+            </Sidebar>
+            <SidebarInset>
+                <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 md:hidden">
+                    <SidebarTrigger>
+                    <PanelLeftOpenIcon />
+                    </SidebarTrigger>
+                    <Logo />
+                </header>
+                {children}
+            </SidebarInset>
+        </SidebarProvider>
+    );
+}
+
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar');
   const firebaseApp = initializeFirebase();
 
   return (
-    <FirebaseClientProvider firebaseApp={firebaseApp}>
-      <SidebarProvider>
-        <Sidebar collapsible="icon" className="bg-card border-r">
-          <SidebarHeader className="border-b">
-            <div className="flex w-full items-center justify-between p-2">
-              <Logo />
-              <SidebarTrigger className="hidden md:flex" />
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <MainNav />
-          </SidebarContent>
-          <SidebarFooter className="p-2 border-t">
-            <SidebarMenuButton size="lg" className="h-auto w-full justify-start p-2 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:justify-center">
-              {userAvatar && (
-                  <Avatar className="h-8 w-8">
-                  <AvatarImage src={userAvatar.imageUrl} alt={userAvatar.description} data-ai-hint={userAvatar.imageHint} />
-                  <AvatarFallback>JD</AvatarFallback>
-                  </Avatar>
-              )}
-              <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
-                <span className="font-medium">Admin User</span>
-                <span className="text-sm text-muted-foreground">admin@corchcrm.com</span>
-              </div>
-              <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
-            </SidebarMenuButton>
-          </SidebarFooter>
-        </Sidebar>
-        <SidebarInset>
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 md:hidden">
-            <SidebarTrigger>
-              <PanelLeftOpenIcon />
-            </SidebarTrigger>
-            <Logo />
-          </header>
-          {children}
-        </SidebarInset>
-      </SidebarProvider>
+    <FirebaseClientProvider>
+      <ProtectedLayout>
+        {children}
+      </ProtectedLayout>
     </FirebaseClientProvider>
   );
 }
@@ -132,3 +211,5 @@ function PanelLeftOpenIcon(props: React.SVGProps<SVGSVGElement>) {
       </svg>
     )
   }
+
+    
