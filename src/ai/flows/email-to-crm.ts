@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const EmailToCRMInputSchema = z.object({
   emailContent: z
@@ -22,7 +22,7 @@ const EmailToCRMOutputSchema = z.object({
   contacts: z
     .array(z.object({
       name: z.string().describe('The name of the contact.'),
-      email: z.string().email().describe('The email address of the contact.'),
+      email: z.string().email().optional().describe('The email address of the contact.'),
       phone: z.string().optional().describe('The phone number of the contact.'),
     }))
     .describe('A list of contacts extracted from the email.'),
@@ -44,7 +44,7 @@ const prompt = ai.definePrompt({
   prompt: `You are a CRM assistant that extracts information from emails.
 
   Given the content of an email, extract the following information:
-  - Contacts: Extract the names, email addresses, and phone numbers of all contacts mentioned in the email. If the email contains a signature, prioritize the information in the signature.
+  - Contacts: Extract the names, email addresses, and phone numbers of all contacts mentioned in the email. If the email contains a signature, prioritize the information in the signature. Only include contacts if you can find their email address.
   - Action Items: Extract a list of action items mentioned in the email. Action items are tasks that need to be done as a result of the email.
   - Summary: Write a brief summary of the email content.
   
