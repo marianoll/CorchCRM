@@ -14,6 +14,10 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +31,8 @@ import {
   Gem,
   History,
   LogOut,
+  Mail,
+  Bug,
 } from 'lucide-react';
 import {
   useUser,
@@ -45,8 +51,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/history', label: 'History', icon: History },
-  { href: '/crystals', label: 'Crystals', icon: Gem },
   { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/search', label: 'Search', icon: Search },
@@ -55,23 +59,50 @@ const navItems = [
 
 function MainNav() {
   const pathname = usePathname();
+  const isDebugActive = pathname.startsWith('/changes-history') || pathname.startsWith('/crystals') || pathname.startsWith('/email-history');
+
   return (
-    <SidebarMenu>
-      {navItems.map((item) => (
-        <SidebarMenuItem key={item.href}>
-          <SidebarMenuButton
-            asChild
-            isActive={pathname === item.href}
-            tooltip={item.label}
-          >
-            <Link href={item.href}>
-              <item.icon />
-              <span>{item.label}</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      ))}
-    </SidebarMenu>
+    <>
+      <SidebarMenu>
+        {navItems.map((item) => (
+          <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === item.href}
+              tooltip={item.label}
+            >
+              <Link href={item.href}>
+                <item.icon />
+                <span>{item.label}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+      <SidebarGroup className='mt-auto pt-4 border-t'>
+         <SidebarGroupLabel className='text-muted-foreground'>
+            <Bug />
+            <span>Debugging</span>
+        </SidebarGroupLabel>
+        <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/email-history'}>
+                    <Link href="/email-history"><Mail /><span>Email History</span></Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/changes-history'}>
+                    <Link href="/changes-history"><History /><span>Changes History</span></Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/crystals'}>
+                    <Link href="/crystals"><Gem /><span>Crystals</span></Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+    </>
   );
 }
 
@@ -205,5 +236,3 @@ function PanelLeftOpenIcon(props: React.SVGProps<SVGSVGElement>) {
       </svg>
     )
   }
-
-    

@@ -56,7 +56,7 @@ export default function HistoryPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
             <History className="h-7 w-7" />
-            History
+            Changes History
           </h1>
           <p className="text-muted-foreground">An immutable audit trail of all changes made to the database.</p>
         </div>
