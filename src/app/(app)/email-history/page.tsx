@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, orderBy, query, writeBatch, doc } from 'firebase/firestore';
+import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 
 type Email = {
     id: string;
-    ts: string;
+    ts: string | Timestamp;
     from_email: string;
     to_email: string;
     direction: 'inbound' | 'outbound';
@@ -79,7 +79,11 @@ export default function EmailHistoryPage() {
                 if (emailObj.id) {
                     const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
                     const emailData: any = { ...emailObj };
-                    if (emailData.ts) emailData.ts = new Date(emailData.ts);
+                    if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
+                      emailData.ts = new Date(emailData.ts);
+                    } else {
+                      delete emailData.ts; // Remove invalid date
+                    }
                     batch.set(emailRef, emailData);
                 }
             });
@@ -95,6 +99,16 @@ export default function EmailHistoryPage() {
         }
     };
 
+    const toDate = (dateValue: any): Date => {
+        if (!dateValue) return new Date();
+        if (dateValue instanceof Date) return dateValue;
+        if (dateValue instanceof Timestamp) return dateValue.toDate();
+        if (typeof dateValue === 'string') return new Date(dateValue);
+        if (dateValue && typeof dateValue.seconds === 'number') {
+            return new Date(dateValue.seconds * 1000);
+        }
+        return new Date();
+    };
 
     const renderLabels = (labels: string) => {
         if (!labels) return null;
@@ -139,7 +153,7 @@ export default function EmailHistoryPage() {
                     {!emailsLoading && emails?.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No emails found.</TableCell></TableRow>}
                     {emails?.map((email) => (
                     <TableRow key={email.id}>
-                        <TableCell>{format(new Date(email.ts), "MMM d, yyyy, h:mm a")}</TableCell>
+                        <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
                         <TableCell>
                             <div className='flex flex-col'>
                                 <span className='font-medium'>{email.subject}</span>
