@@ -37,7 +37,7 @@ const prompt = ai.definePrompt({
   name: 'crystallizeTextPrompt',
   input: { schema: CrystallizeTextInputSchema },
   output: { schema: CrystallizeTextOutputSchema },
-  prompt: `You are an expert AI assistant called The Crystallizer. Your task is to extract key, atomized facts from an unstructured source of information and convert them into "crystals".
+  system: `You are an expert AI assistant called The Crystallizer. Your task is to extract key, atomized facts from an unstructured source of information and convert them into "crystals".
 
   A crystal is a single, undeniable statement of fact. It should be short, clear, and focused on one piece of information.
   Focus on facts related to deals, contacts, and companies. Extract commitments, objections, key numbers, decisions, and important sentiments.
@@ -51,7 +51,8 @@ const prompt = ai.definePrompt({
   - "Javier Gomez's phone number is +1-345-678-901."
 
   Do not create crystals for conversational filler, greetings, or information that is not a core fact.
-
+  `,
+  user: `
   Source: {{{source}}} - {{{sourceIdentifier}}}
   Text to be crystallized:
   '''
@@ -59,7 +60,7 @@ const prompt = ai.definePrompt({
   '''
 
   Generate a list of crystals based on the text.
-  `,
+  `
 });
 
 const crystallizeTextFlow = ai.defineFlow(
