@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { contactData, dealData, type Contact, type Deal } from '@/lib/mock-data';
+import { contactData, dealData, companyData, type Contact, type Deal, type Company } from '@/lib/mock-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { PlusCircle } from 'lucide-react';
+import { CreateContactForm } from '@/components/create-contact-form';
+import { CreateDealForm } from '@/components/create-deal-form';
+import { CreateCompanyForm } from '@/components/create-company-form';
 
 const stageVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
   lead: 'secondary',
@@ -24,6 +29,10 @@ const formatCurrency = (amount: number) => {
 export default function CrmPage() {
     const [deals, setDeals] = useState<Deal[]>(dealData);
     const [contacts, setContacts] = useState<Contact[]>(contactData);
+    const [companies, setCompanies] = useState<Company[]>(companyData);
+    const [isCreateContactOpen, setCreateContactOpen] = useState(false);
+    const [isCreateDealOpen, setCreateDealOpen] = useState(false);
+    const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
 
     const sortDeals = (sortBy: keyof Deal) => {
         const sorted = [...deals].sort((a, b) => {
@@ -43,21 +52,36 @@ export default function CrmPage() {
         setContacts(sorted);
       };
 
+      const sortCompanies = (sortBy: keyof Company) => {
+        const sorted = [...companies].sort((a, b) => {
+            if (a[sortBy] < b[sortBy]) return -1;
+            if (a[sortBy] > b[sortBy]) return 1;
+            return 0;
+        });
+        setCompanies(sorted);
+    };
+
   return (
+    <>
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight font-headline">CRM View</h1>
-                <p className="text-muted-foreground">Browse your deals and contacts.</p>
+                <p className="text-muted-foreground">Browse your deals, contacts and companies.</p>
             </div>
-            {/* Sorting is per-table now for clarity */}
+            <div className="flex gap-2">
+                <Button onClick={() => setCreateContactOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Contact</Button>
+                <Button onClick={() => setCreateDealOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Deal</Button>
+                <Button onClick={() => setCreateCompanyOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Company</Button>
+            </div>
         </div>
 
         <Tabs defaultValue="deals" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 md:w-[600px]">
             <TabsTrigger value="deals">Deals</TabsTrigger>
             <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            <TabsTrigger value="companies">Companies</TabsTrigger>
           </TabsList>
           <TabsContent value="deals">
             <div className="flex justify-end mb-4">
@@ -142,8 +166,43 @@ export default function CrmPage() {
                 </Table>
             </div>
           </TabsContent>
+          <TabsContent value="companies">
+            <div className="flex justify-end mb-4">
+                    <Select onValueChange={(value) => sortCompanies(value as keyof Company)}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Sort by..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="name">Name</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="border rounded-lg">
+                    <Table>
+                        <TableHeader>
+                        <TableRow>
+                            <TableHead>Company Name</TableHead>
+                            <TableHead>Website</TableHead>
+                        </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {companies.map(company => (
+                            <TableRow key={company.id}>
+                            <TableCell className="font-medium">{company.name}</TableCell>
+                            <TableCell><a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a></TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </TabsContent>
         </Tabs>
       </div>
     </main>
+
+    <CreateContactForm open={isCreateContactOpen} onOpenChange={setCreateContactOpen} />
+    <CreateDealForm open={isCreateDealOpen} onOpenChange={setCreateDealOpen} />
+    <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={setCreateCompanyOpen} />
+    </>
   );
 }

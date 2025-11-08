@@ -16,6 +16,12 @@ export type Deal = {
   closeDate: string;
 };
 
+export type Company = {
+  id: string;
+  name: string;
+  website: string;
+};
+
 export type Task = {
   id: string;
   title: string;
@@ -53,6 +59,13 @@ export const dealData: Deal[] = [
   { id: 'd3', name: 'Future Systems AI Integration', contact: 'Sofia Fernandez', amount: 60000, stage: 'won', closeDate: '2024-06-20' },
   { id: 'd4', name: 'Data Dynamics Analytics Platform', contact: 'Carlos Martinez', amount: 35000, stage: 'contacted', closeDate: '2024-09-01' },
   { id: 'd5', name: 'New Client Onboarding', contact: 'Maria Garcia', amount: 15000, stage: 'lead', closeDate: '2024-08-25' },
+];
+
+export const companyData: Company[] = [
+    { id: 'co1', name: 'Innovate Corp', website: 'https://innovatecorp.com' },
+    { id: 'co2', name: 'Tech Solutions', website: 'https://techsolutions.com' },
+    { id: 'co3', name: 'Future Systems', website: 'https://futuresystems.com' },
+    { id: 'co4', name: 'Data Dynamics', website: 'https://datadynamics.com' },
 ];
 
 export const taskData: Task[] = [
