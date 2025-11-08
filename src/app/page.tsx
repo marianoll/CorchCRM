@@ -13,13 +13,13 @@ export default function LandingPage() {
         <section className="container mx-auto px-4 py-16 sm:py-24 text-center">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter mb-4 font-headline">
-              El CRM sin clics que siempre quisiste
+              The Zero-Click CRM You've Always Wanted
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground mb-8">
-              AutoFlow CRM transforma voz, correos y reuniones en datos estructurados de forma automática, permitiéndote enfocarte en lo que de verdad importa: tus clientes.
+              CorchCRM automatically transforms voice, emails, and meetings into structured data, allowing you to focus on what truly matters: your customers.
             </p>
             <Button asChild size="lg">
-              <Link href="/home">Entrar a la aplicación</Link>
+              <Link href="/home">Enter App</Link>
             </Button>
           </div>
         </section>
@@ -28,7 +28,7 @@ export default function LandingPage() {
             <div className="relative aspect-video overflow-hidden rounded-2xl border bg-card shadow-lg">
                 <Image 
                     src="https://picsum.photos/seed/crm-dashboard/1280/720"
-                    alt="AutoFlow CRM Dashboard Screenshot"
+                    alt="CorchCRM Dashboard Screenshot"
                     fill
                     className="object-cover"
                     data-ai-hint="dashboard analytics"
@@ -37,7 +37,7 @@ export default function LandingPage() {
         </section>
       </main>
       <footer className="p-4 sm:p-6 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} AutoFlow CRM. Todos los derechos reservados.
+        © {new Date().getFullYear()} CorchCRM. All rights reserved.
       </footer>
     </div>
   );

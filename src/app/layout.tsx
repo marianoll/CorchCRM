@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'AutoFlow CRM',
-  description: 'Un CRM sin clics, donde la información fluye automáticamente desde voz, correos o reuniones hacia un sistema inteligente.',
+  title: 'CorchCRM',
+  description: 'A zero-click CRM where information flows automatically from voice, emails, or meetings into an intelligent system.',
 };
 
 export default function RootLayout({

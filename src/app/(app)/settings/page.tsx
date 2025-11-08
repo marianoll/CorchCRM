@@ -25,7 +25,7 @@ export default function SettingsPage() {
                     <Mail className="w-6 h-6 text-primary" />
                     <div>
                         <p className="font-semibold">Gmail</p>
-                        <p className="text-sm text-muted-foreground">Connected as admin@autoflow.com</p>
+                        <p className="text-sm text-muted-foreground">Connected as admin@corchcrm.com</p>
                     </div>
                 </div>
                 <Button variant="outline">Disconnect</Button>
@@ -41,13 +41,13 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="language-select">Language</Label>
-              <Select defaultValue="es">
+              <Select defaultValue="en">
                 <SelectTrigger id="language-select" className="w-[180px]">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="es">Español</SelectItem>
                   <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Español</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -58,7 +58,7 @@ export default function SettingsPage() {
             <CardHeader>
                 <CardTitle>Privacy</CardTitle>
                 <CardDescription>Manage how your data is used to improve our AI models.</CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                     <div>

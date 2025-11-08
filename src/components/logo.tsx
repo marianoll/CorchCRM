@@ -33,7 +33,7 @@ export function Logo({ className }: { className?: string }) {
           strokeLinejoin="round"
         />
       </svg>
-      <span>AutoFlow CRM</span>
+      <span>CorchCRM</span>
     </div>
   );
 }

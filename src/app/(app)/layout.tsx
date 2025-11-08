@@ -84,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
               <span className="font-medium">Admin User</span>
-              <span className="text-xs text-muted-foreground">admin@autoflow.com</span>
+              <span className="text-xs text-muted-foreground">admin@corchcrm.com</span>
             </div>
             <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
           </SidebarMenuButton>

@@ -10,7 +10,7 @@ import { naturalLanguageSearch, type NaturalLanguageSearchOutput } from '@/ai/fl
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 export function NaturalLanguageSearch() {
-  const [query, setQuery] = useState('deals sin respuesta en 10 días');
+  const [query, setQuery] = useState('deals with no response in 10 days');
   const [result, setResult] = useState<NaturalLanguageSearchOutput | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -46,7 +46,7 @@ export function NaturalLanguageSearch() {
       <div className="flex w-full items-center space-x-2">
         <Input
           type="text"
-          placeholder="e.g., 'deals cerrados este mes'"
+          placeholder="e.g., 'deals closed this month'"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
