@@ -121,10 +121,11 @@ export default function CrmPage() {
             // Process Companies
             const companiesRes = await fetch('/companies_seed.csv');
             const companiesCsv = await companiesRes.text();
-            const companiesLines = companiesCsv.split('\n').filter(l => l.trim());
+            const companiesLines = companiesCsv.split('\n');
             const companiesHeader = companiesLines.shift()?.trim().split(',');
             if (companiesHeader) {
                 for (const line of companiesLines) {
+                    if (!line.trim()) continue; // Skip empty lines
                     const values = line.trim().split(',');
                     const companyObj: any = {};
                     companiesHeader.forEach((header, index) => {
@@ -138,10 +139,11 @@ export default function CrmPage() {
             // Process Contacts
             const contactsRes = await fetch('/contacts_seed.csv');
             const contactsCsv = await contactsRes.text();
-            const contactsLines = contactsCsv.split('\n').filter(l => l.trim());
+            const contactsLines = contactsCsv.split('\n');
             const contactsHeader = contactsLines.shift()?.trim().split(',');
             if (contactsHeader) {
                 for (const line of contactsLines) {
+                    if (!line.trim()) continue; // Skip empty lines
                     const values = line.trim().split(',');
                     const contactObj: any = {};
                     contactsHeader.forEach((header, index) => {
@@ -155,10 +157,11 @@ export default function CrmPage() {
             // Process Deals
             const dealsRes = await fetch('/deals_seed.csv');
             const dealsCsv = await dealsRes.text();
-            const dealsLines = dealsCsv.split('\n').filter(l => l.trim());
+            const dealsLines = dealsCsv.split('\n');
             const dealsHeader = dealsLines.shift()?.trim().split(',');
             if (dealsHeader) {
                 for (const line of dealsLines) {
+                    if (!line.trim()) continue; // Skip empty lines
                     const values = line.trim().split(',');
                     const dealObj: any = {};
                     dealsHeader.forEach((header, index) => {
