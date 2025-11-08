@@ -26,6 +26,8 @@ import { LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -63,29 +65,34 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
         return;
     }
     setIsSubmitting(true);
-    try {
-      await addDoc(collection(firestore, 'contacts'), {
-        name: values.name,
-        email: values.email,
-        phone: values.phone,
+    
+    const contactsCollection = collection(firestore, 'contacts');
+    const dataToSave = {
+      name: values.name,
+      email: values.email,
+      phone: values.phone,
+    };
+
+    addDoc(contactsCollection, dataToSave)
+      .then(() => {
+        toast({
+          title: 'Contact Created',
+          description: `${values.name} has been added to your contacts.`,
+        });
+        form.reset();
+        onOpenChange(false);
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: contactsCollection.path,
+            operation: 'create',
+            requestResourceData: dataToSave,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-      
-      toast({
-        title: 'Contact Created',
-        description: `${values.name} has been added to your contacts.`,
-      });
-      form.reset();
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Error creating contact:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to create contact.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
   }
 
   return (

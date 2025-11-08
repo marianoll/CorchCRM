@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { onSnapshot, type Query, type DocumentData } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export const useCollection = <T extends DocumentData>(query: Query | null) => {
   const [data, setData] = useState<T[] | null>(null);
@@ -23,11 +25,16 @@ export const useCollection = <T extends DocumentData>(query: Query | null) => {
         })) as T[];
         setData(data);
         setLoading(false);
+        setError(null);
       },
       (err) => {
-        setError(err);
+        const permissionError = new FirestorePermissionError({
+            path: query.path,
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        setError(permissionError);
         setLoading(false);
-        console.error(err);
       }
     );
     return () => unsubscribe();

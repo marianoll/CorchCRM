@@ -25,7 +25,10 @@ import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, type Firestore } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 const formSchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters.'),
@@ -59,25 +62,28 @@ export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps
         return;
     }
     setIsSubmitting(true);
-    try {
-      await addDoc(collection(firestore, 'companies'), values);
-      
-      toast({
-        title: 'Company Created',
-        description: `${values.name} has been added to your companies.`,
+    
+    const companiesCollection = collection(firestore, 'companies');
+    addDoc(companiesCollection, values)
+      .then(() => {
+        toast({
+          title: 'Company Created',
+          description: `${values.name} has been added to your companies.`,
+        });
+        form.reset();
+        onOpenChange(false);
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: companiesCollection.path,
+          operation: 'create',
+          requestResourceData: values,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-      form.reset();
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Error creating company:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to create company.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
   }
 
   return (

@@ -37,6 +37,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Deal name must be at least 2 characters.'),
@@ -90,25 +92,29 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies }: Crea
         return;
     }
     setIsSubmitting(true);
-    try {
-      await addDoc(collection(firestore, 'deals'), values);
-      
-      toast({
-        title: 'Deal Created',
-        description: `The deal "${values.name}" has been successfully created.`,
+    
+    const dealsCollection = collection(firestore, 'deals');
+
+    addDoc(dealsCollection, values)
+      .then(() => {
+        toast({
+          title: 'Deal Created',
+          description: `The deal "${values.name}" has been successfully created.`,
+        });
+        form.reset();
+        onOpenChange(false);
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: dealsCollection.path,
+            operation: 'create',
+            requestResourceData: values,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-      form.reset();
-      onOpenChange(false);
-    } catch (error) {
-        console.error("Error creating deal:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to create deal.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
   }
 
   return (
