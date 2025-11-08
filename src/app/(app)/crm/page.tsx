@@ -6,12 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Pencil } from 'lucide-react';
+import { PlusCircle, Pencil, Database } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 // Define types based on backend.json
 type Contact = {
@@ -53,9 +54,11 @@ const formatCurrency = (amount: number) => {
 export default function CrmPage() {
     const firestore = useFirestore();
     const { user } = useUser();
+    const { toast } = useToast();
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
     const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
     
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -79,6 +82,82 @@ export default function CrmPage() {
         if (!companyId) return 'N/A';
         return companies?.find(c => c.id === companyId)?.name || 'Unknown Company';
     }
+
+    const handleSeedDatabase = async () => {
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
+            return;
+        }
+        setIsSeeding(true);
+        toast({ title: 'Seeding Database...', description: 'Please wait while we populate your CRM.' });
+
+        try {
+            const batch = writeBatch(firestore);
+
+            // Process Companies
+            const companiesRes = await fetch('/companies_seed.csv');
+            const companiesCsv = await companiesRes.text();
+            const companiesLines = companiesCsv.split('\n').filter(l => l.trim());
+            const companiesHeader = companiesLines.shift()?.trim().split(',');
+            if (companiesHeader) {
+                for (const line of companiesLines) {
+                    const values = line.trim().split(',');
+                    const companyObj: any = {};
+                    companiesHeader.forEach((header, index) => {
+                        companyObj[header] = values[index];
+                    });
+                    const companyRef = doc(firestore, 'users', user.uid, 'companies', companyObj.id);
+                    batch.set(companyRef, { name: companyObj.name, website: companyObj.website });
+                }
+            }
+
+            // Process Contacts
+            const contactsRes = await fetch('/contacts_seed.csv');
+            const contactsCsv = await contactsRes.text();
+            const contactsLines = contactsCsv.split('\n').filter(l => l.trim());
+            const contactsHeader = contactsLines.shift()?.trim().split(',');
+            if (contactsHeader) {
+                for (const line of contactsLines) {
+                    const values = line.trim().split(',');
+                    const contactObj: any = {};
+                    contactsHeader.forEach((header, index) => {
+                        contactObj[header] = values[index];
+                    });
+                    const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactObj.id);
+                    batch.set(contactRef, { name: `${contactObj.firstName} ${contactObj.lastName}`, email: contactObj.email, phone: contactObj.phone, companyId: contactObj.companyId });
+                }
+            }
+
+            // Process Deals
+            const dealsRes = await fetch('/deals_seed.csv');
+            const dealsCsv = await dealsRes.text();
+            const dealsLines = dealsCsv.split('\n').filter(l => l.trim());
+            const dealsHeader = dealsLines.shift()?.trim().split(',');
+            if (dealsHeader) {
+                for (const line of dealsLines) {
+                    const values = line.trim().split(',');
+                    const dealObj: any = {};
+                    dealsHeader.forEach((header, index) => {
+                         let value: any = values[index];
+                        if (header === 'amount') value = Number(value);
+                        if (header === 'creationDate') value = new Date(value);
+                        dealObj[header] = value;
+                    });
+                    const dealRef = doc(firestore, 'users', user.uid, 'deals', dealObj.id);
+                    batch.set(dealRef, { name: dealObj.name, amount: dealObj.amount, stage: dealObj.stage, contactId: dealObj.contactId, companyId: dealObj.companyId, creationDate: dealObj.creationDate });
+                }
+            }
+            
+            await batch.commit();
+
+            toast({ title: 'Database Seeded!', description: 'Your CRM has been populated with sample data.' });
+        } catch (error) {
+            console.error("Seeding error:", error);
+            toast({ variant: 'destructive', title: 'Seeding Failed', description: 'Could not populate the database.' });
+        } finally {
+            setIsSeeding(false);
+        }
+    };
 
 
     const handleEditContact = (contact: Contact) => {
@@ -126,6 +205,7 @@ export default function CrmPage() {
                 <p className="text-muted-foreground">Browse your deals, contacts and companies.</p>
             </div>
             <div className="flex gap-2">
+                <Button onClick={handleSeedDatabase} disabled={isSeeding} variant="outline"><Database className="mr-2 h-4 w-4" /> Seed Database</Button>
                 <Button onClick={() => { setEditingContact(null); setCreateContactOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Contact</Button>
                 <Button onClick={() => { setEditingDeal(null); setCreateDealOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Deal</Button>
                 <Button onClick={() => { setEditingCompany(null); setCreateCompanyOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Company</Button>
@@ -248,3 +328,5 @@ export default function CrmPage() {
     </>
   );
 }
+
+    

@@ -1,13 +1,8 @@
-id,company_id,primary_contact_id,title,amount,currency,stage,probability,close_date,owner_email,last_interaction_at
-deal_1ded82f1,comp_4c941992,cont_375b609e,Marea Logistics Pilot Voice,45000,EUR,prospect,0.1,2025-10-23,ana@corchcrm.com,2025-11-05T00:00:00
-deal_73344f4c,comp_a8d67c18,cont_b5db361e,Quantum Quarry Pilot AI,20000,EUR,proposal,0.5,2025-11-28,ana@corchcrm.com,2025-10-12T00:00:00
-deal_af55eda1,comp_a8d67c18,cont_b5db361e,Quantum Quarry Pilot AI,12000,EUR,discovery,0.3,2025-11-28,ana@corchcrm.com,2025-10-23T00:00:00
-deal_1e466bdf,comp_cf618185,cont_64dd1155,Blue Finch Analytics Pilot Automation,20000,EUR,prospect,0.1,2025-11-02,sales@corchcrm.com,2025-11-09T00:00:00
-deal_7757d018,comp_3058ac72,cont_e9a04cda,Helios HealthTech Pilot Automation,20000,EUR,prospect,0.1,2025-10-16,sales@corchcrm.com,2025-11-06T00:00:00
-deal_5fc98a3e,comp_3058ac72,cont_e9a04cda,Helios HealthTech Pilot Voice,45000,EUR,discovery,0.3,2025-10-15,sales@corchcrm.com,2025-10-04T00:00:00
-deal_c32a15a1,comp_4c941992,cont_683be9ed,Marea Logistics Pilot AI,5000,EUR,discovery,0.3,2025-11-04,ana@corchcrm.com,2025-10-19T00:00:00
-deal_c4957898,comp_d83c5c74,cont_b5db361e,Delta AeroParts Pilot Automation,12000,EUR,discovery,0.3,2025-11-02,sales@corchcrm.com,2025-10-15T00:00:00
-deal_e00737aa,comp_3058ac72,cont_e9a04cda,Helios HealthTech Pilot Voice,45000,EUR,discovery,0.3,2025-11-26,sales@corchcrm.com,2025-10-17T00:00:00
-deal_98a6e5ed,comp_4cc3748f,cont_9bd8b216,Nevada SolarWorks Pilot Voice,20000,EUR,proposal,0.5,2025-11-24,jo@corchcrm.com,2025-11-06T00:00:00
-deal_f28c184a,comp_4c941992,cont_375b609e,Marea Logistics Pilot AI,12000,EUR,prospect,0.1,2025-10-13,ana@corchcrm.com,2025-10-22T00:00:00
-deal_b8756ab0,comp_a8d67c18,cont_b5db361e,Quantum Quarry Pilot Voice,5000,EUR,discovery,0.3,2025-11-25,ana@corchcrm.com,2025-10-22T00:00:00
+id,name,amount,stage,contactId,companyId,creationDate
+d1,Innovate Corp Website Redesign,25000,proposal,c1,co1,2024-07-01
+d2,Tech Solutions Cloud Migration,45000,negotiation,c2,co2,2024-06-15
+d3,Future Systems AI Integration,60000,won,c3,co3,2024-05-20
+d4,Data Dynamics Analytics Platform,35000,contacted,c4,co4,2024-07-10
+d5,QuantumLeap New Client Onboarding,15000,lead,c5,co5,2024-07-20
+
+    
