@@ -76,11 +76,18 @@ export function EmailProcessor() {
     if (!crystalsResult || !firestore) return;
 
     setIsSaving(true);
+    const factsToSave = crystalsResult.filter(c => c.type === 'Fact');
+    if (factsToSave.length === 0) {
+        toast({ title: "No facts to save." });
+        setIsSaving(false);
+        return;
+    }
+
     const crystalsCollection = collection(firestore, 'crystals');
 
-    const savePromises = crystalsResult.crystals.map(crystal => {
+    const savePromises = factsToSave.map(fact => {
         const crystalData = {
-            fact: crystal.fact,
+            fact: fact.text,
             source: 'email',
             sourceIdentifier: 'Manually Processed Email', // Simplified for now
             status: 'active',
@@ -101,14 +108,14 @@ export function EmailProcessor() {
     try {
         await Promise.all(savePromises);
         toast({
-            title: 'Crystals Saved',
-            description: `${crystalsResult.crystals.length} crystals have been saved to the log.`
+            title: 'Facts Saved',
+            description: `${factsToSave.length} facts have been saved to the log.`
         });
     } catch (error) {
         toast({
             variant: 'destructive',
-            title: 'Error Saving Crystals',
-            description: 'Could not save crystals to the database.'
+            title: 'Error Saving Facts',
+            description: 'Could not save facts to the database.'
         })
     } finally {
         setIsSaving(false);
@@ -153,20 +160,20 @@ export function EmailProcessor() {
             </AlertDescription>
           </Alert>
         )}
-         {crystalsResult && crystalsResult.crystals.length > 0 && (
+         {crystalsResult && crystalsResult.length > 0 && (
           <Alert>
             <Gem className="h-4 w-4" />
             <AlertTitle className='flex justify-between items-center'>
                 <span>Generated Crystals</span>
                  <Button size="sm" onClick={handleSaveCrystals} disabled={isSaving}>
                     {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                    Save Crystals
+                    Save Facts
                 </Button>
             </AlertTitle>
             <AlertDescription className="space-y-2 mt-2">
-                <ul className="list-disc list-inside text-sm text-muted-foreground">
-                    {crystalsResult.crystals.map((crystal, i) => <li key={i}>{crystal.fact}</li>)}
-                </ul>
+                <div className='font-mono text-xs bg-slate-100 dark:bg-slate-800 p-2 rounded'>
+                    <pre>{JSON.stringify(crystalsResult, null, 2)}</pre>
+                </div>
             </AlertDescription>
           </Alert>
         )}

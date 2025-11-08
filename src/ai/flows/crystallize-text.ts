@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview The Crystallizer AI agent.
- * This flow takes unstructured text and metadata and transforms it into atomized, structured facts called "crystals".
+ * This flow takes unstructured text and transforms it into structured "Facts" (to be saved as Infotopes) and "Orchestrator" commands.
  *
  * - crystallizeText - A function that handles the crystallization process.
  * - CrystallizeTextInput - The input type for the crystallizeText function.
@@ -12,9 +12,12 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-const CrystalSchema = z.object({
-  fact: z.string().describe('The single, atomized statement of fact. This should be a concise and clear statement. For example: "A 20% discount was offered on Product XYZ." or "Customer is not happy with the current price."'),
+const CrystallizationResultSchema = z.object({
+  type: z.enum(['Fact', 'Orchestrator']).describe('The type of output. "Fact" is an atomic piece of information. "Orchestrator" is a command to the system.'),
+  text: z.string().describe('The fact text or the orchestrator command.'),
+  entity: z.string().describe('The entity this fact or command relates to, e.g., "John Doe [john@example.com]" or "Acme Corp".'),
 });
+
 
 const CrystallizeTextInputSchema = z.object({
   text: z.string().describe('The unstructured text to be crystallized (e.g., email body, voice note transcription).'),
@@ -23,9 +26,7 @@ const CrystallizeTextInputSchema = z.object({
 });
 export type CrystallizeTextInput = z.infer<typeof CrystallizeTextInputSchema>;
 
-const CrystallizeTextOutputSchema = z.object({
-  crystals: z.array(CrystalSchema).describe('A list of atomized facts (crystals) extracted from the text.'),
-});
+const CrystallizeTextOutputSchema = z.array(CrystallizationResultSchema);
 export type CrystallizeTextOutput = z.infer<typeof CrystallizeTextOutputSchema>;
 
 
@@ -37,20 +38,21 @@ const prompt = ai.definePrompt({
   name: 'crystallizeTextPrompt',
   input: { schema: CrystallizeTextInputSchema },
   output: { schema: CrystallizeTextOutputSchema },
-  system: `You are an expert AI assistant called The Crystallizer. Your task is to extract key, atomized facts from an unstructured source of information and convert them into "crystals".
+  system: `You are an expert AI assistant. Your task is to extract key information from unstructured text and convert it into a structured JSON array of "Facts" and "Orchestrator" commands.
 
-  A crystal is a single, undeniable statement of fact. It should be short, clear, and focused on one piece of information.
-  Focus on facts related to deals, contacts, and companies. Extract commitments, objections, key numbers, decisions, and important sentiments.
+- A "Fact" is a single, atomized statement of fact about a Company, Contact, or Deal.
+- An "Orchestrator" is a command to the system to perform an action, like creating a deal or sending a notification.
 
-  Examples of good crystals:
-  - "We offered them a 20% discount over product [SKU]."
-  - "Customer does not agree with the current price."
-  - "Between date A and date B, we can offer the deal at X price."
-  - "User does not like the service quality."
-  - "A follow-up meeting is scheduled for next Tuesday."
-  - "Javier Gomez's phone number is +1-345-678-901."
+For each item, identify the related entity.
 
-  Do not create crystals for conversational filler, greetings, or information that is not a core fact.
+Examples of good output:
+[
+  { "type": "Fact", "text": "He does not want to continue the service.", "entity": "John [John@mail.com]" },
+  { "type": "Fact", "text": "A 20% discount was offered.", "entity": "Deal: WeGOTBrands" },
+  { "type": "Orchestrator", "text": "create deal 'WeGOTBrands' for company 'Branders'", "entity": "Branders" }
+]
+
+Do not create items for conversational filler, greetings, or information that is not a core fact or command.
   `,
   user: `
   Source: {{{source}}} - {{{sourceIdentifier}}}
@@ -59,7 +61,7 @@ const prompt = ai.definePrompt({
   {{{text}}}
   '''
 
-  Generate a list of crystals based on the text.
+  Generate a JSON array of "Fact" and "Orchestrator" objects based on the text.
   `
 });
 
