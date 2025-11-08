@@ -74,6 +74,12 @@ export default function CrmPage() {
     const getContactName = (contactId: string) => {
         return contacts?.find(c => c.id === contactId)?.name || 'Unknown Contact';
     }
+    
+    const getCompanyName = (companyId?: string) => {
+        if (!companyId) return 'N/A';
+        return companies?.find(c => c.id === companyId)?.name || 'Unknown Company';
+    }
+
 
     const handleEditContact = (contact: Contact) => {
         setEditingContact(contact);
@@ -120,9 +126,9 @@ export default function CrmPage() {
                 <p className="text-muted-foreground">Browse your deals, contacts and companies.</p>
             </div>
             <div className="flex gap-2">
-                <Button onClick={() => setCreateContactOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Contact</Button>
-                <Button onClick={() => setCreateDealOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Deal</Button>
-                <Button onClick={() => setCreateCompanyOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Company</Button>
+                <Button onClick={() => { setEditingContact(null); setCreateContactOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Contact</Button>
+                <Button onClick={() => { setEditingDeal(null); setCreateDealOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Deal</Button>
+                <Button onClick={() => { setEditingCompany(null); setCreateCompanyOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Company</Button>
             </div>
         </div>
 
@@ -139,17 +145,19 @@ export default function CrmPage() {
                     <TableRow>
                         <TableHead>Deal Name</TableHead>
                         <TableHead>Contact</TableHead>
+                        <TableHead>Company</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Stage</TableHead>
                         <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {dealsLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
+                    {dealsLoading && <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>}
                     {deals?.map(deal => (
                         <TableRow key={deal.id}>
                             <TableCell className="font-medium">{deal.name}</TableCell>
                             <TableCell>{getContactName(deal.contactId)}</TableCell>
+                            <TableCell>{getCompanyName(deal.companyId)}</TableCell>
                             <TableCell className="text-right">{formatCurrency(deal.amount)}</TableCell>
                             <TableCell>
                                 <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
@@ -173,11 +181,12 @@ export default function CrmPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
+                        <TableHead>Company</TableHead>
                         <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {contactsLoading && <TableRow><TableCell colSpan={4}>Loading...</TableCell></TableRow>}
+                    {contactsLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
                     {contacts?.map(contact => (
                         <TableRow key={contact.id}>
                             <TableCell>
@@ -190,6 +199,7 @@ export default function CrmPage() {
                             </TableCell>
                             <TableCell>{contact.email}</TableCell>
                             <TableCell>{contact.phone}</TableCell>
+                            <TableCell>{getCompanyName(contact.companyId)}</TableCell>
                             <TableCell>
                                 <Button variant="ghost" size="icon" onClick={() => handleEditContact(contact)}>
                                     <Pencil className="h-4 w-4" />
@@ -232,7 +242,7 @@ export default function CrmPage() {
       </div>
     </main>
 
-    <CreateContactForm open={isCreateContactOpen} onOpenChange={closeContactForm} contact={editingContact} />
+    <CreateContactForm open={isCreateContactOpen} onOpenChange={closeContactForm} contact={editingContact} companies={companies || []}/>
     <CreateDealForm open={isCreateDealOpen} onOpenChange={closeDealForm} contacts={contacts || []} companies={companies || []} deal={editingDeal} />
     <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={closeCompanyForm} company={editingCompany} />
     </>

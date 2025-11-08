@@ -33,7 +33,7 @@ const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email('Invalid email address.'),
   phone: z.string().optional(),
-  company: z.string().optional(),
+  companyId: z.string().optional(),
 });
 
 type Contact = {
@@ -62,7 +62,7 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
       name: '',
       email: '',
       phone: '',
-      company: '',
+      companyId: '',
     },
   });
 
@@ -75,10 +75,10 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 name: contact.name,
                 email: contact.email,
                 phone: contact.phone || '',
-                company: contact.companyId || '',
+                companyId: contact.companyId || '',
             });
         } else {
-            form.reset({ name: '', email: '', phone: '', company: '' });
+            form.reset({ name: '', email: '', phone: '', companyId: '' });
         }
     }
   }, [contact, isEditing, form, open]);
@@ -89,26 +89,19 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     if (!firestore || !user) {
       toast({
         variant: 'destructive',
-        title: 'Connection Error',
-        description: 'Could not connect to the database. Please try again.',
+        title: 'Authentication Error',
+        description: 'User or database is not available. Please try again.',
       });
       setIsSubmitting(false);
       return;
     }
     
-    const dataToSave = {
-      name: values.name,
-      email: values.email,
-      phone: values.phone,
-      companyId: values.company || ''
-    };
+    const batch = writeBatch(firestore);
 
     try {
-        const batch = writeBatch(firestore);
-        
         if (isEditing && contact) {
             const contactRef = doc(firestore, 'contacts', contact.id);
-            batch.set(contactRef, dataToSave, { merge: true });
+            batch.set(contactRef, values, { merge: true });
 
             const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
@@ -121,11 +114,11 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 table: 'contacts',
                 source: 'ui',
                 before_snapshot: contact,
-                after_snapshot: dataToSave,
+                after_snapshot: values,
             });
         } else {
             const contactRef = doc(collection(firestore, 'contacts'));
-            batch.set(contactRef, dataToSave);
+            batch.set(contactRef, values);
 
             const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
@@ -137,7 +130,7 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 entity_id: contactRef.id,
                 table: 'contacts',
                 source: 'ui',
-                after_snapshot: dataToSave,
+                after_snapshot: values,
             });
         }
 
@@ -151,7 +144,13 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
         form.reset();
         onOpenChange(false);
     } catch(error) {
-        console.error("Error committing batch:", error);
+        if (!(error instanceof FirestorePermissionError)) {
+             toast({
+                variant: 'destructive',
+                title: 'Submission Error',
+                description: 'An unexpected error occurred while saving the contact.',
+            });
+        }
     } finally {
         setIsSubmitting(false);
     }
@@ -209,12 +208,12 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
             />
              <FormField
               control={form.control}
-              name="company"
+              name="companyId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company</FormLabel>
+                  <FormLabel>Company ID</FormLabel>
                   <FormControl>
-                    <Input placeholder="Acme Inc." {...field} />
+                    <Input placeholder="Leave blank if none" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

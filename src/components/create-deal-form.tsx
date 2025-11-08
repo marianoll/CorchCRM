@@ -128,16 +128,16 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
     if (!firestore || !user) {
         toast({
             variant: 'destructive',
-            title: 'Connection Error',
-            description: 'Could not connect to the database. Please try again.',
+            title: 'Authentication Error',
+            description: 'User or database is not available. Please try again.',
         });
         setIsSubmitting(false);
         return;
     }
     
-    try {
-        const batch = writeBatch(firestore);
+    const batch = writeBatch(firestore);
 
+    try {
         if (isEditing && deal) {
             const dealRef = doc(firestore, 'deals', deal.id);
             batch.set(dealRef, values, { merge: true });
@@ -183,7 +183,13 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
         form.reset();
         onOpenChange(false);
     } catch(error) {
-        console.error("Error committing batch:", error);
+        if (!(error instanceof FirestorePermissionError)) {
+             toast({
+                variant: 'destructive',
+                title: 'Submission Error',
+                description: 'An unexpected error occurred while saving the deal.',
+            });
+        }
     } finally {
         setIsSubmitting(false);
     }

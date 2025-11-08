@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, addDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -76,20 +76,18 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     setIsSubmitting(true);
     
     if (!firestore || !user) {
-      // This case should ideally not be hit if providers are set up correctly,
-      // but as a fallback, we can show a toast.
       toast({
         variant: 'destructive',
-        title: 'Connection Error',
-        description: 'Could not connect to the database. Please try again.',
+        title: 'Authentication Error',
+        description: 'User or database is not available. Please try again.',
       });
       setIsSubmitting(false);
       return;
     }
     
-    try {
-        const batch = writeBatch(firestore);
+    const batch = writeBatch(firestore);
 
+    try {
         if (isEditing && company) {
             const companyRef = doc(firestore, 'companies', company.id);
             batch.set(companyRef, values, { merge: true });
@@ -136,8 +134,14 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
         form.reset();
         onOpenChange(false);
     } catch (error) {
-        console.error("Error committing batch:", error);
-        // Let the FirestorePermissionError system handle this via the .catch on commit if it's a permission error
+        // The permission error will be caught by the global listener
+        if (!(error instanceof FirestorePermissionError)) {
+             toast({
+                variant: 'destructive',
+                title: 'Submission Error',
+                description: 'An unexpected error occurred while saving the company.',
+            });
+        }
     } finally {
         setIsSubmitting(false);
     }
