@@ -121,11 +121,6 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 before_snapshot: contact,
                 after_snapshot: dataToSave,
             });
-
-            toast({
-                title: 'Contact Updated',
-                description: `${values.name} has been updated.`,
-            });
         } else {
             const contactRef = doc(collection(firestore, 'contacts'));
             batch.set(contactRef, dataToSave);
@@ -142,26 +137,25 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 source: 'ui',
                 after_snapshot: dataToSave,
             });
-
-            toast({
-              title: 'Contact Created',
-              description: `${values.name} has been added to your contacts.`,
-            });
         }
 
-        await batch.commit().catch(async (serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: isEditing ? `contacts/${contact?.id}` : 'contacts',
-                operation: isEditing ? 'update' : 'create',
-                requestResourceData: dataToSave,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+        await batch.commit();
+        
+        toast({
+            title: isEditing ? 'Contact Updated' : 'Contact Created',
+            description: `${values.name} has been ${isEditing ? 'updated' : 'added to your contacts'}.`,
         });
 
         form.reset();
         onOpenChange(false);
-    } catch(e) {
-        // Errors handled by permission error emitter
+    } catch(error) {
+        console.error("Error committing batch:", error);
+        const permissionError = new FirestorePermissionError({
+            path: isEditing ? `contacts/${contact?.id}` : 'contacts',
+            operation: isEditing ? 'update' : 'create',
+            requestResourceData: dataToSave,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setIsSubmitting(false);
     }

@@ -73,7 +73,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore) {
+    if (!firestore || !user) {
         toast({
             variant: 'destructive',
             title: 'Error',
@@ -104,10 +104,6 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
                 after_snapshot: values,
             });
             
-            toast({
-              title: 'Company Updated',
-              description: `${values.name} has been updated.`,
-            });
         } else {
             const companyRef = doc(collection(firestore, 'companies'));
             batch.set(companyRef, values);
@@ -124,27 +120,25 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
                 source: 'ui',
                 after_snapshot: values,
             });
-
-            toast({
-              title: 'Company Created',
-              description: `${values.name} has been added to your companies.`,
-            });
         }
         
-        await batch.commit().catch(async (serverError) => {
-            const permissionError = new FirestorePermissionError({
-              path: isEditing ? `companies/${company?.id}` : 'companies',
-              operation: isEditing ? 'update' : 'create',
-              requestResourceData: values,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError;
+        await batch.commit();
+
+        toast({
+          title: isEditing ? 'Company Updated' : 'Company Created',
+          description: `${values.name} has been ${isEditing ? 'updated' : 'added to your companies'}.`,
         });
 
         form.reset();
         onOpenChange(false);
     } catch (error) {
-        // Errors are handled by the permission error emitter, or caught in the batch commit.
+        console.error("Error committing batch:", error);
+        const permissionError = new FirestorePermissionError({
+          path: isEditing ? `companies/${company?.id}` : 'companies',
+          operation: isEditing ? 'update' : 'create',
+          requestResourceData: values,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setIsSubmitting(false);
     }

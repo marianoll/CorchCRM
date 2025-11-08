@@ -153,11 +153,6 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 before_snapshot: deal,
                 after_snapshot: values,
             });
-
-            toast({
-              title: 'Deal Updated',
-              description: `The deal "${values.name}" has been successfully updated.`,
-            });
         } else {
             const dealRef = doc(collection(firestore, 'deals'));
             batch.set(dealRef, values);
@@ -174,26 +169,25 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 source: 'ui',
                 after_snapshot: values,
             });
-            
-            toast({
-              title: 'Deal Created',
-              description: `The deal "${values.name}" has been successfully created.`,
-            });
         }
         
-        await batch.commit().catch(async (serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: isEditing ? `deals/${deal?.id}` : 'deals',
-                operation: isEditing ? 'update' : 'create',
-                requestResourceData: values,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+        await batch.commit();
+
+        toast({
+            title: isEditing ? 'Deal Updated' : 'Deal Created',
+            description: `The deal "${values.name}" has been successfully ${isEditing ? 'updated' : 'created'}.`,
         });
 
         form.reset();
         onOpenChange(false);
-    } catch(e) {
-        // Errors are handled by permission error emitter
+    } catch(error) {
+        console.error("Error committing batch:", error);
+        const permissionError = new FirestorePermissionError({
+            path: isEditing ? `deals/${deal?.id}` : 'deals',
+            operation: isEditing ? 'update' : 'create',
+            requestResourceData: values,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setIsSubmitting(false);
     }
