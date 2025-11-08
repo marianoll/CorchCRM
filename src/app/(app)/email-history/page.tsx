@@ -5,7 +5,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebas
 import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, isWithinInterval } from 'date-fns';
 import { Mail, ArrowRight, Database, LoaderCircle, Zap, Calendar as CalendarIcon, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
 
 type Email = {
     id: string;
@@ -54,9 +55,11 @@ export default function EmailHistoryPage() {
     const [isSeeding, setIsSeeding] = useState(false);
 
     // Filter states
-    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedCompany, setSelectedCompany] = useState<string>('all');
     const [labelFilter, setLabelFilter] = useState<string>('');
+    const [keywordFilter, setKeywordFilter] = useState<string>('');
+    const [contactFilter, setContactFilter] = useState<string>('');
 
     const emailsQuery = useMemoFirebase(() => 
         firestore && user
@@ -150,12 +153,16 @@ export default function EmailHistoryPage() {
         if (!emails) return [];
         return emails.filter(email => {
             const emailDate = toDate(email.ts);
-            const isDateMatch = selectedDate ? format(emailDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') : true;
+            
+            const isDateMatch = dateRange?.from ? isWithinInterval(emailDate, { start: dateRange.from, end: dateRange.to || dateRange.from }) : true;
             const isCompanyMatch = selectedCompany === 'all' || email.company_id === selectedCompany;
             const isLabelMatch = labelFilter ? (email.labels || '').toLowerCase().includes(labelFilter.toLowerCase()) : true;
-            return isDateMatch && isCompanyMatch && isLabelMatch;
+            const isKeywordMatch = keywordFilter ? (email.subject.toLowerCase().includes(keywordFilter.toLowerCase()) || email.body_excerpt.toLowerCase().includes(keywordFilter.toLowerCase())) : true;
+            const isContactMatch = contactFilter ? (email.from_email.toLowerCase().includes(contactFilter.toLowerCase()) || email.to_email.toLowerCase().includes(contactFilter.toLowerCase())) : true;
+            
+            return isDateMatch && isCompanyMatch && isLabelMatch && isKeywordMatch && isContactMatch;
         });
-    }, [emails, selectedDate, selectedCompany, labelFilter]);
+    }, [emails, dateRange, selectedCompany, labelFilter, keywordFilter, contactFilter]);
 
 
     const renderLabels = (labels: string) => {
@@ -164,6 +171,14 @@ export default function EmailHistoryPage() {
             <Badge key={label} variant="outline" className="mr-1 mb-1">{label}</Badge>
         ));
     };
+
+    const clearFilters = () => {
+        setDateRange(undefined);
+        setSelectedCompany('all');
+        setLabelFilter('');
+        setKeywordFilter('');
+        setContactFilter('');
+    }
 
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
@@ -182,33 +197,47 @@ export default function EmailHistoryPage() {
             </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 mb-4 p-4 bg-card border rounded-lg">
-            <h3 className="text-sm font-medium mr-2">Filters:</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 items-center gap-4 mb-4 p-4 bg-card border rounded-lg">
+            <h3 className="text-sm font-medium lg:col-span-5">Filters:</h3>
             <Popover>
                 <PopoverTrigger asChild>
                 <Button
+                    id="date"
                     variant={"outline"}
                     className={cn(
-                    "w-[240px] justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
+                    "w-full justify-start text-left font-normal",
+                    !dateRange && "text-muted-foreground"
                     )}
                 >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                    {dateRange?.from ? (
+                    dateRange.to ? (
+                        <>
+                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                        {format(dateRange.to, "LLL dd, y")}
+                        </>
+                    ) : (
+                        format(dateRange.from, "LLL dd, y")
+                    )
+                    ) : (
+                    <span>Pick a date range</span>
+                    )}
                 </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
                     initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
                 />
                 </PopoverContent>
             </Popover>
 
             <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger>
                     <SelectValue placeholder="Filter by company" />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,31 +248,24 @@ export default function EmailHistoryPage() {
                 </SelectContent>
             </Select>
 
-            <div className="relative w-full sm:w-auto">
-                 <Input
-                    placeholder="Filter by labels..."
-                    value={labelFilter}
-                    onChange={(e) => setLabelFilter(e.target.value)}
-                    className="w-full sm:w-[200px] pr-8"
-                />
-                {labelFilter && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setLabelFilter('')}
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
-                )}
-            </div>
+            <Input
+                placeholder="Filter by from/to..."
+                value={contactFilter}
+                onChange={(e) => setContactFilter(e.target.value)}
+            />
+            <Input
+                placeholder="Filter by keyword..."
+                value={keywordFilter}
+                onChange={(e) => setKeywordFilter(e.target.value)}
+            />
+             <Input
+                placeholder="Filter by label..."
+                value={labelFilter}
+                onChange={(e) => setLabelFilter(e.target.value)}
+            />
            
-            {(selectedDate || selectedCompany !== 'all' || labelFilter) && (
-                <Button variant="ghost" onClick={() => {
-                    setSelectedDate(undefined);
-                    setSelectedCompany('all');
-                    setLabelFilter('');
-                }}>
+            {(dateRange || selectedCompany !== 'all' || labelFilter || keywordFilter || contactFilter) && (
+                <Button variant="ghost" onClick={clearFilters} className="lg:col-span-5 justify-self-start">
                     Clear Filters
                 </Button>
             )}
