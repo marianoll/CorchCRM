@@ -10,10 +10,8 @@ import { PlusCircle, Pencil } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
-import { useCollection } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
-import { useMemo } from 'react';
 
 // Define types based on backend.json
 type Contact = {
@@ -62,13 +60,13 @@ export default function CrmPage() {
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
-    const contactsQuery = useMemo(() => firestore ? query(collection(firestore, 'contacts'), orderBy('name')) : null, [firestore]);
+    const contactsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'contacts'), orderBy('name')) : null, [firestore]);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemo(() => firestore ? query(collection(firestore, 'deals'), orderBy('name')) : null, [firestore]);
+    const dealsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'deals'), orderBy('name')) : null, [firestore]);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemo(() => firestore ? query(collection(firestore, 'companies'), orderBy('name')) : null, [firestore]);
+    const companiesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'companies'), orderBy('name')) : null, [firestore]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
     const getContactName = (contactId: string) => {
@@ -248,3 +246,5 @@ export default function CrmPage() {
     </>
   );
 }
+
+    
