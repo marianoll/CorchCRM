@@ -98,6 +98,10 @@ service cloud.firestore {
       allow get, write: if isSignedIn() && isOwner(userId);
     }
 
+    /**
+     * @description Manages email list for a specific user.
+     * @path /users/{userId}/emails
+     */
     match /users/{userId}/emails {
       allow list: if isSignedIn() && isOwner(userId);
     }
