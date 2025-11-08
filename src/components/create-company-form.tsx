@@ -24,6 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useFirestore } from '@/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters.'),
@@ -38,6 +40,7 @@ type CreateCompanyFormProps = {
 export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -47,10 +50,17 @@ export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Firestore is not available.',
+        });
+        return;
+    }
     setIsSubmitting(true);
     try {
-      console.log('Creating company:', values);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await addDoc(collection(firestore, 'companies'), values);
       
       toast({
         title: 'Company Created',
@@ -59,6 +69,7 @@ export function CreateCompanyForm({ open, onOpenChange }: CreateCompanyFormProps
       form.reset();
       onOpenChange(false);
     } catch (error) {
+      console.error("Error creating company:", error);
       toast({
         variant: 'destructive',
         title: 'Error',

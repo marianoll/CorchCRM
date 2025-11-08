@@ -24,6 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useFirestore } from '@/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -40,6 +42,7 @@ type CreateContactFormProps = {
 export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -51,12 +54,21 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Firestore is not available.',
+        });
+        return;
+    }
     setIsSubmitting(true);
     try {
-      // Here you would typically save to a database.
-      // For now, we'll just log it and show a toast.
-      console.log('Creating contact:', values);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate DB call
+      await addDoc(collection(firestore, 'contacts'), {
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+      });
       
       toast({
         title: 'Contact Created',
@@ -65,6 +77,7 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
       form.reset();
       onOpenChange(false);
     } catch (error) {
+      console.error("Error creating contact:", error);
       toast({
         variant: 'destructive',
         title: 'Error',

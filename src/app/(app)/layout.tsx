@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   SidebarProvider,
@@ -28,7 +27,10 @@ import {
   ChevronDown,
   ScrollText,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import {
+  FirebaseClientProvider,
+  initializeFirebase,
+} from '@/firebase';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
@@ -63,45 +65,48 @@ function MainNav() {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar');
-  
+  const firebaseApp = initializeFirebase();
+
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon" className="bg-card border-r">
-        <SidebarHeader className="border-b">
-          <div className="flex w-full items-center justify-between p-2">
-            <Logo />
-            <SidebarTrigger className="hidden md:flex" />
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <MainNav />
-        </SidebarContent>
-        <SidebarFooter className="p-2 border-t">
-          <SidebarMenuButton size="lg" className="h-auto w-full justify-start p-2 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:justify-center">
-            {userAvatar && (
-                <Avatar className="h-8 w-8">
-                <AvatarImage src={userAvatar.imageUrl} alt={userAvatar.description} data-ai-hint={userAvatar.imageHint} />
-                <AvatarFallback>JD</AvatarFallback>
-                </Avatar>
-            )}
-            <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
-              <span className="font-medium">Admin User</span>
-              <span className="text-xs text-muted-foreground">admin@corchcrm.com</span>
+    <FirebaseClientProvider firebaseApp={firebaseApp}>
+      <SidebarProvider>
+        <Sidebar collapsible="icon" className="bg-card border-r">
+          <SidebarHeader className="border-b">
+            <div className="flex w-full items-center justify-between p-2">
+              <Logo />
+              <SidebarTrigger className="hidden md:flex" />
             </div>
-            <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
-          </SidebarMenuButton>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 md:hidden">
-          <SidebarTrigger>
-            <PanelLeftOpenIcon />
-          </SidebarTrigger>
-          <Logo />
-        </header>
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
+          </SidebarHeader>
+          <SidebarContent>
+            <MainNav />
+          </SidebarContent>
+          <SidebarFooter className="p-2 border-t">
+            <SidebarMenuButton size="lg" className="h-auto w-full justify-start p-2 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:justify-center">
+              {userAvatar && (
+                  <Avatar className="h-8 w-8">
+                  <AvatarImage src={userAvatar.imageUrl} alt={userAvatar.description} data-ai-hint={userAvatar.imageHint} />
+                  <AvatarFallback>JD</AvatarFallback>
+                  </Avatar>
+              )}
+              <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
+                <span className="font-medium">Admin User</span>
+                <span className="text-xs text-muted-foreground">admin@corchcrm.com</span>
+              </div>
+              <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
+            </SidebarMenuButton>
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 md:hidden">
+            <SidebarTrigger>
+              <PanelLeftOpenIcon />
+            </SidebarTrigger>
+            <Logo />
+          </header>
+          {children}
+        </SidebarInset>
+      </SidebarProvider>
+    </FirebaseClientProvider>
   );
 }
 

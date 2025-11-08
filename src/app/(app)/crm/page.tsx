@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { contactData, dealData, companyData, type Contact, type Deal, type Company } from '@/lib/mock-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +11,34 @@ import { PlusCircle } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
+import { useCollection } from '@/firebase';
+import { collection, query, orderBy, where, Firestore } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { useMemo } from 'react';
+
+// Define types based on backend.json
+type Contact = {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    companyId?: string;
+  };
+  
+type Deal = {
+    id: string;
+    name: string;
+    amount: number;
+    stage: 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
+    contactId: string;
+    companyId?: string;
+};
+
+type Company = {
+    id: string;
+    name: string;
+    website?: string;
+};
 
 const stageVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
   lead: 'secondary',
@@ -27,39 +54,23 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function CrmPage() {
-    const [deals, setDeals] = useState<Deal[]>(dealData);
-    const [contacts, setContacts] = useState<Contact[]>(contactData);
-    const [companies, setCompanies] = useState<Company[]>(companyData);
+    const firestore = useFirestore();
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
     const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
 
-    const sortDeals = (sortBy: keyof Deal) => {
-        const sorted = [...deals].sort((a, b) => {
-          if (a[sortBy] < b[sortBy]) return -1;
-          if (a[sortBy] > b[sortBy]) return 1;
-          return 0;
-        });
-        setDeals(sorted);
-      };
-      
-      const sortContacts = (sortBy: keyof Contact) => {
-        const sorted = [...contacts].sort((a, b) => {
-          if (a[sortBy] < b[sortBy]) return -1;
-          if (a[sortBy] > b[sortBy]) return 1;
-          return 0;
-        });
-        setContacts(sorted);
-      };
+    const contactsQuery = useMemo(() => firestore ? query(collection(firestore as Firestore, 'contacts'), orderBy('name')) : null, [firestore]);
+    const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
+    
+    const dealsQuery = useMemo(() => firestore ? query(collection(firestore as Firestore, 'deals'), orderBy('name')) : null, [firestore]);
+    const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-      const sortCompanies = (sortBy: keyof Company) => {
-        const sorted = [...companies].sort((a, b) => {
-            if (a[sortBy] < b[sortBy]) return -1;
-            if (a[sortBy] > b[sortBy]) return 1;
-            return 0;
-        });
-        setCompanies(sorted);
-    };
+    const companiesQuery = useMemo(() => firestore ? query(collection(firestore as Firestore, 'companies'), orderBy('name')) : null, [firestore]);
+    const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
+
+    const getContactName = (contactId: string) => {
+        return contacts?.find(c => c.id === contactId)?.name || 'Unknown Contact';
+    }
 
   return (
     <>
@@ -84,18 +95,6 @@ export default function CrmPage() {
             <TabsTrigger value="companies">Companies</TabsTrigger>
           </TabsList>
           <TabsContent value="deals">
-            <div className="flex justify-end mb-4">
-                <Select onValueChange={(value) => sortDeals(value as keyof Deal)}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Sort by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="amount">Amount</SelectItem>
-                        <SelectItem value="closeDate">Close Date</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
             <div className="border rounded-lg">
                 <Table>
                     <TableHeader>
@@ -104,19 +103,18 @@ export default function CrmPage() {
                         <TableHead>Contact</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Stage</TableHead>
-                        <TableHead>Close Date</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {deals.map(deal => (
+                    {dealsLoading && <TableRow><TableCell colSpan={4}>Loading...</TableCell></TableRow>}
+                    {deals?.map(deal => (
                         <TableRow key={deal.id}>
                         <TableCell className="font-medium">{deal.name}</TableCell>
-                        <TableCell>{deal.contact}</TableCell>
+                        <TableCell>{getContactName(deal.contactId)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(deal.amount)}</TableCell>
                         <TableCell>
                             <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
                         </TableCell>
-                        <TableCell>{deal.closeDate}</TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
@@ -124,40 +122,27 @@ export default function CrmPage() {
             </div>
           </TabsContent>
           <TabsContent value="contacts">
-          <div className="flex justify-end mb-4">
-                <Select onValueChange={(value) => sortContacts(value as keyof Contact)}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Sort by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="company">Company</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
             <div className="border rounded-lg">
                 <Table>
                     <TableHeader>
                     <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Company</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {contacts.map(contact => (
+                    {contactsLoading && <TableRow><TableCell colSpan={3}>Loading...</TableCell></TableRow>}
+                    {contacts?.map(contact => (
                         <TableRow key={contact.id}>
                             <TableCell>
                                 <div className="flex items-center gap-3">
                                     <Avatar>
-                                        <AvatarImage src={contact.avatar} />
                                         <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <span className="font-medium">{contact.name}</span>
                                 </div>
                             </TableCell>
-                        <TableCell>{contact.company}</TableCell>
                         <TableCell>{contact.email}</TableCell>
                         <TableCell>{contact.phone}</TableCell>
                         </TableRow>
@@ -167,16 +152,6 @@ export default function CrmPage() {
             </div>
           </TabsContent>
           <TabsContent value="companies">
-            <div className="flex justify-end mb-4">
-                    <Select onValueChange={(value) => sortCompanies(value as keyof Company)}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Sort by..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="name">Name</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
                 <div className="border rounded-lg">
                     <Table>
                         <TableHeader>
@@ -186,7 +161,8 @@ export default function CrmPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {companies.map(company => (
+                        {companiesLoading && <TableRow><TableCell colSpan={2}>Loading...</TableCell></TableRow>}
+                        {companies?.map(company => (
                             <TableRow key={company.id}>
                             <TableCell className="font-medium">{company.name}</TableCell>
                             <TableCell><a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a></TableCell>
@@ -201,7 +177,7 @@ export default function CrmPage() {
     </main>
 
     <CreateContactForm open={isCreateContactOpen} onOpenChange={setCreateContactOpen} />
-    <CreateDealForm open={isCreateDealOpen} onOpenChange={setCreateDealOpen} />
+    <CreateDealForm open={isCreateDealOpen} onOpenChange={setCreateDealOpen} contacts={contacts || []} />
     <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={setCreateCompanyOpen} />
     </>
   );

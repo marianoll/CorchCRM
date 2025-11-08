@@ -31,22 +31,31 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useFirestore } from '@/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Deal name must be at least 2 characters.'),
-  contact: z.string().min(1, 'Please select a contact.'),
+  contactId: z.string().min(1, 'Please select a contact.'),
   amount: z.coerce.number().positive('Amount must be a positive number.'),
   stage: z.enum(['lead', 'contacted', 'proposal', 'negotiation', 'won', 'lost']),
 });
 
+type Contact = {
+  id: string;
+  name: string;
+};
+
 type CreateDealFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contacts: Contact[];
 };
 
-export function CreateDealForm({ open, onOpenChange }: CreateDealFormProps) {
+export function CreateDealForm({ open, onOpenChange, contacts }: CreateDealFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -57,10 +66,17 @@ export function CreateDealForm({ open, onOpenChange }: CreateDealFormProps) {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Firestore is not available.',
+        });
+        return;
+    }
     setIsSubmitting(true);
     try {
-      console.log('Creating deal:', values);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await addDoc(collection(firestore, 'deals'), values);
       
       toast({
         title: 'Deal Created',
@@ -69,6 +85,7 @@ export function CreateDealForm({ open, onOpenChange }: CreateDealFormProps) {
       form.reset();
       onOpenChange(false);
     } catch (error) {
+        console.error("Error creating deal:", error);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -105,15 +122,23 @@ export function CreateDealForm({ open, onOpenChange }: CreateDealFormProps) {
             />
             <FormField
                 control={form.control}
-                name="contact"
+                name="contactId"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Contact</FormLabel>
-                    {/* In a real app, this would be a search/select from existing contacts */}
-                    <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
+                        <FormLabel>Contact</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a contact" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {contacts.map(contact => (
+                                    <SelectItem key={contact.id} value={contact.id}>{contact.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
                     </FormItem>
                 )}
             />
