@@ -1,11 +1,10 @@
 'use client';
 
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, orderBy, query, type Firestore } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { useMemo } from 'react';
 import { History } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -36,7 +35,7 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
 export default function HistoryPage() {
     const firestore = useFirestore();
 
-    const logsQuery = useMemo(() => 
+    const logsQuery = useMemoFirebase(() => 
         firestore 
         ? query(collection(firestore as Firestore, 'audit_logs'), orderBy('ts', 'desc')) 
         : null, 

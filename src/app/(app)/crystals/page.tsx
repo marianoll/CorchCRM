@@ -1,11 +1,10 @@
 'use client';
 
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, orderBy, query, type Firestore } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { useMemo } from 'react';
 import { Gem } from 'lucide-react';
 
 type Crystal = {
@@ -25,7 +24,7 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
 export default function CrystalsPage() {
     const firestore = useFirestore();
 
-    const crystalsQuery = useMemo(() => 
+    const crystalsQuery = useMemoFirebase(() => 
         firestore 
         ? query(collection(firestore as Firestore, 'crystals'), orderBy('createdAt', 'desc')) 
         : null, 
