@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -118,69 +119,70 @@ export default function CrmPage() {
         try {
             const batch = writeBatch(firestore);
 
-            // Process Companies
-            const companiesRes = await fetch('/companies_seed.csv');
-            const companiesCsv = await companiesRes.text();
-            const companiesLines = companiesCsv.split('\n');
-            const companiesHeader = companiesLines.shift()?.trim().split(',');
-            if (companiesHeader) {
-                for (const line of companiesLines) {
-                    if (!line.trim()) continue; // Skip empty lines
-                    const values = line.trim().split(',');
-                    const companyObj: any = {};
-                    companiesHeader.forEach((header, index) => {
-                        companyObj[header] = values[index];
+            const [companiesRes, contactsRes, dealsRes] = await Promise.all([
+                fetch('/companies_seed.csv'),
+                fetch('/contacts_seed.csv'),
+                fetch('/deals_seed.csv')
+            ]);
+
+            const [companiesCsv, contactsCsv, dealsCsv] = await Promise.all([
+                companiesRes.text(),
+                contactsRes.text(),
+                dealsRes.text()
+            ]);
+
+            const parseCsv = (csvText: string): Record<string, string>[] => {
+                const lines = csvText.trim().replace(/\r/g, '').split('\n');
+                if (lines.length < 2) return [];
+                const headerLine = lines.shift();
+                if (!headerLine) return [];
+                const headers = headerLine.split(',');
+
+                return lines.map(line => {
+                    const values = line.split(',');
+                    const obj: Record<string, string> = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = values[index];
                     });
+                    return obj;
+                });
+            };
+            
+            const companiesData = parseCsv(companiesCsv);
+            companiesData.forEach(companyObj => {
+                if (companyObj.id) {
                     const companyRef = doc(firestore, 'users', user.uid, 'companies', companyObj.id);
                     batch.set(companyRef, { ...companyObj });
                 }
-            }
+            });
 
-            // Process Contacts
-            const contactsRes = await fetch('/contacts_seed.csv');
-            const contactsCsv = await contactsRes.text();
-            const contactsLines = contactsCsv.split('\n');
-            const contactsHeader = contactsLines.shift()?.trim().split(',');
-            if (contactsHeader) {
-                for (const line of contactsLines) {
-                    if (!line.trim()) continue; // Skip empty lines
-                    const values = line.trim().split(',');
-                    const contactObj: any = {};
-                    contactsHeader.forEach((header, index) => {
-                        contactObj[header] = values[index];
-                    });
+            const contactsData = parseCsv(contactsCsv);
+            contactsData.forEach(contactObj => {
+                if (contactObj.id) {
                     const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactObj.id);
-                     batch.set(contactRef, { ...contactObj });
+                    batch.set(contactRef, { ...contactObj });
                 }
-            }
+            });
 
-            // Process Deals
-            const dealsRes = await fetch('/deals_seed.csv');
-            const dealsCsv = await dealsRes.text();
-            const dealsLines = dealsCsv.split('\n');
-            const dealsHeader = dealsLines.shift()?.trim().split(',');
-            if (dealsHeader) {
-                for (const line of dealsLines) {
-                    if (!line.trim()) continue; // Skip empty lines
-                    const values = line.trim().split(',');
-                    const dealObj: any = {};
-                    dealsHeader.forEach((header, index) => {
-                         let value: any = values[index];
-                        if (header === 'amount' || header === 'probability') value = Number(value);
-                        if (header === 'close_date' || header === 'last_interaction_at') value = new Date(value);
-                        dealObj[header] = value;
-                    });
+            const dealsData = parseCsv(dealsCsv);
+            dealsData.forEach(dealObj => {
+                if (dealObj.id) {
                     const dealRef = doc(firestore, 'users', user.uid, 'deals', dealObj.id);
-                    batch.set(dealRef, { ...dealObj });
+                    const dealData: any = { ...dealObj };
+                    if (dealData.amount) dealData.amount = Number(dealData.amount);
+                    if (dealData.probability) dealData.probability = Number(dealData.probability);
+                    if (dealData.close_date) dealData.close_date = new Date(dealData.close_date);
+                    if (dealData.last_interaction_at) dealData.last_interaction_at = new Date(dealData.last_interaction_at);
+                    batch.set(dealRef, dealData);
                 }
-            }
+            });
             
             await batch.commit();
 
             toast({ title: 'Database Seeded!', description: 'Your CRM has been populated with sample data.' });
         } catch (error) {
             console.error("Seeding error:", error);
-            toast({ variant: 'destructive', title: 'Seeding Failed', description: 'Could not populate the database.' });
+            toast({ variant: 'destructive', title: 'Seeding Failed', description: 'Could not populate the database. Check console for details.' });
         } finally {
             setIsSeeding(false);
         }
