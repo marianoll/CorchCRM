@@ -16,6 +16,7 @@ export const useCollection = <T extends DocumentData>(query: Query | null) => {
       return;
     }
     setLoading(true);
+    // onSnapshot listens for real-time updates.
     const unsubscribe = onSnapshot(
       query,
       (querySnapshot) => {
@@ -37,8 +38,9 @@ export const useCollection = <T extends DocumentData>(query: Query | null) => {
         setLoading(false);
       }
     );
+    // Unsubscribe from the listener when the component unmounts.
     return () => unsubscribe();
-  }, [query ? query.path : '']);
+  }, [query]); // The effect will re-run if the query object changes.
 
   return { data, loading, error };
 };
