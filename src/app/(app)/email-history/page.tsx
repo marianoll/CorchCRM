@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Mail, ArrowRight, Database, LoaderCircle, Zap } from 'lucide-react';
+import { Mail, ArrowRight, Database, LoaderCircle, Zap, Calendar as CalendarIcon, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,11 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 type Email = {
     id: string;
@@ -47,6 +52,11 @@ export default function EmailHistoryPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
+
+    // Filter states
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+    const [selectedCompany, setSelectedCompany] = useState<string>('all');
+    const [labelFilter, setLabelFilter] = useState<string>('');
 
     const emailsQuery = useMemoFirebase(() => 
         firestore && user
@@ -136,6 +146,18 @@ export default function EmailHistoryPage() {
         return new Date();
     };
 
+    const filteredEmails = useMemo(() => {
+        if (!emails) return [];
+        return emails.filter(email => {
+            const emailDate = toDate(email.ts);
+            const isDateMatch = selectedDate ? format(emailDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') : true;
+            const isCompanyMatch = selectedCompany === 'all' || email.company_id === selectedCompany;
+            const isLabelMatch = labelFilter ? (email.labels || '').toLowerCase().includes(labelFilter.toLowerCase()) : true;
+            return isDateMatch && isCompanyMatch && isLabelMatch;
+        });
+    }, [emails, selectedDate, selectedCompany, labelFilter]);
+
+
     const renderLabels = (labels: string) => {
         if (!labels) return null;
         return labels.split(';').map(label => (
@@ -159,6 +181,75 @@ export default function EmailHistoryPage() {
                  Seed Database
             </Button>
         </div>
+
+        <div className="flex flex-wrap items-center gap-4 mb-4 p-4 bg-card border rounded-lg">
+            <h3 className="text-sm font-medium mr-2">Filters:</h3>
+            <Popover>
+                <PopoverTrigger asChild>
+                <Button
+                    variant={"outline"}
+                    className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                    )}
+                >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    initialFocus
+                />
+                </PopoverContent>
+            </Popover>
+
+            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by company" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Companies</SelectItem>
+                    {companies?.map(company => (
+                        <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            <div className="relative w-full sm:w-auto">
+                 <Input
+                    placeholder="Filter by labels..."
+                    value={labelFilter}
+                    onChange={(e) => setLabelFilter(e.target.value)}
+                    className="w-full sm:w-[200px] pr-8"
+                />
+                {labelFilter && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setLabelFilter('')}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                )}
+            </div>
+           
+            {(selectedDate || selectedCompany !== 'all' || labelFilter) && (
+                <Button variant="ghost" onClick={() => {
+                    setSelectedDate(undefined);
+                    setSelectedCompany('all');
+                    setLabelFilter('');
+                }}>
+                    Clear Filters
+                </Button>
+            )}
+        </div>
+
+
         <Card>
             <CardHeader>
                 <CardTitle>Email Logs</CardTitle>
@@ -179,8 +270,8 @@ export default function EmailHistoryPage() {
                 </TableHeader>
                 <TableBody>
                     {(emailsLoading || companiesLoading) && <TableRow><TableCell colSpan={7} className="text-center">Loading emails...</TableCell></TableRow>}
-                    {!emailsLoading && emails?.length === 0 && <TableRow><TableCell colSpan={7} className="text-center">No emails found.</TableCell></TableRow>}
-                    {emails?.map((email) => (
+                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={7} className="text-center">No emails found.</TableCell></TableRow>}
+                    {filteredEmails.map((email) => (
                     <TableRow key={email.id}>
                         <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
                         <TableCell className="font-medium">
