@@ -43,7 +43,7 @@ export default function LandingPage() {
           </nav>
           <div className="flex items-center gap-3">
              <Button asChild className="inline-flex items-center justify-center rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-mint hover:text-ink transition">
-                <Link href="/home">Enter App</Link>
+                <Link href="/login">Enter App</Link>
             </Button>
           </div>
         </div>
@@ -57,7 +57,7 @@ export default function LandingPage() {
             <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">The CRM that updates itself.<br /><span className="text-mint">Seal customer leakage with CorchCRM.</span></h1>
             <p className="mt-5 text-lg text-ink/80 max-w-xl">CorchCRM is a zero‑click, voice‑and‑AI powered CRM. Speak or connect Gmail; we transcribe, extract and auto‑update contacts, deals and tasks — so nothing slips through the funnel.</p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/home" className="inline-flex items-center rounded-full bg-mint px-5 py-3 font-semibold text-ink shadow-sm hover:brightness-95">Try the Demo</Link>
+              <Link href="/login" className="inline-flex items-center rounded-full bg-mint px-5 py-3 font-semibold text-ink shadow-sm hover:brightness-95">Try the Demo</Link>
               <a href="#how" className="inline-flex items-center rounded-full border border-ink/10 px-5 py-3 font-semibold hover:border-mint">See how it works</a>
             </div>
             <div className="mt-8 wave" aria-hidden="true">
