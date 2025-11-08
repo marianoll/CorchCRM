@@ -84,15 +84,17 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
   }, [contact, isEditing, form, open]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore || !user) {
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Firestore or user is not available.',
-        });
-        return;
-    }
     setIsSubmitting(true);
+
+    if (!firestore || !user) {
+      toast({
+        variant: 'destructive',
+        title: 'Connection Error',
+        description: 'Could not connect to the database. Please try again.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
     
     const dataToSave = {
       name: values.name,
@@ -150,12 +152,6 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
         onOpenChange(false);
     } catch(error) {
         console.error("Error committing batch:", error);
-        const permissionError = new FirestorePermissionError({
-            path: isEditing ? `contacts/${contact?.id}` : 'contacts',
-            operation: isEditing ? 'update' : 'create',
-            requestResourceData: dataToSave,
-        });
-        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setIsSubmitting(false);
     }

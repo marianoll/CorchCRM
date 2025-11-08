@@ -123,15 +123,17 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
   }, [deal, isEditing, form, open]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true);
+
     if (!firestore || !user) {
         toast({
             variant: 'destructive',
-            title: 'Error',
-            description: 'Firestore or user is not available.',
+            title: 'Connection Error',
+            description: 'Could not connect to the database. Please try again.',
         });
+        setIsSubmitting(false);
         return;
     }
-    setIsSubmitting(true);
     
     try {
         const batch = writeBatch(firestore);
@@ -182,12 +184,6 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
         onOpenChange(false);
     } catch(error) {
         console.error("Error committing batch:", error);
-        const permissionError = new FirestorePermissionError({
-            path: isEditing ? `deals/${deal?.id}` : 'deals',
-            operation: isEditing ? 'update' : 'create',
-            requestResourceData: values,
-        });
-        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setIsSubmitting(false);
     }

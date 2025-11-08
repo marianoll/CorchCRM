@@ -73,15 +73,19 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore || !user) {
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Firestore is not available.',
-        });
-        return;
-    }
     setIsSubmitting(true);
+    
+    if (!firestore || !user) {
+      // This case should ideally not be hit if providers are set up correctly,
+      // but as a fallback, we can show a toast.
+      toast({
+        variant: 'destructive',
+        title: 'Connection Error',
+        description: 'Could not connect to the database. Please try again.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
     
     try {
         const batch = writeBatch(firestore);
@@ -133,12 +137,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
         onOpenChange(false);
     } catch (error) {
         console.error("Error committing batch:", error);
-        const permissionError = new FirestorePermissionError({
-          path: isEditing ? `companies/${company?.id}` : 'companies',
-          operation: isEditing ? 'update' : 'create',
-          requestResourceData: values,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        // Let the FirestorePermissionError system handle this via the .catch on commit if it's a permission error
     } finally {
         setIsSubmitting(false);
     }
