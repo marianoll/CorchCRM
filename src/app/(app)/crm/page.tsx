@@ -139,13 +139,14 @@ export default function CrmPage() {
                 const headers = headerLine.split(',');
 
                 return lines.map(line => {
+                    if (!line.trim()) return null;
                     const values = line.split(',');
                     const obj: Record<string, string> = {};
                     headers.forEach((header, index) => {
                         obj[header] = values[index];
                     });
                     return obj;
-                });
+                }).filter((obj): obj is Record<string, string> => obj !== null);
             };
             
             const companiesData = parseCsv(companiesCsv);
@@ -359,3 +360,5 @@ export default function CrmPage() {
     </>
   );
 }
+
+    
