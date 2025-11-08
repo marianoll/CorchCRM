@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import { Mic, Square, LoaderCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
@@ -13,36 +13,81 @@ type RecordingState = 'idle' | 'recording' | 'loading' | 'success';
 export function VoiceRecorder() {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [result, setResult] = useState<VoiceToCRMOutput | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
-  const handleRecord = () => {
-    if (recordingState === 'idle') {
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          processAudio(base64Audio);
+        };
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
       setRecordingState('recording');
       setResult(null);
-    } else if (recordingState === 'recording') {
-      setRecordingState('loading');
-      startTransition(async () => {
-        try {
-            // This is a placeholder for a real audio data URI.
-            const mockAudioDataUri = "data:audio/webm;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAAAAAAAAA...";
-            const res = await voiceToCRM({ audioDataUri: mockAudioDataUri });
-            setResult(res);
-            setRecordingState('success');
-            toast({
-                title: 'Voice Note Processed',
-                description: 'Your voice note has been transcribed and analyzed.',
-            });
-        } catch (error) {
-            console.error(error);
-            toast({
-                variant: 'destructive',
-                title: 'Error Processing Voice Note',
-                description: 'There was a problem analyzing your voice note.',
-            });
-            setRecordingState('idle');
-        }
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      toast({
+        variant: 'destructive',
+        title: 'Microphone access denied',
+        description: 'Please allow microphone access in your browser settings to use this feature.',
       });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recordingState === 'recording') {
+      mediaRecorderRef.current.stop();
+      setRecordingState('loading');
+    }
+  };
+
+  const processAudio = (audioDataUri: string) => {
+    startTransition(async () => {
+      try {
+        const res = await voiceToCRM({ audioDataUri });
+        setResult(res);
+        setRecordingState('success');
+        toast({
+          title: 'Voice Note Processed',
+          description: 'Your voice note has been transcribed and analyzed.',
+        });
+      } catch (error) {
+        console.error(error);
+        toast({
+          variant: 'destructive',
+          title: 'Error Processing Voice Note',
+          description: 'There was a problem analyzing your voice note.',
+        });
+        setRecordingState('idle');
+      }
+    });
+  };
+
+  const handleRecord = () => {
+    if (recordingState === 'idle') {
+      startRecording();
+    } else if (recordingState === 'recording') {
+      stopRecording();
     }
   };
 
@@ -50,13 +95,24 @@ export function VoiceRecorder() {
     idle: 'Start Recording',
     recording: 'Stop Recording',
     loading: 'Processing...',
+    success: 'Start New Recording',
   };
 
   const buttonIcon = {
     idle: <Mic className="mr-2 h-4 w-4" />,
     recording: <Square className="mr-2 h-4 w-4 animate-pulse fill-current text-red-500" />,
     loading: <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />,
+    success: <Mic className="mr-2 h-4 w-4" />,
   };
+  
+  const getButtonAction = () => {
+    if (recordingState === 'success') {
+        setRecordingState('idle');
+        setResult(null);
+        return;
+    }
+    handleRecord();
+  }
 
   return (
     <Card>
@@ -94,9 +150,9 @@ export function VoiceRecorder() {
          )}
       </CardContent>
       <CardFooter>
-        <Button onClick={handleRecord} disabled={isPending} className="w-full">
-          {buttonIcon[recordingState as Exclude<RecordingState, 'success'>]}
-          {buttonText[recordingState as Exclude<RecordingState, 'success'>]}
+        <Button onClick={getButtonAction} disabled={isPending} className="w-full">
+          {buttonIcon[recordingState]}
+          {buttonText[recordingState]}
         </Button>
       </CardFooter>
     </Card>
