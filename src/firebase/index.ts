@@ -19,7 +19,6 @@ export {
 } from './client-provider';
 
 export {
-    useUser,
     useAuth,
     useFirestore,
     useFirebase,
@@ -27,5 +26,6 @@ export {
     FirebaseProvider
 } from './provider';
 
+export { useUser } from './auth/use-user';
 export { useCollection } from './firestore/use-collection';
 export { useDoc } from './firestore/use-doc';
