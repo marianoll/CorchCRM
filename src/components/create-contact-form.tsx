@@ -21,6 +21,13 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -30,28 +37,42 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
-  email: z.string().email('Invalid email address.'),
+  first_name: z.string().min(1, 'First name is required.'),
+  last_name: z.string().min(1, 'Last name is required.'),
+  email_primary: z.string().email('Invalid email address.'),
   phone: z.string().optional(),
-  companyId: z.string().optional(),
+  company_id: z.string().optional(),
+  title: z.string().optional(),
 });
 
 type Contact = {
     id: string;
-    name: string;
-    email: string;
+    company_id?: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email_primary: string;
+    email_alt?: string;
     phone?: string;
-    companyId?: string;
+    title?: string;
+    seniority?: string;
+    linkedin_url?: string;
+    owner_email?: string;
 };
+
+type Company = {
+    id: string;
+    name: string;
+}
 
 type CreateContactFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact?: Contact | null;
-  companies: any[]; // Add this prop
+  companies: Company[];
 };
 
-export function CreateContactForm({ open, onOpenChange, contact }: CreateContactFormProps) {
+export function CreateContactForm({ open, onOpenChange, contact, companies }: CreateContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -60,10 +81,12 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      email: '',
+      first_name: '',
+      last_name: '',
+      email_primary: '',
       phone: '',
-      companyId: '',
+      company_id: '',
+      title: ''
     },
   });
 
@@ -73,13 +96,22 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     if (open) {
         if (isEditing && contact) {
             form.reset({
-                name: contact.name,
-                email: contact.email,
+                first_name: contact.first_name,
+                last_name: contact.last_name,
+                email_primary: contact.email_primary,
                 phone: contact.phone || '',
-                companyId: contact.companyId || '',
+                company_id: contact.company_id || '',
+                title: contact.title || '',
             });
         } else {
-            form.reset({ name: '', email: '', phone: '', companyId: '' });
+            form.reset({
+              first_name: '',
+              last_name: '',
+              email_primary: '',
+              phone: '',
+              company_id: '',
+              title: ''
+            });
         }
     }
   }, [contact, isEditing, form, open]);
@@ -98,11 +130,13 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     }
     
     const batch = writeBatch(firestore);
+    const full_name = `${values.first_name} ${values.last_name}`;
+    const contactData = { ...values, full_name };
 
     try {
         if (isEditing && contact) {
             const contactRef = doc(firestore, 'users', user.uid, 'contacts', contact.id);
-            batch.update(contactRef, values);
+            batch.update(contactRef, contactData);
 
             const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
@@ -115,11 +149,11 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 table: 'contacts',
                 source: 'ui',
                 before_snapshot: contact,
-                after_snapshot: values,
+                after_snapshot: contactData,
             });
         } else {
             const contactRef = doc(collection(firestore, 'users', user.uid, 'contacts'));
-            batch.set(contactRef, values);
+            batch.set(contactRef, contactData);
 
             const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
@@ -131,7 +165,7 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 entity_id: contactRef.id,
                 table: 'contacts',
                 source: 'ui',
-                after_snapshot: values,
+                after_snapshot: contactData,
             });
         }
 
@@ -139,7 +173,7 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
         
         toast({
             title: isEditing ? 'Contact Updated' : 'Contact Created',
-            description: `${values.name} has been ${isEditing ? 'updated' : 'added to your contacts'}.`,
+            description: `${full_name} has been ${isEditing ? 'updated' : 'added to your contacts'}.`,
         });
 
         form.reset();
@@ -170,22 +204,37 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+               <FormField
+                control={form.control}
+                name="first_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="last_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
+              name="email_primary"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
@@ -210,13 +259,35 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
               )}
             />
              <FormField
+                control={form.control}
+                name="company_id"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Company</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a company" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {companies.map(company => (
+                                    <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+             <FormField
               control={form.control}
-              name="companyId"
+              name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company ID</FormLabel>
+                  <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="Leave blank if none" {...field} />
+                    <Input placeholder="CEO, Marketing Director..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
@@ -41,19 +41,19 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
-  name: z.string().min(2, 'Deal name must be at least 2 characters.'),
-  companyId: z.string().optional(),
-  contactId: z.string().min(1, 'Please select a contact.'),
+  title: z.string().min(2, 'Deal title must be at least 2 characters.'),
+  company_id: z.string().optional(),
+  primary_contact_id: z.string().min(1, 'Please select a contact.'),
   amount: z.coerce.number().positive('Amount must be a positive number.'),
-  stage: z.enum(['lead', 'contacted', 'proposal', 'negotiation', 'won', 'lost']),
-  creationDate: z.date({
-    required_error: 'A creation date is required.',
+  stage: z.enum(['prospect', 'discovery', 'proposal', 'negotiation', 'won', 'lost']),
+  close_date: z.date({
+    required_error: 'A close date is required.',
   }),
 });
 
 type Contact = {
   id: string;
-  name: string;
+  full_name: string;
 };
 
 type Company = {
@@ -63,12 +63,16 @@ type Company = {
 
 type Deal = {
     id: string;
-    name: string;
+    company_id?: string;
+    primary_contact_id: string;
+    title: string;
     amount: number;
-    stage: 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
-    contactId: string;
-    companyId?: string;
-    creationDate?: { seconds: number; nanoseconds: number } | Date;
+    currency?: string;
+    stage: 'prospect' | 'discovery' | 'proposal' | 'negotiation' | 'won' | 'lost';
+    probability?: number;
+    close_date: Date | Timestamp | string;
+    owner_email?: string;
+    last_interaction_at?: Date | Timestamp | string;
 };
 
 type CreateDealFormProps = {
@@ -88,35 +92,41 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
+      title: '',
       amount: 0,
-      stage: 'lead',
-      creationDate: new Date(),
+      stage: 'prospect',
+      close_date: new Date(),
     },
   });
 
   const isEditing = !!deal;
 
+  const toDate = (dateValue: any): Date => {
+        if (!dateValue) return new Date();
+        if (dateValue instanceof Date) return dateValue;
+        if (dateValue instanceof Timestamp) return dateValue.toDate();
+        if (typeof dateValue === 'string') return new Date(dateValue);
+        if (dateValue && typeof dateValue.seconds === 'number') {
+            return new Date(dateValue.seconds * 1000);
+        }
+        return new Date();
+    };
+
   useEffect(() => {
     if (open) {
         if (isEditing && deal) {
-            let creationDate = new Date();
-            if (deal.creationDate) {
-                if (deal.creationDate instanceof Date) {
-                    creationDate = deal.creationDate;
-                } else if (deal.creationDate && typeof deal.creationDate.seconds === 'number') {
-                    creationDate = new Date(deal.creationDate.seconds * 1000);
-                }
-            }
-            form.reset({ ...deal, creationDate });
+            form.reset({
+                 ...deal,
+                 close_date: toDate(deal.close_date)
+            });
         } else {
             form.reset({
-                name: '',
+                title: '',
                 amount: 0,
-                stage: 'lead',
-                creationDate: new Date(),
-                contactId: undefined,
-                companyId: undefined,
+                stage: 'prospect',
+                close_date: new Date(),
+                primary_contact_id: undefined,
+                company_id: undefined,
             });
         }
     }
@@ -177,7 +187,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
 
         toast({
             title: isEditing ? 'Deal Updated' : 'Deal Created',
-            description: `The deal "${values.name}" has been successfully ${isEditing ? 'updated' : 'created'}.`,
+            description: `The deal "${values.title}" has been successfully ${isEditing ? 'updated' : 'created'}.`,
         });
 
         form.reset();
@@ -210,10 +220,10 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
             <FormField
               control={form.control}
-              name="name"
+              name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Deal Name</FormLabel>
+                  <FormLabel>Deal Title</FormLabel>
                   <FormControl>
                     <Input placeholder="Website Redesign Project" {...field} />
                   </FormControl>
@@ -223,7 +233,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
             />
             <FormField
                 control={form.control}
-                name="companyId"
+                name="company_id"
                 render={({ field }) => (
                     <FormItem>
                         <FormLabel>Company</FormLabel>
@@ -245,10 +255,10 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
             />
             <FormField
                 control={form.control}
-                name="contactId"
+                name="primary_contact_id"
                 render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Contact</FormLabel>
+                        <FormLabel>Primary Contact</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                                 <SelectTrigger>
@@ -257,7 +267,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                             </FormControl>
                             <SelectContent>
                                 {contacts.map(contact => (
-                                    <SelectItem key={contact.id} value={contact.id}>{contact.name}</SelectItem>
+                                    <SelectItem key={contact.id} value={contact.id}>{contact.full_name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -267,10 +277,10 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
             />
              <FormField
               control={form.control}
-              name="creationDate"
+              name="close_date"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Creation Date</FormLabel>
+                  <FormLabel>Close Date</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -295,9 +305,6 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
                         initialFocus
                       />
                     </PopoverContent>
@@ -332,8 +339,8 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="contacted">Contacted</SelectItem>
+                      <SelectItem value="prospect">Prospect</SelectItem>
+                      <SelectItem value="discovery">Discovery</SelectItem>
                       <SelectItem value="proposal">Proposal</SelectItem>
                       <SelectItem value="negotiation">Negotiation</SelectItem>
                       <SelectItem value="won">Won</SelectItem>

@@ -11,44 +11,68 @@ import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
-// Define types based on backend.json
-type Contact = {
-    id: string;
-    name: string;
-    email: string;
-    phone?: string;
-    companyId?: string;
-  };
-  
-type Deal = {
-    id: string;
-    name: string;
-    amount: number;
-    stage: 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
-    contactId: string;
-    companyId?: string;
-};
-
+// Define types based on new schema
 type Company = {
     id: string;
     name: string;
-    website?: string;
+    domain?: string;
+    industry?: string;
+    size?: string;
+    region?: string;
+    owner_email?: string;
+    website?: string; // Keeping for compatibility if old data exists
 };
 
+type Contact = {
+    id: string;
+    company_id?: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email_primary: string;
+    email_alt?: string;
+    phone?: string;
+    title?: string;
+    seniority?: string;
+    linkedin_url?: string;
+    owner_email?: string;
+    name?: string; // For compatibility
+    email?: string; // For compatibility
+    companyId?: string; // For compatibility
+};
+
+type Deal = {
+    id: string;
+    company_id?: string;
+    primary_contact_id: string;
+    title: string;
+    amount: number;
+    currency?: string;
+    stage: 'prospect' | 'discovery' | 'proposal' | 'negotiation' | 'won' | 'lost';
+    probability?: number;
+    close_date: Date | Timestamp | string;
+    owner_email?: string;
+    last_interaction_at?: Date | Timestamp | string;
+    name?: string; // For compatibility
+    contactId?: string; // For compatibility
+    companyId?: string; // For compatibility
+};
+
+
 const stageVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
-  lead: 'secondary',
-  contacted: 'secondary',
+  prospect: 'secondary',
+  discovery: 'secondary',
   proposal: 'default',
   negotiation: 'default',
   won: 'default',
   lost: 'destructive',
 };
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+const formatCurrency = (amount: number, currency: string = 'USD') => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 };
 
 export default function CrmPage() {
@@ -64,10 +88,10 @@ export default function CrmPage() {
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
-    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('name')) : null, [firestore, user]);
+    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [firestore, user]);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('name')) : null, [firestore, user]);
+    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')) : null, [firestore, user]);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
@@ -75,7 +99,7 @@ export default function CrmPage() {
 
 
     const getContactName = (contactId: string) => {
-        return contacts?.find(c => c.id === contactId)?.name || 'Unknown Contact';
+        return contacts?.find(c => c.id === contactId)?.full_name || 'Unknown Contact';
     }
     
     const getCompanyName = (companyId?: string) => {
@@ -107,7 +131,7 @@ export default function CrmPage() {
                         companyObj[header] = values[index];
                     });
                     const companyRef = doc(firestore, 'users', user.uid, 'companies', companyObj.id);
-                    batch.set(companyRef, { name: companyObj.name, website: companyObj.website });
+                    batch.set(companyRef, { ...companyObj });
                 }
             }
 
@@ -124,7 +148,7 @@ export default function CrmPage() {
                         contactObj[header] = values[index];
                     });
                     const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactObj.id);
-                    batch.set(contactRef, { name: `${contactObj.firstName} ${contactObj.lastName}`, email: contactObj.email, phone: contactObj.phone, companyId: contactObj.companyId });
+                     batch.set(contactRef, { ...contactObj });
                 }
             }
 
@@ -139,12 +163,12 @@ export default function CrmPage() {
                     const dealObj: any = {};
                     dealsHeader.forEach((header, index) => {
                          let value: any = values[index];
-                        if (header === 'amount') value = Number(value);
-                        if (header === 'creationDate') value = new Date(value);
+                        if (header === 'amount' || header === 'probability') value = Number(value);
+                        if (header === 'close_date' || header === 'last_interaction_at') value = new Date(value);
                         dealObj[header] = value;
                     });
                     const dealRef = doc(firestore, 'users', user.uid, 'deals', dealObj.id);
-                    batch.set(dealRef, { name: dealObj.name, amount: dealObj.amount, stage: dealObj.stage, contactId: dealObj.contactId, companyId: dealObj.companyId, creationDate: dealObj.creationDate });
+                    batch.set(dealRef, { ...dealObj });
                 }
             }
             
@@ -223,7 +247,7 @@ export default function CrmPage() {
                 <Table>
                     <TableHeader>
                     <TableRow>
-                        <TableHead>Deal Name</TableHead>
+                        <TableHead>Deal Title</TableHead>
                         <TableHead>Contact</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
@@ -235,10 +259,10 @@ export default function CrmPage() {
                     {dealsLoading && <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>}
                     {deals?.map(deal => (
                         <TableRow key={deal.id}>
-                            <TableCell className="font-medium">{deal.name}</TableCell>
-                            <TableCell>{getContactName(deal.contactId)}</TableCell>
-                            <TableCell>{getCompanyName(deal.companyId)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(deal.amount)}</TableCell>
+                            <TableCell className="font-medium">{deal.title || deal.name}</TableCell>
+                            <TableCell>{getContactName(deal.primary_contact_id || deal.contactId!)}</TableCell>
+                            <TableCell>{getCompanyName(deal.company_id || deal.companyId)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(deal.amount, deal.currency)}</TableCell>
                             <TableCell>
                                 <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
                             </TableCell>
@@ -272,14 +296,14 @@ export default function CrmPage() {
                             <TableCell>
                                 <div className="flex items-center gap-3">
                                     <Avatar>
-                                        <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback>{(contact.full_name || contact.name || 'U').charAt(0)}</AvatarFallback>
                                     </Avatar>
-                                    <span className="font-medium">{contact.name}</span>
+                                    <span className="font-medium">{contact.full_name || contact.name}</span>
                                 </div>
                             </TableCell>
-                            <TableCell>{contact.email}</TableCell>
+                            <TableCell>{contact.email_primary || contact.email}</TableCell>
                             <TableCell>{contact.phone}</TableCell>
-                            <TableCell>{getCompanyName(contact.companyId)}</TableCell>
+                            <TableCell>{getCompanyName(contact.company_id || contact.companyId)}</TableCell>
                             <TableCell>
                                 <Button variant="ghost" size="icon" onClick={() => handleEditContact(contact)}>
                                     <Pencil className="h-4 w-4" />
@@ -297,16 +321,18 @@ export default function CrmPage() {
                         <TableHeader>
                         <TableRow>
                             <TableHead>Company Name</TableHead>
-                            <TableHead>Website</TableHead>
+                            <TableHead>Domain</TableHead>
+                            <TableHead>Industry</TableHead>
                             <TableHead className="w-[80px]">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {companiesLoading && <TableRow><TableCell colSpan={3}>Loading...</TableCell></TableRow>}
+                        {companiesLoading && <TableRow><TableCell colSpan={4}>Loading...</TableCell></TableRow>}
                         {companies?.map(company => (
                             <TableRow key={company.id}>
                                 <TableCell className="font-medium">{company.name}</TableCell>
-                                <TableCell><a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a></TableCell>
+                                <TableCell><a href={`http://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.domain}</a></TableCell>
+                                <TableCell>{company.industry}</TableCell>
                                 <TableCell>
                                     <Button variant="ghost" size="icon" onClick={() => handleEditCompany(company)}>
                                         <Pencil className="h-4 w-4" />
@@ -328,5 +354,3 @@ export default function CrmPage() {
     </>
   );
 }
-
-    

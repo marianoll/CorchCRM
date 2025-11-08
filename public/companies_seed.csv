@@ -1,8 +1,11 @@
-id,name,website
-co1,Innovate Corp,https://innovatecorp.com
-co2,Tech Solutions,https://techsolutions.com
-co3,Future Systems,https://futuresystems.com
-co4,Data Dynamics,https://datadynamics.com
-co5,QuantumLeap,https://quantumleap.com
-
-    
+id,name,domain,industry,size,region,owner_email
+comp_20397e6f,Acme Robotics,acmerobotics.com,Manufacturing Automation,51-200,ES,jo@corchcrm.com
+comp_cf618185,Blue Finch Analytics,bluefinch.ai,Analytics SaaS,11-50,UK,sales@corchcrm.com
+comp_4cc3748f,Nevada SolarWorks,nevadasolar.co,Energy,201-500,US,jo@corchcrm.com
+comp_4c941992,Marea Logistics,marealogistics.io,Logistics,51-200,ES,ana@corchcrm.com
+comp_3058ac72,Helios HealthTech,helioshealth.io,HealthTech,11-50,DE,sales@corchcrm.com
+comp_6d4c2fdd,Cumbre Retail,cumbreshop.com,Retail,1001-5000,CL,jo@corchcrm.com
+comp_a8d67c18,Quantum Quarry,quantumquarry.com,Data Infrastructure,51-200,US,ana@corchcrm.com
+comp_d83c5c74,Delta AeroParts,deltaaeroparts.com,Aerospace,201-500,FR,sales@corchcrm.com
+comp_877ad023,Orchard Finance,orchardfinance.io,Fintech,51-200,ES,jo@corchcrm.com
+comp_af8712b7,Lumen Media,lumen.media,Media,11-50,PT,ana@corchcrm.com

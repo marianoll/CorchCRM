@@ -32,13 +32,15 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters.'),
-  website: z.string().url('Invalid URL.').optional().or(z.literal('')),
+  domain: z.string().optional(),
+  industry: z.string().optional(),
 });
 
 type Company = {
     id: string;
     name: string;
-    website?: string;
+    domain?: string;
+    industry?: string;
 };
 
 type CreateCompanyFormProps = {
@@ -57,7 +59,8 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      website: '',
+      domain: '',
+      industry: '',
     },
   });
 
@@ -67,7 +70,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     if (isEditing && company) {
         form.reset(company);
     } else {
-        form.reset({ name: '', website: '' });
+        form.reset({ name: '', domain: '', industry: '' });
     }
   }, [company, isEditing, form, open]);
 
@@ -86,11 +89,15 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     }
     
     const batch = writeBatch(firestore);
+    const companyData = {
+        ...values,
+        website: values.domain ? `https://${values.domain}` : ''
+    }
 
     try {
         if (isEditing && company) {
             const companyRef = doc(firestore, 'users', user.uid, 'companies', company.id);
-            batch.update(companyRef, values);
+            batch.update(companyRef, companyData);
 
             const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
@@ -103,12 +110,12 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
                 table: 'companies',
                 source: 'ui',
                 before_snapshot: company,
-                after_snapshot: values,
+                after_snapshot: companyData,
             });
             
         } else {
             const companyRef = doc(collection(firestore, 'users', user.uid, 'companies'));
-            batch.set(companyRef, values);
+            batch.set(companyRef, companyData);
 
             const logRef = doc(collection(firestore, 'audit_logs'));
             batch.set(logRef, {
@@ -120,7 +127,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
                 entity_id: companyRef.id,
                 table: 'companies',
                 source: 'ui',
-                after_snapshot: values,
+                after_snapshot: companyData,
             });
         }
         
@@ -174,12 +181,25 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
             />
             <FormField
               control={form.control}
-              name="website"
+              name="domain"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Website</FormLabel>
+                  <FormLabel>Domain</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://acme.com" {...field} />
+                    <Input placeholder="acme.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="industry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Industry</FormLabel>
+                  <FormControl>
+                    <Input placeholder="SaaS" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
