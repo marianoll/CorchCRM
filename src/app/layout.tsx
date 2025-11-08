@@ -3,8 +3,14 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'CorchCRM',
-  description: 'A zero-click CRM where information flows automatically from voice, emails, or meetings into an intelligent system.',
+  title: 'CorchCRM — The Customer Orchestrator',
+  description: 'CorchCRM is the Customer Orchestrator: a zero‑click, voice‑and‑AI powered CRM that seals customer leakage and keeps your pipeline up to date by itself.',
+  openGraph: {
+    title: 'CorchCRM — The Customer Orchestrator',
+    description: 'Zero‑click, voice‑and‑AI powered CRM that seals customer leakage and auto‑updates your pipeline.',
+    type: 'website',
+  },
+  themeColor: '#61d8c4',
 };
 
 export default function RootLayout({
@@ -17,7 +23,7 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
         {children}

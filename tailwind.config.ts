@@ -65,6 +65,11 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        // Custom brand palette
+        mint: '#61d8c4',
+        honey: '#ffb757',
+        lavender: '#c2b9db',
+        ink: '#0f172a'
       },
       borderRadius: {
         lg: 'var(--radius)',
