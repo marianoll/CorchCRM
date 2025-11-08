@@ -31,11 +31,6 @@ export default function LandingPage() {
         .wave span:nth-child(4){ animation-delay:.3s }
         .wave span:nth-child(5){ animation-delay:.4s }
         @keyframes bounce{ 0%,100%{ height:8px } 50%{ height:40px } }
-        
-        /* Reset some base styles for the landing page */
-        body {
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-        }
       `}</style>
       {/* NAV */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur">
