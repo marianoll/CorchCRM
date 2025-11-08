@@ -49,7 +49,7 @@ export default function CrmPage() {
         <div className="flex items-center justify-between mb-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight font-headline">CRM View</h1>
-                <p className="text-muted-foreground">Browse your automatically created deals and contacts.</p>
+                <p className="text-muted-foreground">Browse your deals and contacts.</p>
             </div>
             {/* Sorting is per-table now for clarity */}
         </div>
