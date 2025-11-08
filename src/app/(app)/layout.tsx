@@ -25,7 +25,7 @@ import {
   Search,
   Settings,
   ChevronDown,
-  ScrollText,
+  Gem,
 } from 'lucide-react';
 import {
   FirebaseClientProvider,
@@ -34,7 +34,7 @@ import {
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/logs', label: 'Logs', icon: ScrollText },
+  { href: '/crystals', label: 'Crystals', icon: Gem },
   { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/search', label: 'Search', icon: Search },

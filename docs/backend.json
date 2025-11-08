@@ -89,6 +89,52 @@
         }
       },
       "required": ["name"]
+    },
+    "crystal": {
+      "title": "Crystal",
+      "description": "An atomized fact or piece of information extracted from an unstructured source.",
+      "type": "object",
+      "properties": {
+        "fact": {
+          "type": "string",
+          "description": "The atomized statement of fact."
+        },
+        "source": {
+          "type": "string",
+          "description": "The origin of the information (e.g., 'email', 'voice note', 'manual')."
+        },
+        "sourceIdentifier": {
+          "type": "string",
+          "description": "A reference to the specific source item (e.g., email subject or voice note ID)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "overwritten"],
+          "description": "The current status of the crystal."
+        },
+        "overwrittenBy": {
+          "type": "string",
+          "description": "The ID of the crystal that overwrites this one, if applicable."
+        },
+        "contactId": {
+          "$ref": "#/backend/entities/contact"
+        },
+        "dealId": {
+          "$ref": "#/backend/entities/deal"
+        },
+        "companyId": {
+          "$ref": "#/backend/entities/company"
+        },
+        "createdBy": {
+          "$ref": "#/backend/entities/userProfile"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the crystal was created."
+        }
+      },
+      "required": ["fact", "source", "status", "createdAt"]
     }
   },
   "auth": {
@@ -118,6 +164,12 @@
         "$ref": "#/backend/entities/company"
       },
       "description": "Stores company information."
-    }
+    },
+    "/crystals/{crystalId}": {
+        "schema": {
+          "$ref": "#/backend/entities/crystal"
+        },
+        "description": "Stores atomized facts (crystals) extracted from various sources."
+      }
   }
 }

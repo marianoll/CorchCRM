@@ -1,50 +1,70 @@
-import { logData, type Log } from '@/lib/mock-data';
+'use client';
+
+import { useCollection, useFirestore } from '@/firebase';
+import { collection, orderBy, query, type Firestore } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { useMemo } from 'react';
+import { Gem } from 'lucide-react';
 
-const eventTypeVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
-  'Voice Input': 'default',
-  'Email Parsed': 'default',
-  'Contact Created': 'secondary',
-  'Deal Updated': 'secondary',
-  'Task Assigned': 'secondary',
+type Crystal = {
+    id: string;
+    fact: string;
+    source: string;
+    sourceIdentifier: string;
+    status: 'active' | 'overwritten';
+    createdAt: string;
 };
 
-export default function LogsPage() {
+const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
+  active: 'default',
+  overwritten: 'destructive',
+};
+
+export default function CrystalsPage() {
+    const firestore = useFirestore();
+
+    const crystalsQuery = useMemo(() => 
+        firestore 
+        ? query(collection(firestore as Firestore, 'crystals'), orderBy('createdAt', 'desc')) 
+        : null, 
+    [firestore]);
+
+    const { data: crystals, loading: crystalsLoading } = useCollection<Crystal>(crystalsQuery);
+
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight font-headline">Event Logs</h1>
-          <p className="text-muted-foreground">An immutable audit trail of all system and user actions.</p>
+          <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
+            <Gem className="h-7 w-7" />
+            Crystals Log
+          </h1>
+          <p className="text-muted-foreground">An immutable audit trail of all atomized facts extracted by the AI.</p>
         </div>
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[180px]">Timestamp</TableHead>
-                <TableHead className="w-[150px]">Event Type</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Key Info</TableHead>
+                <TableHead>Fact</TableHead>
+                <TableHead className="w-[150px]">Source</TableHead>
+                <TableHead className="w-[120px]">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logData.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{format(new Date(log.timestamp), "MMM d, yyyy, h:mm a")}</TableCell>
+              {crystalsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading crystals...</TableCell></TableRow>}
+              {!crystalsLoading && crystals?.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No crystals found.</TableCell></TableRow>}
+              {crystals?.map((crystal) => (
+                <TableRow key={crystal.id}>
+                  <TableCell>{format(new Date(crystal.createdAt), "MMM d, yyyy, h:mm a")}</TableCell>
+                  <TableCell className="font-medium">{crystal.fact}</TableCell>
                   <TableCell>
-                    <Badge variant={eventTypeVariant[log.eventType] || 'secondary'}>{log.eventType}</Badge>
+                    <Badge variant="outline">{crystal.source}</Badge>
                   </TableCell>
-                  <TableCell>{log.client}</TableCell>
-                  <TableCell className="font-medium">{log.description}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {log.keyInfo.map((info, index) => (
-                        <Badge key={index} variant="outline">{info}</Badge>
-                      ))}
-                    </div>
+                   <TableCell>
+                    <Badge variant={statusVariant[crystal.status] || 'secondary'}>{crystal.status}</Badge>
                   </TableCell>
                 </TableRow>
               ))}

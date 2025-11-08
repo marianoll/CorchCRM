@@ -1,13 +1,18 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Mail, LoaderCircle, Sparkles } from 'lucide-react';
+import { Mail, LoaderCircle, Sparkles, Gem, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { emailToCRM, type EmailToCRMOutput } from '@/ai/flows/email-to-crm';
+import { crystallizeText, type CrystallizeTextOutput } from '@/ai/flows/crystallize-text';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { useFirestore } from '@/firebase';
+import { addDoc, collection } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const sampleEmail = `Hi Team,
 
@@ -22,9 +27,12 @@ Admin`;
 
 export function EmailProcessor() {
   const [emailContent, setEmailContent] = useState(sampleEmail);
-  const [result, setResult] = useState<EmailToCRMOutput | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<EmailToCRMOutput | null>(null);
+  const [crystalsResult, setCrystalsResult] = useState<CrystallizeTextOutput | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const handleProcessEmail = () => {
     if (!emailContent) {
@@ -35,14 +43,23 @@ export function EmailProcessor() {
       });
       return;
     }
+    
+    setAnalysisResult(null);
+    setCrystalsResult(null);
 
     startTransition(async () => {
       try {
-        const res = await emailToCRM({ emailContent });
-        setResult(res);
+        const [analysisRes, crystalsRes] = await Promise.all([
+            emailToCRM({ emailContent }),
+            crystallizeText({ text: emailContent, source: 'email', sourceIdentifier: 'Manually Processed Email' })
+        ]);
+
+        setAnalysisResult(analysisRes);
+        setCrystalsResult(crystalsRes);
+        
         toast({
           title: 'Email Processed',
-          description: 'AI has extracted information from the email.',
+          description: 'AI has extracted information and generated crystals.',
         });
       } catch (error) {
         console.error(error);
@@ -55,11 +72,54 @@ export function EmailProcessor() {
     });
   };
 
+  const handleSaveCrystals = async () => {
+    if (!crystalsResult || !firestore) return;
+
+    setIsSaving(true);
+    const crystalsCollection = collection(firestore, 'crystals');
+
+    const savePromises = crystalsResult.crystals.map(crystal => {
+        const crystalData = {
+            fact: crystal.fact,
+            source: 'email',
+            sourceIdentifier: 'Manually Processed Email', // Simplified for now
+            status: 'active',
+            createdAt: new Date().toISOString(),
+        };
+        return addDoc(crystalsCollection, crystalData)
+            .catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: crystalsCollection.path,
+                  operation: 'create',
+                  requestResourceData: crystalData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError; // throw to stop Promise.all
+            });
+    });
+
+    try {
+        await Promise.all(savePromises);
+        toast({
+            title: 'Crystals Saved',
+            description: `${crystalsResult.crystals.length} crystals have been saved to the log.`
+        });
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Error Saving Crystals',
+            description: 'Could not save crystals to the database.'
+        })
+    } finally {
+        setIsSaving(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Email-to-CRM</CardTitle>
-        <CardDescription>Paste an email below. AI will create contacts, tasks, and summarize the content.</CardDescription>
+        <CardDescription>Paste an email below. AI will create contacts, tasks, summarize, and crystallize the content.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Textarea
@@ -69,27 +129,44 @@ export function EmailProcessor() {
           rows={8}
           disabled={isPending}
         />
-        {result && (
+        {analysisResult && (
           <Alert>
             <Sparkles className="h-4 w-4" />
             <AlertTitle>AI Analysis Complete</AlertTitle>
             <AlertDescription className="space-y-2">
               <div>
                 <h3 className="font-semibold">Summary:</h3>
-                <p className="text-sm text-muted-foreground">{result.summary}</p>
+                <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
               </div>
               <div>
                 <h3 className="font-semibold">Extracted Contacts:</h3>
                 <ul className="list-disc list-inside text-sm text-muted-foreground">
-                    {result.contacts.map((contact, i) => <li key={i}>{contact.name} ({contact.email})</li>)}
+                    {analysisResult.contacts.map((contact, i) => <li key={i}>{contact.name} ({contact.email})</li>)}
                 </ul>
               </div>
               <div>
                 <h3 className="font-semibold">Action Items:</h3>
                 <ul className="list-disc list-inside text-sm text-muted-foreground">
-                    {result.actionItems.map((item, i) => <li key={i}>{item}</li>)}
+                    {analysisResult.actionItems.map((item, i) => <li key={i}>{item}</li>)}
                 </ul>
               </div>
+            </AlertDescription>
+          </Alert>
+        )}
+         {crystalsResult && crystalsResult.crystals.length > 0 && (
+          <Alert>
+            <Gem className="h-4 w-4" />
+            <AlertTitle className='flex justify-between items-center'>
+                <span>Generated Crystals</span>
+                 <Button size="sm" onClick={handleSaveCrystals} disabled={isSaving}>
+                    {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                    Save Crystals
+                </Button>
+            </AlertTitle>
+            <AlertDescription className="space-y-2 mt-2">
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {crystalsResult.crystals.map((crystal, i) => <li key={i}>{crystal.fact}</li>)}
+                </ul>
             </AlertDescription>
           </Alert>
         )}
@@ -101,7 +178,7 @@ export function EmailProcessor() {
           ) : (
             <Mail className="mr-2 h-4 w-4" />
           )}
-          Process Email
+          Process & Crystallize Email
         </Button>
       </CardFooter>
     </Card>
