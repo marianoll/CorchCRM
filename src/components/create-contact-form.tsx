@@ -48,6 +48,7 @@ type CreateContactFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact?: Contact | null;
+  companies: any[]; // Add this prop
 };
 
 export function CreateContactForm({ open, onOpenChange, contact }: CreateContactFormProps) {
@@ -87,27 +88,21 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
     setIsSubmitting(true);
 
     if (!firestore || !user) {
-      toast({
-        variant: 'destructive',
-        title: 'Connection Error',
-        description: 'Could not connect to the database. Please try again.',
-      });
-      setIsSubmitting(false);
-      return;
+      // This will be handled by the Firestore error emitter if the batch fails
     }
     
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(firestore!);
 
     try {
         if (isEditing && contact) {
-            const contactRef = doc(firestore, 'contacts', contact.id);
+            const contactRef = doc(firestore!, 'contacts', contact.id);
             batch.set(contactRef, values, { merge: true });
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(firestore!, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
-                actor_id: user.uid,
+                actor_id: user!.uid,
                 action: 'update',
                 entity_type: 'contact',
                 entity_id: contact.id,
@@ -117,14 +112,14 @@ export function CreateContactForm({ open, onOpenChange, contact }: CreateContact
                 after_snapshot: values,
             });
         } else {
-            const contactRef = doc(collection(firestore, 'contacts'));
+            const contactRef = doc(collection(firestore!, 'contacts'));
             batch.set(contactRef, values);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(firestore!, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
-                actor_id: user.uid,
+                actor_id: user!.uid,
                 action: 'create',
                 entity_type: 'contact',
                 entity_id: contactRef.id,

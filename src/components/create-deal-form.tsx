@@ -126,27 +126,21 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
     setIsSubmitting(true);
 
     if (!firestore || !user) {
-        toast({
-            variant: 'destructive',
-            title: 'Connection Error',
-            description: 'Could not connect to the database. Please try again.',
-        });
-        setIsSubmitting(false);
-        return;
+       // This will be handled by the Firestore error emitter if the batch fails
     }
     
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(firestore!);
 
     try {
         if (isEditing && deal) {
-            const dealRef = doc(firestore, 'deals', deal.id);
+            const dealRef = doc(firestore!, 'deals', deal.id);
             batch.set(dealRef, values, { merge: true });
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(firestore!, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
-                actor_id: user.uid,
+                actor_id: user!.uid,
                 action: 'update',
                 entity_type: 'deal',
                 entity_id: deal.id,
@@ -156,14 +150,14 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 after_snapshot: values,
             });
         } else {
-            const dealRef = doc(collection(firestore, 'deals'));
+            const dealRef = doc(collection(firestore!, 'deals'));
             batch.set(dealRef, values);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(firestore!, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
-                actor_id: user.uid,
+                actor_id: user!.uid,
                 action: 'create',
                 entity_type: 'deal',
                 entity_id: dealRef.id,

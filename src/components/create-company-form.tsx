@@ -76,23 +76,18 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     setIsSubmitting(true);
     
     if (!firestore || !user) {
-        toast({
-            variant: "destructive",
-            title: "Connection Error",
-            description: "Could not connect to the database. Please try again.",
-        });
-        setIsSubmitting(false);
-        return;
+      // This will be handled by the Firestore error emitter if the batch fails
+      // No need for a separate error message here.
     }
     
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(firestore!);
 
     try {
         if (isEditing && company) {
-            const companyRef = doc(firestore, 'companies', company.id);
+            const companyRef = doc(firestore!, 'companies', company.id);
             batch.set(companyRef, values, { merge: true });
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(firestore!, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -107,10 +102,10 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
             });
             
         } else {
-            const companyRef = doc(collection(firestore, 'companies'));
+            const companyRef = doc(collection(firestore!, 'companies'));
             batch.set(companyRef, values);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(firestore!, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
