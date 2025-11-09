@@ -440,11 +440,7 @@ export default function SettingsPage() {
           </Card>
 
           <Card className="border-destructive">
-            <CardHeader>
-                <CardTitle>Danger Zone</CardTitle>
-                <CardDescription>These actions are irreversible.</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
                  <Button variant="destructive" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Log Out
