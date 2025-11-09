@@ -1,64 +1,83 @@
-'use client';
+'use server';
+/**
+ * @fileOverview A Genkit flow that translates natural language into a structured database query.
+ *
+ * - naturalLanguageSearch - The main function to call the flow.
+ * - NaturalLanguageSearchInput - The input type for the flow.
+ * - NaturalLanguageSearchOutput - The output type for the flow.
+ */
 
-import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { type Suggestion } from '@/lib/mock-data';
-import { Check, X, LoaderCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
+import { googleAI } from '@genkit-ai/google-genai';
 
-interface SuggestionCardProps {
-  suggestion: Suggestion;
-}
+// ---- Schemas ----
 
-export function SuggestionCard({ suggestion }: SuggestionCardProps) {
-  const [isPending, startTransition] = useTransition();
-  const [isGone, setIsGone] = useState(false);
-  const { toast } = useToast();
+const NaturalLanguageSearchInputSchema = z.object({
+  query: z.string().describe('The natural language query from the user.'),
+});
+export type NaturalLanguageSearchInput = z.infer<typeof NaturalLanguageSearchInputSchema>;
 
-  const handleAction = (approvalStatus: 'approved' | 'rejected') => {
-    startTransition(async () => {
-      toast({
-        variant: 'destructive',
-        title: 'Feature Not Available',
-        description: 'AI functionality is currently disabled.',
-      });
+const NaturalLanguageSearchOutputSchema = z.object({
+  results: z.string().describe('A summary of the results or a message to the user.'),
+});
+export type NaturalLanguageSearchOutput = z.infer<typeof NaturalLanguageSearchOutputSchema>;
 
-      // Simulate a delay and then hide the card
-      setTimeout(() => {
-          if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
-              setIsGone(true);
-          }
-      }, 500);
+// ---- Prompt ----
 
-    });
-  };
+const searchPrompt = ai.definePrompt({
+  name: 'naturalLanguageSearchPrompt',
+  model: googleAI.model('gemini-2.0-flash-lite-001'),
+  input: { schema: NaturalLanguageSearchInputSchema },
+  output: { schema: NaturalLanguageSearchOutputSchema },
+  prompt: `You are a helpful CRM assistant. Your task is to interpret the user's natural language query and provide a concise, helpful answer based on it.
 
-  if (isGone) {
-    return null;
+DO NOT just repeat the query. Acknowledge the query and state what you are looking for.
+
+User Query:
+---
+{{query}}
+---
+
+Example Response:
+If the user asks "Top deals above €20,000 closing this month", a good response would be:
+"Sure, I'm looking for all deals with a value greater than €20,000 that are expected to close in the current month."
+
+Now, provide a response for the user's query.`,
+});
+
+
+// ---- Flow ----
+const naturalLanguageSearchFlow = ai.defineFlow(
+  {
+    name: 'naturalLanguageSearchFlow',
+    inputSchema: NaturalLanguageSearchInputSchema,
+    outputSchema: NaturalLanguageSearchOutputSchema,
+  },
+  async ({ query }) => {
+    // In a real application, you would add a step here to:
+    // 1. Translate the natural language query into a structured database query (e.g., SQL or Firestore query).
+    // 2. Execute the query against the database.
+    // 3. Format the results into a human-readable summary.
+    // For now, we will just have the AI interpret the query and respond.
+
+    const llmResponse = await searchPrompt({ query });
+    const output = llmResponse.output;
+
+    if (!output?.results) {
+        return { results: "I'm sorry, I couldn't understand that query. Could you rephrase it?" };
+    }
+    
+    return {
+        results: output.results
+    };
   }
+);
 
-  return (
-    <Card className={cn("transition-all duration-300", isPending && "opacity-50 pointer-events-none")}>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-            {suggestion.type}
-        </CardTitle>
-        <CardDescription>Source: {suggestion.source}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm font-mono bg-secondary p-3 rounded-md">{suggestion.details}</p>
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => handleAction('rejected')} disabled={isPending}>
-          <X className="mr-2 h-4 w-4" /> Reject
-        </Button>
-        <Button onClick={() => handleAction('approved')} disabled={isPending}>
-          {isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-          Approve
-        </Button>
-      </CardFooter>
-    </Card>
-  );
+
+// ---- API ----
+export async function naturalLanguageSearch(
+  input: NaturalLanguageSearchInput
+): Promise<NaturalLanguageSearchOutput> {
+  return naturalLanguageSearchFlow(input);
 }
