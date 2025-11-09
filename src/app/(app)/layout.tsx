@@ -14,8 +14,6 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
-  SidebarGroup,
-  SidebarGroupLabel,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,14 +21,10 @@ import { Button } from '@/components/ui/button';
 import { SearchChatbot } from '@/components/search-chatbot';
 import {
   Home,
-  Inbox,
   Briefcase,
   Settings,
-  Gem,
   Mail,
-  ClipboardCheck,
   Upload,
-  LayoutDashboard,
   Bot,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
@@ -43,32 +37,16 @@ import { auth } from '@/firebase/client';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
-  { href: '/tasks', label: 'Tasks', icon: ClipboardCheck },
+  { href: '/email-history', label: 'Email History', icon: Mail },
+  { href: '/upload-history', label: 'Upload History', icon: Upload },
+  { href: '/orquestrator', label: 'Orquestrator', icon: Bot },
 ];
-
-const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <path d="M19 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
-        <path d="M5 10h14"/>
-        <path d="M8 10v8"/>
-        <path d="M12 10v8"/>
-        <path d="M16 10v8"/>
-        <path d="M6 6h.01"/>
-        <path d="M10 6h.01"/>
-        <path d="M14 6h.01"/>
-        <path d="M18 6h.01"/>
-    </svg>
-);
-
 
 function MainNav() {
   const pathname = usePathname();
 
   return (
-    <>
       <SidebarMenu>
         {navItems.map((item) => (
           <SidebarMenuItem key={item.href}>
@@ -85,34 +63,6 @@ function MainNav() {
           </SidebarMenuItem>
         ))}
       </SidebarMenu>
-      <SidebarGroup className='mt-auto pt-4 border-t'>
-         <SidebarGroupLabel className='text-muted-foreground'>
-            <span>Debugging</span>
-        </SidebarGroupLabel>
-        <SidebarMenu>
-            <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/email-history'} className="text-muted-foreground">
-                    <Link href="/email-history"><Mail /><span>Email History</span></Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/upload-history'} className="text-muted-foreground">
-                    <Link href="/upload-history"><Upload /><span>Upload History</span></Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/orquestrator'} className="text-muted-foreground">
-                    <Link href="/orquestrator"><PianoIcon /><span>Orquestrator</span></Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/crystals'} className="text-muted-foreground">
-                    <Link href="/crystals"><Gem /><span>Crystals</span></Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
-    </>
   );
 }
 
@@ -202,7 +152,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
                 <SidebarContent>
                     <MainNav />
                 </SidebarContent>
-                <SidebarFooter className="p-2 border-t">
+                <SidebarFooter className="p-2 border-t mt-auto">
                     <UserProfile />
                 </SidebarFooter>
             </Sidebar>
@@ -266,5 +216,3 @@ function PanelLeftOpenIcon(props: React.SVGProps<SVGSVGElement>) {
       </svg>
     )
   }
-
-    

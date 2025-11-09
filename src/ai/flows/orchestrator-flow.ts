@@ -19,7 +19,7 @@ import {
 
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.0-flash-lite'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input:  { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   prompt: `
@@ -99,9 +99,7 @@ const orchestrateInteractionFlow = ai.defineFlow(
     }
     try {
       const res = await orchestratePrompt(input);
-      const out = typeof (res as any)?.output === 'function'
-        ? (res as any).output()
-        : (res as any)?.output;
+      const out = res.output;
 
       const actions = Array.isArray(out?.actions) ? out.actions : [];
 
