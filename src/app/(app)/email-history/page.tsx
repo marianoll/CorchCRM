@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -34,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { syncGmail } from '@/ai/flows/sync-gmail-flow';
 import { OrchestratorSuggestionDialog } from '@/components/orchestrator-suggestion-dialog';
 import { orchestrateInteraction, type OrchestratorOutput, type Interaction } from '@/ai/flows/orchestrator-flow';
+import { EmailReplyDialog } from '@/components/email-reply-dialog';
 
 
 type Email = {
@@ -101,18 +101,22 @@ export default function EmailHistoryPage() {
     const [isOrchestratorDialogOpen, setIsOrchestratorDialogOpen] = useState(false);
     const [selectedEmailForOrchestrator, setSelectedEmailForOrchestrator] = useState<Email | null>(null);
 
+    // Reply Dialog state
+    const [isReplyDialogOpen, setIsReplyDialogOpen] = useState(false);
+    const [selectedEmailForReply, setSelectedEmailForReply] = useState<Email | null>(null);
+
 
     // Data fetching
-    const emailsQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')), []);
+    const emailsQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, []);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
 
-    const companiesQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'companies')), []);
+    const companiesQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, []);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
-    const contactsQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'contacts')), []);
+    const contactsQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, []);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
 
-    const dealsQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'deals')), []);
+    const dealsQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, []);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const crmDataLoading = companiesLoading || contactsLoading || dealsLoading;
@@ -370,6 +374,11 @@ export default function EmailHistoryPage() {
     const handleOrchestrate = (email: Email) => {
         setSelectedEmailForOrchestrator(email);
         setIsOrchestratorDialogOpen(true);
+    };
+
+    const handleGenerateReply = (email: Email) => {
+        setSelectedEmailForReply(email);
+        setIsReplyDialogOpen(true);
     };
 
     const processOrchestration = useCallback(async (): Promise<OrchestratorOutput | null> => {
@@ -655,6 +664,15 @@ export default function EmailHistoryPage() {
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-1">
+                                     <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)}>
+                                                <MailPlus className="h-4 w-4" />
+                                                <span className="sr-only">Generate Reply</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Generate Reply</p></TooltipContent>
+                                    </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleOrchestrate(email)}>
@@ -689,6 +707,14 @@ export default function EmailHistoryPage() {
             onOpenChange={setIsOrchestratorDialogOpen}
             email={selectedEmailForOrchestrator}
             processFunction={processOrchestration}
+        />
+      )}
+       {selectedEmailForReply && (
+        <EmailReplyDialog
+          open={isReplyDialogOpen}
+          onOpenChange={setIsReplyDialogOpen}
+          email={selectedEmailForReply}
+          user={user}
         />
       )}
     </main>
