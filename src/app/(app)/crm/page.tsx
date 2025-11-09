@@ -186,7 +186,14 @@ export default function CrmPage() {
                 if (emailObj.id) {
                     const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
                     const emailData: any = { ...emailObj };
-                    if (emailData.ts) emailData.ts = new Date(emailData.ts);
+                    
+                    // Validate and convert timestamp
+                    if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
+                        emailData.ts = new Date(emailData.ts);
+                    } else {
+                        delete emailData.ts; // Remove invalid or empty timestamp
+                    }
+
                     batch.set(emailRef, emailData);
                 }
             });
@@ -373,5 +380,3 @@ export default function CrmPage() {
     </>
   );
 }
-
-    

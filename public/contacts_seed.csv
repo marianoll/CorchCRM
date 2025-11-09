@@ -1,16 +1,16 @@
-tualiid,company_id,first_name,last_name,full_name,email_primary,email_alt,phone,title,seniority,linkedin_url,owner_email
-cont_64dd1155,comp_cf618185,María,Gómez,María Gómez,maría.gómez@bluefinch.ai,,+34 600 000 00,CTO,Senior,https://www.linkedin.com/in/maríagómez,sales@corchcrm.com
-cont_f605d1c6,comp_20397e6f,Luis,Pérez,Luis Pérez,luis.pérez@acmerobotics.com,,+34 600 000 01,Head of Ops,Manager,https://www.linkedin.com/in/luispérez,jo@corchcrm.com
-cont_e9a04cda,comp_3058ac72,Ana,Silva,Ana Silva,ana.silva@helioshealth.io,,+34 600 000 02,CFO,Director,https://www.linkedin.com/in/anasilva,sales@corchcrm.com
-cont_0a06995d,comp_4c941992,Hugo,Ramos,Hugo Ramos,hugo.ramos@marealogistics.io,,+34 600 000 03,Procurement Lead,Manager,https://www.linkedin.com/in/hugoramos,ana@corchcrm.com
-cont_683be9ed,comp_4c941992,Sara,Ibarra,Sara Ibarra,sara.ibarra@marealogistics.io,,+34 600 000 04,COO,VP,https://www.linkedin.com/in/saraibarra,ana@corchcrm.com
-cont_9bd8b216,comp_4cc3748f,Clara,Nieves,Clara Nieves,clara.nieves@nevadasolar.co,,+34 600 000 05,IT Manager,Manager,https://www.linkedin.com/in/claranieves,jo@corchcrm.com
-cont_7816fc0d,comp_cf618185,Pedro,Moya,Pedro Moya,pedro.moya@bluefinch.ai,,+34 600 000 06,CEO,C-Level,https://www.linkedin.com/in/pedromoya,sales@corchcrm.com
-cont_5e1b6587,comp_877ad023,Lucía,Rey,Lucía Rey,lucía.rey@orchardfinance.io,,+34 600 000 07,VP Sales,VP,https://www.linkedin.com/in/lucíarey,jo@corchcrm.com
-cont_1fe7efa5,comp_cf618185,Tomás,Roca,Tomás Roca,tomás.roca@bluefinch.ai,,+34 600 000 08,Engineering Lead,Senior,https://www.linkedin.com/in/tomásroca,sales@corchcrm.com
-cont_b05c4e8e,comp_af8712b7,Elena,Vidal,Elena Vidal,elena.vidal@lumen.media,,+34 600 000 09,Product Manager,Senior,https://www.linkedin.com/in/elenavidal,ana@corchcrm.com
-cont_b5db361e,comp_a8d67c18,Andrés,Cuevas,Andrés Cuevas,andrés.cuevas@quantumquarry.com,,+34 600 000 00,Legal Counsel,Senior,https://www.linkedin.com/in/andréscuevas,ana@corchcrm.com
-cont_55a8f86b,comp_20397e6f,Jorge,Ruiz,Jorge Ruiz,jorge.ruiz@acmerobotics.com,,+34 600 000 01,Facilities,Staff,https://www.linkedin.com/in/jorgeruiz,jo@corchcrm.com
-cont_57772edf,comp_20397e6f,Valeria,Bosch,Valeria Bosch,valeria.bosch@acmerobotics.com,,+34 600 000 02,Data Scientist,Senior,https://www.linkedin.com/in/valeriabosch,jo@corchcrm.com
-cont_3e62dba3,comp_cf618185,Nina,Costa,Nina Costa,nina.costa@bluefinch.ai,,+34 600 000 03,HR Director,Director,https://www.linkedin.com/in/ninacosta,sales@corchcrm.com
-cont_375b609e,comp_4c941992,Marco,Serra,Marco Serra,marco.serra@marealogistics.io,,+34 600 000 04,BD Manager,Manager,https://www.linkedin.com/in/marcoserra,ana@corchcrm.com
+tualiid,company_id,first_name,last_name,full_name,email_primary,phone,title,seniority,linkedin_url,owner_email
+cont_64dd1155,comp_cf618185,María,Gómez,María Gómez,maría.gómez@bluefinch.ai,+34 600 000 00,CTO,Senior,https://www.linkedin.com/in/maríagómez,sales@corchcrm.com
+cont_f605d1c6,comp_20397e6f,Luis,Pérez,Luis Pérez,luis.pérez@acmerobotics.com,+34 600 000 01,Head of Ops,Manager,https://www.linkedin.com/in/luispérez,jo@corchcrm.com
+cont_e9a04cda,comp_3058ac72,Ana,Silva,Ana Silva,ana.silva@helioshealth.io,+34 600 000 02,CFO,Director,https://www.linkedin.com/in/anasilva,sales@corchcrm.com
+cont_0a06995d,comp_4c941992,Hugo,Ramos,Hugo Ramos,hugo.ramos@marealogistics.io,+34 600 000 03,Procurement Lead,Manager,https://www.linkedin.com/in/hugoramos,ana@corchcrm.com
+cont_683be9ed,comp_4c941992,Sara,Ibarra,Sara Ibarra,sara.ibarra@marealogistics.io,+34 600 000 04,COO,VP,https://www.linkedin.com/in/saraibarra,ana@corchcrm.com
+cont_9bd8b216,comp_4cc3748f,Clara,Nieves,Clara Nieves,clara.nieves@nevadasolar.co,+34 600 000 05,IT Manager,Manager,https://www.linkedin.com/in/claranieves,jo@corchcrm.com
+cont_7816fc0d,comp_cf618185,Pedro,Moya,Pedro Moya,pedro.moya@bluefinch.ai,+34 600 000 06,CEO,C-Level,https://www.linkedin.com/in/pedromoya,sales@corchcrm.com
+cont_5e1b6587,comp_877ad023,Lucía,Rey,Lucía Rey,lucía.rey@orchardfinance.io,+34 600 000 07,VP Sales,VP,https://www.linkedin.com/in/lucíarey,jo@corchcrm.com
+cont_1fe7efa5,comp_cf618185,Tomás,Roca,Tomás Roca,tomás.roca@bluefinch.ai,+34 600 000 08,Engineering Lead,Senior,https://www.linkedin.com/in/tomásroca,sales@corchcrm.com
+cont_b05c4e8e,comp_af8712b7,Elena,Vidal,Elena Vidal,elena.vidal@lumen.media,+34 600 000 09,Product Manager,Senior,https://www.linkedin.com/in/elenavidal,ana@corchcrm.com
+cont_b5db361e,comp_a8d67c18,Andrés,Cuevas,Andrés Cuevas,andrés.cuevas@quantumquarry.com,+34 600 000 00,Legal Counsel,Senior,https://www.linkedin.com/in/andréscuevas,ana@corchcrm.com
+cont_55a8f86b,comp_20397e6f,Jorge,Ruiz,Jorge Ruiz,jorge.ruiz@acmerobotics.com,+34 600 000 01,Facilities,Staff,https://www.linkedin.com/in/jorgeruiz,jo@corchcrm.com
+cont_57772edf,comp_20397e6f,Valeria,Bosch,Valeria Bosch,valeria.bosch@acmerobotics.com,+34 600 000 02,Data Scientist,Senior,https://www.linkedin.com/in/valeriabosch,jo@corchcrm.com
+cont_3e62dba3,comp_cf618185,Nina,Costa,Nina Costa,nina.costa@bluefinch.ai,+34 600 000 03,HR Director,Director,https://www.linkedin.com/in/ninacosta,sales@corchcrm.com
+cont_375b609e,comp_4c941992,Marco,Serra,Marco Serra,marco.serra@marealogistics.io,+34 600 000 04,BD Manager,Manager,https://www.linkedin.com/in/marcoserra,ana@corchcrm.com
