@@ -135,7 +135,7 @@ export default function CrmPage() {
             ]);
 
             const parseCsv = (csvText: string): Record<string, string>[] => {
-                const lines = csvText.trim().replace(/\r/g, '').split('\n');
+                const lines = csvText.trim().split(/\r?\n/);
                 if (lines.length < 2) return [];
                 const headerLine = lines.shift();
                 if (!headerLine) return [];
