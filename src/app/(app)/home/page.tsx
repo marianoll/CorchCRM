@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import { InfoshardProcessor } from '@/components/infoshard-processor';
 import { RecentActivity } from '@/components/recent-activity';
 import { UpcomingTasks } from '@/components/upcoming-tasks';
-import { useCollection } from '@/firebase/firestore/hooks';
-import { useUser } from '@/firebase/auth/hooks';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
 

@@ -16,7 +16,7 @@ interface FirebaseServerServices {
 // Memoize the initialized services to avoid re-initialization on every call
 let services: FirebaseServerServices | null = null;
 
-export function initializeFirebaseServer(): FirebaseServerServices {
+export async function initializeFirebaseServer(): Promise<FirebaseServerServices> {
   if (services) {
     return services;
   }

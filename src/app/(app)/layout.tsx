@@ -29,8 +29,8 @@ import {
   Gem,
   Mail,
 } from 'lucide-react';
-import { useUser } from '@/firebase/auth/hooks';
-import { useCollection } from '@/firebase/firestore/hooks';
+import { useUser } from '@/firebase/auth/use-user';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -106,7 +106,7 @@ function MainNav() {
 }
 
 function UserProfile() {
-    const { user, loading: isUserLoading } = useUser();
+    const { user, isUserLoading } = useUser();
     const pathname = usePathname();
     
     if (isUserLoading) {
@@ -144,7 +144,7 @@ function UserProfile() {
 }
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
-    const { user, loading: isUserLoading } = useUser();
+    const { user, isUserLoading } = useUser();
     const router = useRouter();
 
     const [isSearchOpen, setIsSearchOpen] = useState(false);

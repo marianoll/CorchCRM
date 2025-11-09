@@ -5,7 +5,7 @@ import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { processGmailAuthCode } from '@/ai/flows/gmail-auth-flow';
-import { useUser } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
 import { LoaderCircle } from 'lucide-react';
 
 function AuthCallback() {

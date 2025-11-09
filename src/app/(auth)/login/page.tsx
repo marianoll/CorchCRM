@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { useUser } from '@/firebase/auth/hooks';
+import { useUser } from '@/firebase/auth/use-user';
 import { auth, db } from '@/firebase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +26,7 @@ function GoogleIcon() {
 }
 
 export default function LoginPage() {
-  const { user, loading: isUserLoading } = useUser();
+  const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
   const [isProcessingLogin, setIsProcessingLogin] = useState(false);

@@ -10,8 +10,9 @@ import { PlusCircle, Pencil, Database } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
-import { useCollection, useDoc } from '@/firebase/firestore/hooks';
-import { useUser } from '@/firebase/auth/hooks';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { useUser } from '@/firebase/auth/use-user';
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -105,7 +106,7 @@ const toDate = (dateValue: any): Date => {
 
 
 export default function CrmPage() {
-    const { user, loading: userLoading } = useUser();
+    const { user, isUserLoading: userLoading } = useUser();
     const { toast } = useToast();
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
