@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { SearchChatbot } from '@/components/search-chatbot';
 import {
   Home,
   Inbox,
@@ -30,10 +32,15 @@ import {
   History,
   Mail,
   Bug,
+  MessageCircle,
 } from 'lucide-react';
 import {
   useUser,
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
 } from '@/firebase';
+import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +50,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from '@/components/ui/skeleton';
-
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
@@ -146,15 +152,32 @@ function UserProfile() {
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
+    const firestore = useFirestore();
+
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    // Types for CRM data
+    type Company = { id: string; name: string; [key: string]: any; };
+    type Contact = { id: string; full_name: string; [key: string]: any; };
+    type Deal = { id: string; title: string; [key: string]: any; };
+
+    // Fetch all CRM data needed for the search context
+    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [firestore, user]);
+    const { data: contacts } = useCollection<Contact>(contactsQuery);
+    
+    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')) : null, [firestore, user]);
+    const { data: deals } = useCollection<Deal>(dealsQuery);
+
+    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
+    const { data: companies } = useCollection<Company>(companiesQuery);
+
 
     React.useEffect(() => {
-        // If loading is finished and there's no user, redirect to login.
         if (!isUserLoading && !user) {
             router.replace('/login');
         }
     }, [user, isUserLoading, router]);
 
-    // While loading, we can show a loader or null
     if (isUserLoading || !user) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
@@ -163,7 +186,6 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
         );
     }
     
-    // If user is loaded and present, render the layout
     return (
         <SidebarProvider>
             <Sidebar collapsible="icon" className="bg-card border-r">
@@ -188,6 +210,24 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
                     <Logo />
                 </header>
                 {children}
+
+                <div className="fixed bottom-6 right-6 z-50">
+                    <Button
+                        size="icon"
+                        className="rounded-full w-14 h-14 shadow-lg"
+                        onClick={() => setIsSearchOpen(true)}
+                    >
+                        <MessageCircle className="h-6 w-6" />
+                        <span className="sr-only">Open Search Chat</span>
+                    </Button>
+                </div>
+                 <SearchChatbot 
+                    open={isSearchOpen} 
+                    onOpenChange={setIsSearchOpen}
+                    contacts={contacts}
+                    deals={deals}
+                    companies={companies}
+                />
             </SidebarInset>
         </SidebarProvider>
     );
