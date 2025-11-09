@@ -124,11 +124,7 @@ export function CrmDetailsDialog({
                         <TableBody>
                             {companyDeals.map(d => (
                                 <TableRow key={d.id}>
-                                    <TableCell>
-                                         <Button variant="link" className="p-0 h-auto font-normal text-left" onClick={() => onEntityClick(d, 'Deal')}>
-                                            {d.title}
-                                        </Button>
-                                    </TableCell>
+                                    <TableCell>{d.title}</TableCell>
                                     <TableCell>{formatCurrency(d.amount)}</TableCell>
                                     <TableCell><Badge variant="secondary">{d.stage}</Badge></TableCell>
                                     <TableCell>{format(toDate(d.close_date), 'MMM d, yyyy')}</TableCell>
