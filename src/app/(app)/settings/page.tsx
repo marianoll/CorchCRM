@@ -87,6 +87,10 @@ const StageEditor = ({ stages, onStagesChange }: { stages: Stage[], onStagesChan
         onStagesChange(stages.filter(s => s.name !== name));
     };
 
+    const updateStageName = (oldName: string, newName: string) => {
+        onStagesChange(stages.map(s => s.name === oldName ? { ...s, name: newName } : s));
+    };
+
     const updateStageColor = (name: string, color: string) => {
         onStagesChange(stages.map(s => s.name === name ? { ...s, color } : s));
     }
@@ -113,7 +117,11 @@ const StageEditor = ({ stages, onStagesChange }: { stages: Stage[], onStagesChan
                                 </div>
                             </PopoverContent>
                         </Popover>
-                        <Input value={stage.name} className="h-9" readOnly />
+                        <Input 
+                            value={stage.name} 
+                            onChange={(e) => updateStageName(stage.name, e.target.value)}
+                            className="h-9"
+                        />
                         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeStage(stage.name)}>
                             <X className="h-4 w-4" />
                         </Button>
@@ -452,5 +460,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
