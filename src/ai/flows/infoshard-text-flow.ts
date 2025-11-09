@@ -37,7 +37,7 @@ const OrchestratorSchema = z.object({
     command: z.string().describe("The action to be taken, e.g., 'createContact', 'createDeal', 'createTask', 'updateDeal'."),
     entityType: z.string().optional().describe("The type of entity, e.g., 'Contact', 'Deal', 'Task'."),
     entityName: z.string().optional().describe("The name of the entity to be created or updated."),
-    details: z.record(z.any()).optional().describe("A structured object of data for the command, e.g., { email: 'jane@acme.com', amount: 50000 }."),
+    details: z.string().optional().describe("A JSON string representing a structured object of data for the command, e.g., '{ \"email\": \"jane@acme.com\", \"amount\": 50000 }'."),
     sourceText: z.string().optional().describe("The original text snippet that led to this command.")
 });
 
@@ -75,15 +75,15 @@ Your task is to deconstruct unstructured text into "infotopes" (atomic, self-con
     *   Extract any instruction, next step, or task from the text.
     *   Format it as a structured command object.
     *   The 'command' should be a camelCase verb like 'createContact', 'createDeal', 'createTask', 'updateDeal'.
-    *   The 'details' should be an object containing all extracted data (e.g., email, phone, amount, stage).
+    *   The 'details' should be a JSON STRING containing all extracted data (e.g., "{\\"email\\": \\"jane@acme.com\\", \\"amount\\": 50000}").
     *   'sourceText' should contain the original snippet that justifies the command.
-    *   Example: "Please review the document" becomes { command: "createTask", details: { description: "Review the document" } }.
-    *   Example: "Let's create a deal for Julian for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: { contactName: "Julian", amount: 25000 } }.
+    *   Example: "Please review the document" becomes { command: "createTask", details: "{\\"description\\": \\"Review the document\\"}" }.
+    *   Example: "Let's create a deal for Julian for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: "{\\"contactName\\": \\"Julian\\", \\"amount\\": 25000}" }.
 4.  **Link to CRM Entities:**
     *   For each infotope, match the entity mentioned (e.g., "Javier Gomez", "Tech Solutions") with an entity from the provided CRM Context Data.
     *   If a match is found, use the entity's name and its ID.
     *   **If you cannot find a match, use the name from the text and "Not Found" as the ID.**
-    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. Example: { command: "createContact", entityName: "Julian Lopez", details: { email: "julian.l@example.com" } }.
+    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. Example: { command: "createContact", entityName: "Julian Lopez", details: "{\\"email\\": \\"julian.l@example.com\\"}" }.
 5.  **Return JSON:** Format your entire output as a single JSON object that strictly matches the output schema. Do not add any commentary.
 
 **CRM Context Data:**
@@ -118,7 +118,7 @@ const infoshardTextFlow = ai.defineFlow(
   },
   async (input) => {
     if (!input.text || input.text.trim().length < 10) {
-      return { infotopes: [], orchestrators: [{ command: 'error', details: { message: 'Input text is too short.' } }] };
+      return { infotopes: [], orchestrators: [{ command: 'error', details: 'Input text is too short.' }] };
     }
 
     try {
@@ -141,7 +141,7 @@ const infoshardTextFlow = ai.defineFlow(
             orchestrators: [
                 ...creationCommands, // Prioritize creation commands.
                 ...otherCommands,
-                { command: 'retryInfoshard', details: { originalText: input.text }, sourceText: 'An entity was not found, scheduling a retry.' }
+                { command: 'retryInfoshard', details: `{ "originalText": "${input.text.replace(/"/g, '\\"')}" }`, sourceText: 'An entity was not found, scheduling a retry.' }
             ]
         };
 

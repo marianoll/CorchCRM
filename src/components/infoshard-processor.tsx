@@ -59,6 +59,15 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
       }
     });
   };
+  
+  const parseDetails = (details: string | undefined) => {
+    if (!details) return {};
+    try {
+        return JSON.parse(details);
+    } catch (e) {
+        return { raw: details };
+    }
+  }
 
 
   return (
@@ -107,7 +116,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
                     {result.orchestrators.map((item, i) => (
                         <div key={`or-${i}`} className="text-sm text-muted-foreground bg-background/50 p-2 rounded-md">
                             <p className="font-semibold text-foreground">{item.command}</p>
-                            <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(item.details || {}, null, 2)}</pre>
+                            <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(parseDetails(item.details), null, 2)}</pre>
                             {item.sourceText && <p className="text-xs italic mt-2 border-t pt-1">Source: "{item.sourceText}"</p>}
                         </div>
                     ))}

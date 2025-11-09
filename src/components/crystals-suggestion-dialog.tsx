@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { LoaderCircle, Check, X, Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, writeBatch, Timestamp, doc } from 'firebase/firestore';
 import type { InfoshardTextOutput } from '@/ai/flows/infoshard-text-flow';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -42,7 +42,7 @@ export function CrystalsSuggestionDialog({
   const firestore = useFirestore();
   const { user } = useUser();
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     if (open) {
       setResult(null);
       setIsLoading(true);
@@ -65,6 +65,10 @@ export function CrystalsSuggestionDialog({
     }
   }, [open, processFunction, toast, onOpenChange]);
 
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const handleApprove = async () => {
     if (!result || !firestore || !user) return;
 
@@ -73,10 +77,9 @@ export function CrystalsSuggestionDialog({
 
     // Save each infotope as a "crystal"
     result.infotopes.forEach(infotope => {
-        const crystalRef = collection(firestore, 'crystals');
-        const crystalDoc = doc(crystalRef);
+        const crystalRef = doc(collection(firestore, 'crystals'));
         
-        batch.set(crystalDoc, {
+        batch.set(crystalRef, {
             fact: `(${infotope.entityName}) ${infotope.fact}`,
             source: 'email',
             sourceIdentifier: emailSourceIdentifier,
@@ -110,6 +113,15 @@ export function CrystalsSuggestionDialog({
         setIsSaving(false);
     }
   };
+  
+  const parseDetails = (details: string | undefined) => {
+    if (!details) return {};
+    try {
+        return JSON.parse(details);
+    } catch (e) {
+        return { raw: details };
+    }
+  }
 
 
   return (
@@ -156,11 +168,15 @@ export function CrystalsSuggestionDialog({
               <div>
                 <h4 className="font-semibold text-sm mb-2">Orchestrate Commands:</h4>
                 {result.orchestrators.length > 0 ? (
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                 <div className="space-y-2">
                     {result.orchestrators.map((item, i) => (
-                      <li key={`or-${i}`}>{item}</li>
+                        <div key={`or-${i}`} className="text-sm text-muted-foreground bg-background/50 p-2 rounded-md">
+                            <p className="font-semibold text-foreground">{item.command}</p>
+                            <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(parseDetails(item.details), null, 2)}</pre>
+                            {item.sourceText && <p className="text-xs italic mt-2 border-t pt-1">Source: "{item.sourceText}"</p>}
+                        </div>
                     ))}
-                  </ul>
+                </div>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">No commands generated.</p>
                 )}
