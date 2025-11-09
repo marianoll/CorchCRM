@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useTransition } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -25,6 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
+import { summarizeText } from '@/ai/flows/summarize-text';
 
 type Email = {
     id: string;
@@ -53,6 +54,9 @@ export default function EmailHistoryPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
+    const [isSummarizing, startSummaryTransition] = useTransition();
+    const [summaries, setSummaries] = useState<Record<string, string>>({});
+
 
     // Filter states
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -180,6 +184,30 @@ export default function EmailHistoryPage() {
         setContactFilter('');
     }
 
+    const handleSummarize = () => {
+        if (!filteredEmails || filteredEmails.length === 0) {
+            toast({ variant: 'destructive', title: 'No Emails', description: 'There are no emails to summarize.' });
+            return;
+        }
+
+        startSummaryTransition(async () => {
+            toast({ title: 'Generating Summaries...', description: `Processing ${filteredEmails.length} emails.`});
+            const newSummaries: Record<string, string> = {};
+            const promises = filteredEmails.map(async (email) => {
+                try {
+                    const result = await summarizeText({ text: email.body_excerpt });
+                    newSummaries[email.id] = result.summary;
+                } catch (error) {
+                    console.error(`Could not summarize email ${email.id}`, error);
+                    newSummaries[email.id] = 'Error generating summary.';
+                }
+            });
+            await Promise.all(promises);
+            setSummaries(prev => ({...prev, ...newSummaries}));
+            toast({ title: 'Summaries Generated!', description: 'AI summaries have been created for the visible emails.'});
+        });
+    };
+
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -197,7 +225,7 @@ export default function EmailHistoryPage() {
             </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 items-center gap-4 mb-4 p-4 bg-card border rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 items-start gap-4 mb-4 p-4 bg-card border rounded-lg">
             <h3 className="text-sm font-medium lg:col-span-5">Filters:</h3>
             <Popover>
                 <PopoverTrigger asChild>
@@ -264,11 +292,17 @@ export default function EmailHistoryPage() {
                 onChange={(e) => setLabelFilter(e.target.value)}
             />
            
-            {(dateRange || selectedCompany !== 'all' || labelFilter || keywordFilter || contactFilter) && (
-                <Button variant="ghost" onClick={clearFilters} className="lg:col-span-5 justify-self-start">
-                    Clear Filters
+            <div className="lg:col-span-5 flex flex-wrap gap-2 items-center">
+                 {(dateRange || selectedCompany !== 'all' || labelFilter || keywordFilter || contactFilter) && (
+                    <Button variant="ghost" onClick={clearFilters}>
+                        Clear Filters
+                    </Button>
+                )}
+                 <Button onClick={handleSummarize} disabled={isSummarizing}>
+                    {isSummarizing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
+                    Generate AI Summaries
                 </Button>
-            )}
+            </div>
         </div>
 
 
@@ -287,12 +321,11 @@ export default function EmailHistoryPage() {
                         <TableHead>Company</TableHead>
                         <TableHead>AI Summary</TableHead>
                         <TableHead>Labels</TableHead>
-                        <TableHead className="w-[80px]">Action</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {(emailsLoading || companiesLoading) && <TableRow><TableCell colSpan={7} className="text-center">Loading emails...</TableCell></TableRow>}
-                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={7} className="text-center">No emails found.</TableCell></TableRow>}
+                    {(emailsLoading || companiesLoading) && <TableRow><TableCell colSpan={6} className="text-center">Loading emails...</TableCell></TableRow>}
+                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={6} className="text-center">No emails found.</TableCell></TableRow>}
                     {filteredEmails.map((email) => (
                     <TableRow key={email.id}>
                         <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
@@ -325,14 +358,11 @@ export default function EmailHistoryPage() {
                             </div>
                         </TableCell>
                         <TableCell>{getCompanyName(email.company_id)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground italic line-clamp-2">{email.body_excerpt}</TableCell>
-                        <TableCell>
-                            {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
+                        <TableCell className="text-xs text-muted-foreground italic line-clamp-2">
+                            {summaries[email.id] || email.body_excerpt}
                         </TableCell>
                         <TableCell>
-                            <Button variant="ghost" size="icon" title="Automate">
-                                <Zap className="h-4 w-4" />
-                            </Button>
+                            {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
                         </TableCell>
                     </TableRow>
                     ))}
