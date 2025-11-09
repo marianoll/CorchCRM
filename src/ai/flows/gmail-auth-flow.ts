@@ -15,11 +15,9 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-const OAUTH2_CLIENT = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.OAUTH_REDIRECT_URI
-);
+// Explicitly load environment variables from .env.local
+require('dotenv').config({ path: './.env.local' });
+
 
 const GMAIL_SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -41,7 +39,14 @@ export const getGmailAuthUrl = ai.defineFlow(
     outputSchema: getAuthUrlOutputSchema,
   },
   async () => {
-    const url = OAUTH2_CLIENT.generateAuthUrl({
+    // Initialize the OAuth2 client inside the flow to ensure env vars are loaded.
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.OAUTH_REDIRECT_URI
+    );
+
+    const url = oauth2Client.generateAuthUrl({
       access_type: 'offline', // Important to get a refresh token
       scope: GMAIL_SCOPES,
       prompt: 'consent', // Force consent screen to ensure refresh token
@@ -77,8 +82,14 @@ export const processGmailAuthCode = ai.defineFlow(
       return { success: false, message: 'User ID is missing.' };
     }
 
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.OAUTH_REDIRECT_URI
+    );
+
     try {
-      const { tokens } = await OAUTH2_CLIENT.getToken(code);
+      const { tokens } = await oauth2Client.getToken(code);
       const { access_token, refresh_token, expiry_date } = tokens;
 
       if (!access_token || !refresh_token) {
@@ -89,9 +100,9 @@ export const processGmailAuthCode = ai.defineFlow(
       if (!firestore) throw new Error("Firestore not available");
 
       // We use the user's email as the ID for the integration document for simplicity
-      const oauth2Client = new google.auth.OAuth2();
-      oauth2Client.setCredentials(tokens);
-      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const oauth2ClientWithTokens = new google.auth.OAuth2();
+      oauth2ClientWithTokens.setCredentials(tokens);
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2ClientWithTokens });
       const userInfo = await oauth2.userinfo.get();
       
       const emailAddress = userInfo.data.email;
