@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -23,19 +24,15 @@ import {
   Home,
   Inbox,
   Briefcase,
-  Search,
   Settings,
   ChevronDown,
   Gem,
   History,
-  LogOut,
   Mail,
   Bug,
-  MessageCircle,
 } from 'lucide-react';
 import {
   useUser,
-  useAuth
 } from '@/firebase';
 import {
   DropdownMenu,
@@ -45,10 +42,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { SearchChatbot } from '@/components/search-chatbot';
 
 
 const navItems = [
@@ -152,9 +146,8 @@ function UserProfile() {
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-    useEffect(() => {
+    React.useEffect(() => {
         // If loading is finished and there's no user, redirect to login.
         if (!isUserLoading && !user) {
             router.replace('/login');
@@ -195,17 +188,6 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
                     <Logo />
                 </header>
                 {children}
-                <div className="fixed bottom-6 right-6 z-50">
-                    <Button
-                        size="icon"
-                        className="rounded-full w-14 h-14 shadow-lg"
-                        onClick={() => setIsSearchOpen(true)}
-                    >
-                        <MessageCircle className="h-6 w-6" />
-                        <span className="sr-only">Open Search Chat</span>
-                    </Button>
-                </div>
-                 <SearchChatbot open={isSearchOpen} onOpenChange={setIsSearchOpen} />
             </SidebarInset>
         </SidebarProvider>
     );

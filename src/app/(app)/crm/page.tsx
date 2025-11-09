@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -7,13 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Pencil, Database } from 'lucide-react';
+import { PlusCircle, Pencil, Database, MessageCircle } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { SearchChatbot } from '@/components/search-chatbot';
 
 // Define types based on new schema
 type Company = {
@@ -84,6 +86,7 @@ export default function CrmPage() {
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
     const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
     const [isSeeding, setIsSeeding] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
     
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -366,9 +369,27 @@ export default function CrmPage() {
       </div>
     </main>
 
+    <div className="fixed bottom-6 right-6 z-50">
+        <Button
+            size="icon"
+            className="rounded-full w-14 h-14 shadow-lg"
+            onClick={() => setIsSearchOpen(true)}
+        >
+            <MessageCircle className="h-6 w-6" />
+            <span className="sr-only">Open Search Chat</span>
+        </Button>
+    </div>
+
     <CreateContactForm open={isCreateContactOpen} onOpenChange={closeContactForm} contact={editingContact} companies={companies || []}/>
     <CreateDealForm open={isCreateDealOpen} onOpenChange={closeDealForm} contacts={contacts || []} companies={companies || []} deal={editingDeal} />
-    <CreateCompanyForm open={isCreateCompanyOpen} onOpenchaIge={closeCompanyForm} company={editingCompany} />
+    <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={closeCompanyForm} company={editingCompany} />
+    <SearchChatbot 
+        open={isSearchOpen} 
+        onOpenChange={setIsSearchOpen}
+        contacts={contacts}
+        deals={deals}
+        companies={companies}
+    />
     </>
   );
 }

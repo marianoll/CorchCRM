@@ -14,11 +14,16 @@ import {z} from 'genkit';
 
 const NaturalLanguageSearchInputSchema = z.object({
   query: z.string().describe('The natural language query to search CRM data.'),
+  context: z.object({
+    contacts: z.array(z.any()).optional(),
+    deals: z.array(z.any()).optional(),
+    companies: z.array(z.any()).optional(),
+  }).describe('The CRM data context for the query.'),
 });
 export type NaturalLanguageSearchInput = z.infer<typeof NaturalLanguageSearchInputSchema>;
 
 const NaturalLanguageSearchOutputSchema = z.object({
-  results: z.string().describe('The relevant CRM data based on the natural language query.'),
+  results: z.string().describe('The answer to the query based on the provided CRM data context.'),
 });
 export type NaturalLanguageSearchOutput = z.infer<typeof NaturalLanguageSearchOutputSchema>;
 
@@ -30,20 +35,16 @@ const prompt = ai.definePrompt({
   name: 'naturalLanguageSearchPrompt',
   input: {schema: NaturalLanguageSearchInputSchema},
   output: {schema: NaturalLanguageSearchOutputSchema},
-  prompt: `You are an AI assistant that translates natural language search queries into SQL queries to retrieve data from a CRM database.
+  system: `You are an expert CRM assistant. Your task is to answer the user's question based *only* on the data provided in the context.
+Do not make up information. If the answer is not in the data, say that you cannot find the information.
+Format your answer in a clear and concise way. You can use markdown for lists or tables if it helps.
 
-  The CRM database contains tables for Contacts, Deals, and Tasks.
-  - The Contacts table has columns: id, name, email, phone, company.
-  - The Deals table has columns: id, name, contact_id, amount, close_date, stage.
-  - The Tasks table has columns: id, description, deal_id, due_date, status.
-
-  Translate the following natural language query into a SQL query that can be executed against the CRM database to retrieve the relevant information.
-
-  Query: {{{query}}}
-
-  Return the SQL query as a string.
-
-  If the user is asking to show data, make sure to return a plain english explanation of what data is shown after the query.`,
+Here is the data context you have access to:
+- Contacts: {{{json context.contacts}}}
+- Deals: {{{json context.deals}}}
+- Companies: {{{json context.companies}}}
+`,
+  user: `Question: {{{query}}}`,
 });
 
 const naturalLanguageSearchFlow = ai.defineFlow(
@@ -54,6 +55,6 @@ const naturalLanguageSearchFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return {results: output!.results};
+    return output || {results: "I could not process the search request."};
   }
 );

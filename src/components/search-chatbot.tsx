@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -11,17 +12,21 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { LoaderCircle, MessageCircle, Send, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { naturalLanguageSearch, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import ReactMarkdown from 'react-markdown';
 
 type SearchChatbotProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contacts: any[] | null;
+  deals: any[] | null;
+  companies: any[] | null;
 };
 
-export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
+export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }: SearchChatbotProps) {
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<NaturalLanguageSearchOutput | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -40,7 +45,14 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
     setResult(null);
     startTransition(async () => {
       try {
-        const res = await naturalLanguageSearch({ query });
+        const res = await naturalLanguageSearch({ 
+            query,
+            context: {
+                contacts: contacts || [],
+                deals: deals || [],
+                companies: companies || [],
+            }
+        });
         setResult(res);
       } catch (error) {
         console.error(error);
@@ -77,7 +89,7 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
           <div className="flex w-full items-center space-x-2">
             <Input
               type="text"
-              placeholder="e.g., 'deals closed this month'"
+              placeholder="e.g., 'deals over 50k for Acme Corp'"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -93,7 +105,7 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
               <span className="sr-only">Search</span>
             </Button>
           </div>
-          <div className="min-h-[200px]">
+          <div className="min-h-[200px] max-h-[400px] overflow-y-auto">
             {isPending && (
               <div className="flex flex-col items-center justify-center rounded-lg p-12 text-center">
                 <LoaderCircle className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
@@ -104,8 +116,8 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
                 <Alert>
                     <Sparkles className="h-4 w-4" />
                     <AlertTitle>AI Interpretation</AlertTitle>
-                    <AlertDescription className="font-mono text-sm bg-secondary p-3 mt-2 rounded-lg">
-                        {result.results}
+                    <AlertDescription className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{result.results}</ReactMarkdown>
                     </AlertDescription>
                 </Alert>
             )}
