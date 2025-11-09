@@ -37,10 +37,11 @@ Ahora crearás las claves que tu aplicación usará para identificarse ante Goog
 2.  Haz clic en **+ Crear credenciales** y selecciona **ID de cliente de OAuth**.
 3.  **Tipo de aplicación**: Selecciona **Aplicación web**.
 4.  **Nombre**: Ponle un nombre, como "CorchCRM Web Client".
-5.  **URIs de redirección autorizados**: Esta es la parte más importante.
+5.  **URIs de redirección autorizados**: Esta es la parte más importante. Debes añadir **TODAS** las URLs desde donde la aplicación se conectará.
     *   Haz clic en **+ Añadir URI**.
-    *   Introduce la siguiente URL: `http://localhost:9002/oauth/callback`
-    *   *Nota: Si tu aplicación se ejecuta en un puerto diferente, cambia `9002` por el puerto correcto.*
+    *   Introduce la URL para el desarrollo local: `http://localhost:9002/oauth/callback`
+    *   Haz clic en **+ Añadir URI** de nuevo.
+    *   Introduce la URL para el entorno de la ventana externa: `http://6000-firebase-studio-1762619755690.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev/oauth/callback`
 6.  Haz clic en **Crear**.
 
 ### 4. Añadir las Credenciales a tu Aplicación
@@ -65,4 +66,4 @@ OAUTH_REDIRECT_URI=http://localhost:9002/oauth/callback
 
 Después de guardar los cambios en `.env.local`, **debes reiniciar el servidor de desarrollo** para que las nuevas variables de entorno se carguen.
 
-¡Y eso es todo! Ahora puedes volver a la página de "Settings" en la aplicación y usar el botón "Conectar con Gmail".
+¡Y eso es todo! Ahora puedes volver a la página de "Settings" en la aplicación y usar el botón "Conectar con Gmail" desde cualquiera de los dos entornos.
