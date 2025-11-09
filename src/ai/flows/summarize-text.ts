@@ -9,6 +9,7 @@
 
 import { ai } from '@/ai';
 import { z } from 'zod';
+import { googleAI } from '@genkit-ai/google-genai';
 
 // Define the input schema for the flow
 const SummarizeTextInputSchema = z.object({
@@ -25,6 +26,7 @@ export type SummarizeTextOutput = z.infer<typeof SummarizeTextOutputSchema>;
 // Define the prompt that will be used by the AI model
 const summarizeTextPrompt = ai.definePrompt({
   name: 'summarizeTextPrompt',
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: SummarizeTextInputSchema },
   output: { schema: SummarizeTextOutputSchema },
   prompt: `Summarize the following text into a single, concise line:
