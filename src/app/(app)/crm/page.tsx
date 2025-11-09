@@ -323,11 +323,21 @@ export default function CrmPage() {
                     </TableHeader>
                     <TableBody>
                     {dealsLoading && <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>}
-                    {deals?.map(deal => (
+                    {deals?.map(deal => {
+                        const company = getCompany(deal.company_id || deal.companyId);
+                        return (
                         <TableRow key={deal.id}>
                             <TableCell className="font-medium">{deal.title || deal.name}</TableCell>
                             <TableCell>{getContactName(deal.primary_contact_id || deal.contactId!)}</TableCell>
-                            <TableCell>{getCompany(deal.company_id || deal.companyId)?.name || 'N/A'}</TableCell>
+                            <TableCell>
+                                {company ? (
+                                    <Button variant="link" className="p-0 h-auto" onClick={() => handleEntityClick(company, 'Company')}>
+                                        {company.name}
+                                    </Button>
+                                ) : (
+                                    'N/A'
+                                )}
+                            </TableCell>
                             <TableCell className="text-right">{formatCurrency(deal.amount, deal.currency)}</TableCell>
                             <TableCell>
                                 <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
@@ -338,7 +348,8 @@ export default function CrmPage() {
                                 </Button>
                             </TableCell>
                         </TableRow>
-                    ))}
+                        )
+                    })}
                     </TableBody>
                 </Table>
             </div>
