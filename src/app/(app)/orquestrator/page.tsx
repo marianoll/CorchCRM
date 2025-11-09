@@ -90,28 +90,30 @@ export default function OrquestratorPage() {
                 <CardDescription>Emails drafted or scheduled by the system or user.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Scheduled At</TableHead>
-                        <TableHead>To</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Actor</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
-                    {!logsLoading && scheduledEmails.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No scheduled emails found.</TableCell></TableRow>}
-                    {scheduledEmails.map((log) => (
-                    <TableRow key={log.id}>
-                        <TableCell>{log.ts ? format(toDate(log.ts), "MMM d, yyyy, h:mm a") : 'N/A'}</TableCell>
-                        <TableCell>{log.after_snapshot?.to}</TableCell>
-                        <TableCell className="font-medium">{log.after_snapshot?.subject}</TableCell>
-                        <TableCell><Badge variant={actorVariant[log.actor_type] || 'secondary'}>{log.actor_type}</Badge></TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-                </Table>
+                <div className="max-h-80 overflow-y-auto">
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Scheduled At</TableHead>
+                            <TableHead>To</TableHead>
+                            <TableHead>Subject</TableHead>
+                            <TableHead>Actor</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
+                        {!logsLoading && scheduledEmails.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No scheduled emails found.</TableCell></TableRow>}
+                        {scheduledEmails.map((log) => (
+                        <TableRow key={log.id}>
+                            <TableCell>{log.ts ? format(toDate(log.ts), "MMM d, yyyy, h:mm a") : 'N/A'}</TableCell>
+                            <TableCell>{log.after_snapshot?.to}</TableCell>
+                            <TableCell className="font-medium">{log.after_snapshot?.subject}</TableCell>
+                            <TableCell><Badge variant={actorVariant[log.actor_type] || 'secondary'}>{log.actor_type}</Badge></TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
 
@@ -122,28 +124,30 @@ export default function OrquestratorPage() {
                 <CardDescription>Meetings created by the system or user.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Proposed Time</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Participants</TableHead>
-                        <TableHead>Related Deal</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
-                    {!logsLoading && scheduledMeetings.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No scheduled meetings found.</TableCell></TableRow>}
-                    {scheduledMeetings.map((log) => (
-                    <TableRow key={log.id}>
-                        <TableCell>{log.after_snapshot?.proposed_time ? format(toDate(log.after_snapshot.proposed_time), "MMM d, yyyy, h:mm a") : 'N/A'}</TableCell>
-                        <TableCell className="font-medium">{log.after_snapshot?.title}</TableCell>
-                        <TableCell className="text-xs">{log.after_snapshot?.participants?.join(', ')}</TableCell>
-                        <TableCell>{log.after_snapshot?.deal_id || 'N/A'}</TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-                </Table>
+                <div className="max-h-80 overflow-y-auto">
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Proposed Time</TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Participants</TableHead>
+                            <TableHead>Related Deal</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
+                        {!logsLoading && scheduledMeetings.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No scheduled meetings found.</TableCell></TableRow>}
+                        {scheduledMeetings.map((log) => (
+                        <TableRow key={log.id}>
+                            <TableCell>{log.after_snapshot?.proposed_time ? format(toDate(log.after_snapshot.proposed_time), "MMM d, yyyy, h:mm a") : 'N/A'}</TableCell>
+                            <TableCell className="font-medium">{log.after_snapshot?.title}</TableCell>
+                            <TableCell className="text-xs">{log.after_snapshot?.participants?.join(', ')}</TableCell>
+                            <TableCell>{log.after_snapshot?.deal_id || 'N/A'}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
 
@@ -154,30 +158,32 @@ export default function OrquestratorPage() {
                 <CardDescription>All deal stage updates are recorded here.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Update At</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Deal</TableHead>
-                        <TableHead>Company</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {(logsLoading || dealsLoading || companiesLoading) && <TableRow><TableCell colSpan={4} className="text-center">Loading updates...</TableCell></TableRow>}
-                    {!logsLoading && dealUpdates.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No deal updates found.</TableCell></TableRow>}
-                    {dealUpdates.map((log) => (
-                    <TableRow key={log.id}>
-                        <TableCell>{log.ts ? format(toDate(log.ts), "MMM d, yyyy, h:mm a") : 'N/A'}</TableCell>
-                        <TableCell className="font-medium">
-                            {`Update deal to '${log.after_snapshot?.stage}' stage`}
-                        </TableCell>
-                        <TableCell>{log.before_snapshot?.title || 'N/A'}</TableCell>
-                        <TableCell>{getCompanyNameForDeal(log.entity_id)}</TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-                </Table>
+                <div className="max-h-80 overflow-y-auto">
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Update At</TableHead>
+                            <TableHead>Action</TableHead>
+                            <TableHead>Deal</TableHead>
+                            <TableHead>Company</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {(logsLoading || dealsLoading || companiesLoading) && <TableRow><TableCell colSpan={4} className="text-center">Loading updates...</TableCell></TableRow>}
+                        {!logsLoading && dealUpdates.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No deal updates found.</TableCell></TableRow>}
+                        {dealUpdates.map((log) => (
+                        <TableRow key={log.id}>
+                            <TableCell>{log.ts ? format(toDate(log.ts), "MMM d, yyyy, h:mm a") : 'N/A'}</TableCell>
+                            <TableCell className="font-medium">
+                                {`Update deal to '${log.after_snapshot?.stage}' stage`}
+                            </TableCell>
+                            <TableCell>{log.before_snapshot?.title || 'N/A'}</TableCell>
+                            <TableCell>{getCompanyNameForDeal(log.entity_id)}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
       </div>
