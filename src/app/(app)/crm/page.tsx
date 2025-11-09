@@ -6,7 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Pencil } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
@@ -215,11 +221,24 @@ export default function CrmPage() {
                 <h1 className="text-3xl font-bold tracking-tight font-headline">CRM View</h1>
                 <p className="text-muted-foreground">Browse your deals, contacts and companies.</p>
             </div>
-            <div className="flex gap-2">
-                <Button onClick={() => { setEditingContact(null); setCreateContactOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Contact</Button>
-                <Button onClick={() => { setEditingDeal(null); setCreateDealOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Deal</Button>
-                <Button onClick={() => { setEditingCompany(null); setCreateCompanyOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Company</Button>
-            </div>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button size="icon">
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => { setEditingContact(null); setCreateContactOpen(true); }}>
+                        New Contact
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setEditingDeal(null); setCreateDealOpen(true); }}>
+                        New Deal
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setEditingCompany(null); setCreateCompanyOpen(true); }}>
+                        New Company
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
 
         <Tabs defaultValue="deals" className="w-full">
