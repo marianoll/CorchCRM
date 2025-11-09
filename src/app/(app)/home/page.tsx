@@ -1,5 +1,4 @@
-import { VoiceRecorder } from '@/components/voice-recorder';
-import { EmailProcessor } from '@/components/email-processor';
+import { InfoshardProcessor } from '@/components/infoshard-processor';
 import { RecentActivity } from '@/components/recent-activity';
 import { UpcomingTasks } from '@/components/upcoming-tasks';
 
@@ -11,9 +10,8 @@ export default function HomePage() {
           Home Dashboard
         </h1>
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            <div className="xl:col-span-2 grid gap-6 md:grid-cols-2">
-                <VoiceRecorder />
-                <EmailProcessor />
+            <div className="xl:col-span-2">
+                <InfoshardProcessor />
             </div>
             <div className="space-y-6">
                 <RecentActivity />
