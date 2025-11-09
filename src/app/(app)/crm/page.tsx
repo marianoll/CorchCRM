@@ -16,6 +16,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebas
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
+import { format } from 'date-fns';
 
 // Define types based on new schema
 type Company = {
@@ -93,6 +94,18 @@ const stageVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } =
 const formatCurrency = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 };
+
+const toDate = (dateValue: any): Date => {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (dateValue instanceof Timestamp) return dateValue.toDate();
+    if (typeof dateValue === 'string') return new Date(dateValue);
+    if (dateValue && typeof dateValue.seconds === 'number') {
+        return new Date(dateValue.seconds * 1000);
+    }
+    return new Date();
+};
+
 
 export default function CrmPage() {
     const firestore = useFirestore();
@@ -316,13 +329,15 @@ export default function CrmPage() {
                         <TableHead>Deal Title</TableHead>
                         <TableHead>Contact</TableHead>
                         <TableHead>Company</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Amount</TableHead>
                         <TableHead>Stage</TableHead>
+                        <TableHead>Probability</TableHead>
+                        <TableHead>Close Date</TableHead>
                         <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {dealsLoading && <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>}
+                    {dealsLoading && <TableRow><TableCell colSpan={8}>Loading...</TableCell></TableRow>}
                     {deals?.map(deal => {
                         const company = getCompany(deal.company_id || deal.companyId);
                         return (
@@ -338,10 +353,12 @@ export default function CrmPage() {
                                     'N/A'
                                 )}
                             </TableCell>
-                            <TableCell className="text-right">{formatCurrency(deal.amount, deal.currency)}</TableCell>
+                            <TableCell>{formatCurrency(deal.amount, deal.currency)}</TableCell>
                             <TableCell>
                                 <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
                             </TableCell>
+                            <TableCell>{deal.probability ? `${deal.probability}%` : 'N/A'}</TableCell>
+                            <TableCell>{deal.close_date ? format(toDate(deal.close_date), 'MMM dd, yyyy') : 'N/A'}</TableCell>
                             <TableCell>
                                 <Button variant="ghost" size="icon" onClick={() => handleEditDeal(deal)}>
                                     <Pencil className="h-4 w-4" />
@@ -363,11 +380,13 @@ export default function CrmPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Company</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Seniority</TableHead>
                         <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {contactsLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
+                    {contactsLoading && <TableRow><TableCell colSpan={7}>Loading...</TableCell></TableRow>}
                     {contacts?.map(contact => {
                         const company = getCompany(contact.company_id || contact.companyId);
                         return (
@@ -381,7 +400,7 @@ export default function CrmPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>{contact.email_primary || contact.email}</TableCell>
-                                <TableCell>{contact.phone}</TableCell>
+                                <TableCell>{contact.phone || 'N/A'}</TableCell>
                                 <TableCell>
                                     {company ? (
                                         <Button variant="link" className="p-0 h-auto" onClick={() => handleEntityClick(company, 'Company')}>
@@ -391,6 +410,8 @@ export default function CrmPage() {
                                         'N/A'
                                     )}
                                 </TableCell>
+                                <TableCell>{contact.title || 'N/A'}</TableCell>
+                                <TableCell>{contact.seniority || 'N/A'}</TableCell>
                                 <TableCell>
                                     <Button variant="ghost" size="icon" onClick={() => handleEditContact(contact)}>
                                         <Pencil className="h-4 w-4" />
@@ -411,16 +432,20 @@ export default function CrmPage() {
                             <TableHead>Company Name</TableHead>
                             <TableHead>Domain</TableHead>
                             <TableHead>Industry</TableHead>
+                            <TableHead>Size</TableHead>
+                            <TableHead>Region</TableHead>
                             <TableHead className="w-[80px]">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {companiesLoading && <TableRow><TableCell colSpan={4}>Loading...</TableCell></TableRow>}
+                        {companiesLoading && <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>}
                         {companies?.map(company => (
                             <TableRow key={company.id}>
                                 <TableCell className="font-medium">{company.name}</TableCell>
                                 <TableCell><a href={`http://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.domain}</a></TableCell>
-                                <TableCell>{company.industry}</TableCell>
+                                <TableCell>{company.industry || 'N/A'}</TableCell>
+                                <TableCell>{company.size || 'N/A'}</TableCell>
+                                <TableCell>{company.region || 'N/A'}</TableCell>
                                 <TableCell>
                                     <Button variant="ghost" size="icon" onClick={() => handleEditCompany(company)}>
                                         <Pencil className="h-4 w-4" />
