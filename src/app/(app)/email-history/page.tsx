@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -779,17 +780,17 @@ export default function EmailHistoryPage() {
                         
                         const isProcessingRow = processingActionsId === email.id;
 
-                        const hasAction = (type: ActionType) => {
-                             if (!email.actions) return false;
-                             return email.actions.some(a => actionTypeMapping[a.type] === type || a.type === type);
-                        };
-
-                        const getIconClass = (action: ActionType) => {
-                            const status = email.actionStates?.[action];
-                            if (status === 'approved') return 'text-green-500';
-                            if (status === 'rejected') return 'text-red-500';
-                            if (hasAction(action)) return 'text-foreground'; // Black
-                            return 'text-muted-foreground'; // Gray
+                        const getIconClass = (actionType: ActionType) => {
+                            const userDecision = email.actionStates?.[actionType];
+                            if (userDecision === 'approved') return 'text-green-500';
+                            if (userDecision === 'rejected') return 'text-red-500';
+                            
+                            const hasPendingAction = email.actions?.some(a => 
+                                (actionTypeMapping[a.type] === actionType || a.type === actionType) && a.status === 'pending'
+                            );
+                            if (hasPendingAction) return 'text-yellow-500';
+                            
+                            return 'text-muted-foreground';
                         };
 
                         return (
@@ -1026,3 +1027,5 @@ export default function EmailHistoryPage() {
     </TooltipProvider>
   );
 }
+
+    
