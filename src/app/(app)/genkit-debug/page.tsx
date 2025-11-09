@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bug, LoaderCircle, CheckCircle, XCircle, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { debugEcho } from '@/ai/flows/debug-echo';
+import { debugEcho, type DebugEchoOutput } from '@/ai/flows/debug-echo';
 
 type TestStatus = 'pending' | 'running' | 'passed' | 'failed';
 
@@ -18,7 +18,7 @@ const statusConfig = {
 
 export default function GenkitDebugPage() {
     const [testStatus, setTestStatus] = useState<TestStatus>('pending');
-    const [testResult, setTestResult] = useState<string | null>(null);
+    const [testResult, setTestResult] = useState<DebugEchoOutput | { error: string } | null>(null);
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
 
@@ -26,26 +26,27 @@ export default function GenkitDebugPage() {
         setTestStatus('running');
         setTestResult(null);
         const testMessage = `Hello Genkit, this is a test at ${new Date().toISOString()}`;
+        const inputPayload = { message: testMessage };
 
         startTransition(async () => {
             try {
-                console.log(`[Client-Side Test] Sending: "${testMessage}"`);
-                const result = await debugEcho({ message: testMessage });
+                console.log(`[Client-Side Test] Sending payload:`, inputPayload);
+                const result = await debugEcho(inputPayload);
                 
-                if (result.echo === `ECHO: ${testMessage}`) {
+                setTestResult(result);
+
+                if (result.receivedInput && result.receivedInput.message === testMessage) {
                     setTestStatus('passed');
-                    setTestResult(`Success! Flow returned the expected echo:\n\nINPUT:\n${testMessage}\n\nOUTPUT:\n${result.echo}`);
                     toast({ title: 'Test Passed', description: 'The Genkit flow responded correctly.' });
                 } else {
                     setTestStatus('failed');
-                    setTestResult(`Test failed. The flow returned an unexpected value.\n\nExpected: "ECHO: ${testMessage}"\nReceived: "${result.echo}"`);
-                    toast({ variant: 'destructive', title: 'Test Failed', description: 'The flow returned an unexpected value.' });
+                    toast({ variant: 'destructive', title: 'Test Failed', description: 'The flow returned an unexpected or empty value.' });
                 }
 
             } catch (error: any) {
                 console.error('[Client-Side Test] Error invoking flow:', error);
                 setTestStatus('failed');
-                setTestResult(`Test failed with an error.\n\nError Message:\n${error.message}\n\nCheck the browser console and server logs for more details.`);
+                setTestResult({ error: error.message || "An unknown error occurred." });
                 toast({ variant: 'destructive', title: 'Test Failed', description: 'An error occurred while invoking the flow.' });
             }
         });
@@ -68,8 +69,8 @@ export default function GenkitDebugPage() {
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <div>
-                                <CardTitle>Flow Invocation Test</CardTitle>
-                                <CardDescription>Checks if a simple Genkit flow can be invoked from the client and return a predictable value.</CardDescription>
+                                <CardTitle>Flow Invocation Test (Steps 5, 6, 10)</CardTitle>
+                                <CardDescription>Sends a structured payload to a debug flow and echoes the entire received object to check for data loss in the pipeline.</CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
                                 <TestIcon className={`h-5 w-5 ${statusConfig[testStatus].color}`} />
@@ -80,8 +81,8 @@ export default function GenkitDebugPage() {
                     <CardContent>
                         {testResult && (
                              <div className="p-4 bg-secondary rounded-md text-sm">
-                                <h4 className="font-semibold mb-2">Test Output:</h4>
-                                <pre className="whitespace-pre-wrap font-mono text-xs">{testResult}</pre>
+                                <h4 className="font-semibold mb-2">Raw JSON Output from Flow:</h4>
+                                <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(testResult, null, 2)}</pre>
                             </div>
                         )}
                     </CardContent>
