@@ -5,6 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const ProcessMediaInputSchema = z.object({
   fileDataUri: z.string().describe("File data encoded as a data URI. Expected format: 'data:<mimetype>;base64,...'"),
@@ -20,7 +21,7 @@ export type ProcessMediaOutput = z.infer<typeof ProcessMediaOutputSchema>;
 
 const processMediaPrompt = ai.definePrompt({
     name: 'processMediaFilePrompt',
-    model: 'googleai/gemini-1.5-flash-latest',
+    model: googleAI.model('gemini-2.0-flash-lite'),
     input: { schema: ProcessMediaInputSchema },
     prompt: `You are a data extraction specialist. Your task is to extract all relevant text from the provided file.
 - For audio or video, transcribe the speech.
