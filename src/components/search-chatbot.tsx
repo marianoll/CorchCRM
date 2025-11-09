@@ -19,13 +19,16 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 
-type SearchChatbotProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+type CrmData = {
   contacts: any[] | null;
   deals: any[] | null;
   companies: any[] | null;
-};
+}
+
+type SearchChatbotProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+} & CrmData;
 
 type Message = {
     role: 'user' | 'assistant';
@@ -41,7 +44,7 @@ const inspirationChips = [
     "Average deal size by industry",
 ];
 
-export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
+export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }: SearchChatbotProps) {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -72,7 +75,12 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
 
     startTransition(async () => {
       try {
-        const res = await naturalLanguageSearch({ query: searchQuery });
+        const res = await naturalLanguageSearch({ 
+            query: searchQuery,
+            contacts: contacts || [],
+            deals: deals || [],
+            companies: companies || []
+        });
         setMessages(prev => [...prev, { role: 'assistant', content: res.results }]);
       } catch (error: any) {
         console.error(error);
@@ -110,7 +118,7 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
         
         <ScrollArea className="flex-1 space-y-4 py-4 pr-4 -mr-4" ref={scrollAreaRef}>
             <div className="space-y-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && !isPending && (
                  <div className="p-4">
                     <p className="text-sm font-medium mb-2 text-muted-foreground">Try asking me something like...</p>
                     <div className="flex flex-wrap gap-2">

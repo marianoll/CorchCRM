@@ -169,13 +169,13 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     type Deal = { id: string; title: string; [key: string]: any; };
 
     // Fetch all CRM data needed for the search context
-    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [firestore, user]);
+    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, [firestore, user]);
     const { data: contacts } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')) : null, [firestore, user]);
+    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
     const { data: deals } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
+    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, [firestore, user]);
     const { data: companies } = useCollection<Company>(companiesQuery);
 
 
