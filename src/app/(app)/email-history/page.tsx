@@ -229,16 +229,8 @@ export default function EmailHistoryPage() {
             const emailRef = doc(firestore, 'users', user.uid, 'emails', emailId);
             const summaryData = { ai_summary: result.summary };
 
-            setDoc(emailRef, summaryData, { merge: true }).catch(error => {
-                const permissionError = new FirestorePermissionError({
-                    path: emailRef.path,
-                    operation: 'update',
-                    requestResourceData: summaryData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-                throw error;
-            });
-
+            await setDoc(emailRef, summaryData, { merge: true });
+            
             if (setEmails) {
                  setEmails(prevEmails => {
                     if (!prevEmails) return null;
@@ -249,8 +241,10 @@ export default function EmailHistoryPage() {
             toast({ title: 'Summary Generated!', description: 'AI summary has been saved.' });
         } catch (err: any) {
             console.error(`Failed to summarize email ${emailId}:`, err);
-            if (!(err instanceof FirestorePermissionError)) {
-                toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not generate or save summary.' });
+             if (err instanceof FirestorePermissionError) {
+                errorEmitter.emit('permission-error', err);
+            } else {
+                 toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not generate or save summary.' });
             }
         } finally {
             setSummarizingId(null);
@@ -269,40 +263,35 @@ export default function EmailHistoryPage() {
         }
 
         setIsSummarizingAll(true);
-        toast({ title: 'Summarizing All...', description: `Processing ${emailsToSummarize.length} emails. This may take a moment.` });
+        toast({ title: 'Summarizing All...', description: `Processing ${emailsToSummarize.length} emails.` });
+        
+        let successCount = 0;
 
-        const batch = writeBatch(firestore);
-        const newSummaries: { [id: string]: string } = {};
+        for (const email of emailsToSummarize) {
+            setSummarizingId(email.id); // Show loader for current row
+            try {
+                const result = await summarizeText({ text: email.body_excerpt });
+                const emailRef = doc(firestore, 'users', user.uid, 'emails', email.id);
+                await setDoc(emailRef, { ai_summary: result.summary }, { merge: true });
 
-        try {
-            for (const email of emailsToSummarize) {
-                try {
-                    const result = await summarizeText({ text: email.body_excerpt });
-                    newSummaries[email.id] = result.summary;
-                    const emailRef = doc(firestore, 'users', user.uid, 'emails', email.id);
-                    batch.update(emailRef, { ai_summary: result.summary });
-                } catch (err) {
-                    console.warn(`Could not summarize email ${email.id}. Skipping.`, err);
+                // Update UI state for this specific email
+                if (setEmails) {
+                    setEmails(prevEmails => {
+                        if (!prevEmails) return null;
+                        return prevEmails.map(e => e.id === email.id ? { ...e, ai_summary: result.summary } : e);
+                    });
                 }
+                successCount++;
+            } catch (err) {
+                console.warn(`Could not summarize email ${email.id}. Skipping.`, err);
+                // Optionally show a toast for each failure
+            } finally {
+                setSummarizingId(null); // Hide loader for this row
             }
-
-            await batch.commit();
-
-            if (setEmails) {
-                setEmails(prevEmails => {
-                    if (!prevEmails) return null;
-                    return prevEmails.map(e => newSummaries[e.id] ? { ...e, ai_summary: newSummaries[e.id] } : e);
-                });
-            }
-
-            toast({ title: 'Summaries Complete!', description: `${Object.keys(newSummaries).length} emails were summarized.` });
-
-        } catch (error) {
-            console.error("Batch summarizing error:", error);
-            toast({ variant: 'destructive', title: 'Batch Failed', description: 'Could not save all summaries. Check console.' });
-        } finally {
-            setIsSummarizingAll(false);
         }
+
+        setIsSummarizingAll(false);
+        toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
     };
 
 
@@ -484,7 +473,7 @@ export default function EmailHistoryPage() {
                             <TableCell>
                                 <div className="flex items-center gap-2">
                                 {email.ai_summary ? (
-                                    <span className="line-clamp-2">{email.ai_summary}</span>
+                                    <span className="line-clamp-2 text-sm">{email.ai_summary}</span>
                                 ) : (
                                     <>
                                         {summarizingId === email.id ? (
@@ -494,7 +483,7 @@ export default function EmailHistoryPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
-                                                disabled={summarizingId === email.id || isSummarizingAll}
+                                                disabled={isSummarizingAll}
                                                 className="h-6 w-6 shrink-0"
                                             >
                                                 <RefreshCw className="h-4 w-4" />
