@@ -8,7 +8,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { format } from 'date-fns';
 
 // ---- Schemas (local variables, not exported) ----
 
@@ -47,45 +46,74 @@ const syncGmailFlow = ai.defineFlow(
   async ({ userId }) => {
     console.log(`Starting Gmail sync for user: ${userId}`);
 
-    // In a real implementation:
-    // 1. Fetch the user's Gmail integration details (access/refresh tokens) from Firestore:
-    //    /users/{userId}/gmailIntegrations/{integrationId}
-    // 2. Use the tokens to initialize a Gmail API client.
-    // 3. If the access token is expired, use the refresh token to get a new one.
-    // 4. Query the Gmail API for messages from today.
-    //    Example query: `after:${format(new Date(), 'yyyy/MM/dd')} before:${format(new Date(Date.now() + 86400000), 'yyyy/MM/dd')}`
-    // 5. For each message, fetch its full content.
-    // 6. Parse the content and transform it into our Email schema.
-    
-    // For this demo, we will return a hardcoded list of simulated emails.
-    const today = new Date();
-    const simulatedEmails = [
+    // STEP 1: (REAL) Authenticate and get API client.
+    // (SIMULATED) We assume we have an authenticated client.
+
+    // STEP 2: (REAL) Fetch list of message IDs from today.
+    // (SIMULATED) We generate a list of raw "API-like" responses.
+    const rawEmailsFromApi = [
         {
-            thread_id: `thread-${Math.random().toString(36).substring(7)}`,
-            from_email: 'customer@example.com',
-            to_email: `sales+${userId.substring(0,5)}@mycompany.com`,
-            direction: 'inbound' as const,
-            subject: 'Following up on our call',
-            body_excerpt: 'Hi, it was great chatting with you today. I have a few more questions about the proposal you sent over. Can we connect tomorrow?',
-            labels: 'followup;question',
-            ts: today.toISOString(),
+            id: `gmail-id-${Math.random().toString(16).slice(2)}`,
+            threadId: `thread-${Math.random().toString(36).substring(7)}`,
+            payload: {
+                headers: [
+                    { name: 'From', value: 'customer@example.com' },
+                    { name: 'To', value: `sales+${userId.substring(0,5)}@mycompany.com` },
+                    { name: 'Subject', value: 'Following up on our call' },
+                    { name: 'Date', value: new Date().toUTCString() },
+                ],
+                snippet: 'Hi, it was great chatting with you today. I have a few more questions about the proposal you sent over. Can we connect tomorrow?',
+            },
+            labelIds: ['INBOX', 'IMPORTANT'],
         },
         {
-            thread_id: `thread-${Math.random().toString(36).substring(7)}`,
-            from_email: `sales+${userId.substring(0,5)}@mycompany.com`,
-            to_email: 'prospect@newlead.com',
-            direction: 'outbound' as const,
-            subject: 'Intro to CorchCRM',
-            body_excerpt: 'Hi Prospect, thanks for your interest in CorchCRM. I\'d love to schedule a 15-minute demo to show you how we can help you seal your funnel. Are you free sometime this week?',
-            labels: 'outreach;demo',
-            ts: new Date(today.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        },
+            id: `gmail-id-${Math.random().toString(16).slice(2)}`,
+            threadId: `thread-${Math.random().toString(36).substring(7)}`,
+            payload: {
+                 headers: [
+                    { name: 'From', value: `sales+${userId.substring(0,5)}@mycompany.com` },
+                    { name: 'To', value: 'prospect@newlead.com' },
+                    { name: 'Subject', value: 'Intro to CorchCRM' },
+                    { name: 'Date', value: new Date(Date.now() - 2 * 60 * 60 * 1000).toUTCString() },
+                ],
+                snippet: 'Hi Prospect, thanks for your interest in CorchCRM. I\'d love to schedule a 15-minute demo to show you how we can help you seal your funnel. Are you free sometime this week?',
+            },
+            labelIds: ['SENT'],
+        }
     ];
+
+    // STEP 3: (REAL & SIMULATED) Process each raw email into our schema.
+    const processedEmails = rawEmailsFromApi.map(rawEmail => {
+        const fromHeader = rawEmail.payload.headers.find(h => h.name === 'From');
+        const toHeader = rawEmail.payload.headers.find(h => h.name === 'To');
+        const subjectHeader = rawEmail.payload.headers.find(h => h.name === 'Subject');
+        const dateHeader = rawEmail.payload.headers.find(h => h.name === 'Date');
+
+        const from_email = fromHeader ? fromHeader.value : 'unknown';
+        const to_email = toHeader ? toHeader.value : 'unknown';
+        
+        // A real implementation would parse the user's email from the auth token
+        const userEmailDomain = 'mycompany.com';
+        const direction = from_email.includes(userEmailDomain) ? 'outbound' : 'inbound';
+        
+        return {
+            thread_id: rawEmail.threadId,
+            from_email,
+            to_email,
+            direction,
+
+            subject: subjectHeader ? subjectHeader.value : '(No Subject)',
+            body_excerpt: rawEmail.payload.snippet,
+            labels: 'followup;question', // Real implementation would map labelIds
+            ts: dateHeader ? new Date(dateHeader.value).toISOString() : new Date().toISOString(),
+        } as z.infer<typeof EmailSchema>;
+    });
+
 
     return {
       success: true,
-      message: `Successfully simulated fetching ${simulatedEmails.length} emails.`,
-      emails: simulatedEmails,
+      message: `Successfully simulated fetching ${processedEmails.length} emails.`,
+      emails: processedEmails,
     };
   }
 );
