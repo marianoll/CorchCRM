@@ -514,6 +514,7 @@ export default function EmailHistoryPage() {
         onEntityClick={handleEntityClick}
         contacts={contacts || []}
         deals={deals || []}
+        emails={emails || []}
       />
     </main>
     </TooltipProvider>
