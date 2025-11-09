@@ -55,7 +55,7 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
             behavior: 'smooth'
         });
     }
-  }, [messages])
+  }, [messages, isPending])
 
   const handleSearch = (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -137,7 +137,7 @@ export function SearchChatbot({ open, onOpenChange }: SearchChatbotProps) {
               </div>
             ))}
             {isPending && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                     <Avatar className="w-8 h-8 border">
                         <AvatarFallback><Sparkles className="h-4 w-4" /></AvatarFallback>
                     </Avatar>
