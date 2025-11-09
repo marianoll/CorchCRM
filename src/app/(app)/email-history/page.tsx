@@ -969,15 +969,6 @@ export default function EmailHistoryPage() {
                                         </TooltipTrigger>
                                         <TooltipContent><p>Schedule Meeting</p></TooltipContent>
                                     </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for task dialog */ toast({title: 'Not Implemented'})}} disabled={isProcessingRow}>
-                                                <FileText className={cn("h-4 w-4", getIconClass('task'))} />
-                                                <span className="sr-only">Create Task</span>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Create Task</p></TooltipContent>
-                                    </Tooltip>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -1086,5 +1077,3 @@ export default function EmailHistoryPage() {
     </TooltipProvider>
   );
 }
-
-    
