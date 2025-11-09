@@ -1,3 +1,4 @@
+
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -8,20 +9,20 @@ import { z } from 'zod';
 
 const ActionSchema = z.object({
   type: z.enum([
-    'update_entity', // Para 'update_data'
-    'create_ai_draft', // Para 'create_email'
-    'create_meeting',
-    'create_task' // Se mantiene para seguimientos
+    'update_entity',      // update data
+    'create_ai_draft',    // email draft
+    'create_meeting',     // schedule meeting
+    'create_task'         // follow-up task
   ]),
   target: z.enum([
     'companies','contacts','deals','emails','tasks','ai_drafts','meetings'
   ]),
-  id: z.string().optional(),              // para update_entity
-  data: z.record(z.any()).optional(),     // para create_*
-  changes: z.record(z.any()).optional(),  // para update_entity
-  reason: z.string().describe("A concise, one-line explanation of the action to be performed, e.g., 'Update deal amount to $50,000' or 'Create task to send follow-up email.'"),
+  id: z.string().optional(),              // for update_entity
+  data: z.record(z.any()).optional(),     // for create_*
+  changes: z.record(z.any()).optional(),  // for update_entity
+  reason: z.string(),
   confidence: z.number().min(0).max(1).optional(),
-  date: z.string().optional().describe("ISO UTC timestamp for scheduled actions like meetings or future tasks.")
+  date: z.string().optional()             // ISO UTC for scheduled items
 });
 
 const OrchestratorInputSchema = z.object({
@@ -32,9 +33,9 @@ const OrchestratorInputSchema = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     timestamp: z.string().optional(),
-    direction: z.enum(['inbound', 'outbound']).optional(), // Añadido para la nueva lógica
+    direction: z.enum(['inbound','outbound']).optional()
   }),
-  related_entities: z.record(z.any()).optional(),
+  related_entities: z.record(z.any()).optional(), // { deal, contact, company ... }
   policy: z.record(z.any()).optional()
 });
 
@@ -47,7 +48,7 @@ export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 export type Action = z.infer<typeof ActionSchema>;
 export type Interaction = z.infer<typeof OrchestratorInputSchema>['interaction'];
 
-/* ---------- Prompt (Lógica de negocio específica) ---------- */
+/* ---------- Prompt con few-shots y regla "≥1 acción" ---------- */
 
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
@@ -56,43 +57,73 @@ const orchestratePrompt = ai.definePrompt({
   output: { schema: OrchestratorOutputSchema },
   prompt: `
 You are CorchCRM's Orchestrator AI.
-Your task is to analyze an interaction and generate a list of concrete actions.
 Return ONLY a JSON object with an "actions" array. No extra text.
 
-**Allowed Actions:**
-- \`create_ai_draft\`: To draft an email.
-- \`create_task\`: To schedule a future task (like a follow-up).
-- \`update_entity\`: To change data in a contact, company, or deal.
-- \`create_meeting\`: To schedule a meeting.
+Allowed actions: create_ai_draft, create_task, update_entity, create_meeting.
+Allowed targets: companies, contacts, deals, emails, tasks, ai_drafts, meetings.
 
-**Business Logic Rules:**
+Business rules (MANDATORY):
+- Always produce AT LEAST ONE action.
+- If interaction.direction == "inbound": MUST add create_ai_draft (reason: "Draft response to inbound email") to respond now.
+- If interaction.direction == "outbound": MUST add create_task (reason: "Schedule follow-up for outbound email") dated 5 days from now.
+- If email mentions demo/call/meeting with date/time, add create_meeting.
+- If body implies data change (stage/amount/contact info), add update_entity with minimal "changes".
 
-1.  **Email Drafting Logic (Mandatory):**
-    *   If the interaction's \`direction\` is \`inbound\`, you MUST generate a \`create_ai_draft\` action to draft an immediate response. The 'reason' should be "Draft response to inbound email".
-    *   If the interaction's \`direction\` is \`outbound\`, you MUST generate a \`create_task\` action to follow up in 5 days. The 'reason' should be "Schedule follow-up for outbound email" and the 'date' should be 5 days from now.
+Hints:
+- For create_ai_draft use: { "source_type": "email", "related_id": dealIdIfAny, "draft_text": "<short reply>" }
+- For create_task use: { "deal_id": dealIdIfAny, "title": "<concise>", "due_date": "<ISO>", "owner_email": "<owner if available>" }
+- For create_meeting use: { "deal_id": dealIdIfAny, "title": "Meeting/Demo", "proposed_time": "<ISO>", "participants": ["from","to"] }
 
-2.  **Data Update Logic:**
-    *   Carefully read the email body (\`interaction.body\`).
-    *   If you find information that changes an existing entity (e.g., a deal's amount or stage, a contact's phone number), you MUST generate an \`update_entity\` action.
-    *   The 'target' should be 'deals', 'contacts', or 'companies'.
-    *   The 'id' must be the ID of the entity to update.
-    *   The 'changes' field must contain ONLY the fields to be updated (e.g., \`{"amount": 50000}\`).
-    *   The 'reason' must be specific, like "Update deal amount to $50,000".
+Few-shots:
 
-3.  **Meeting Creation Logic:**
-    *   If the email body mentions scheduling a meeting, a call, or a demo, you MUST generate a \`create_meeting\` action.
-    *   The 'reason' should be "Schedule meeting as requested in email".
-    *   Extract the proposed date and time if available and put it in the 'date' field.
+[Example 1 - inbound reply]
+Interaction:
+{"source":"email","direction":"inbound","subject":"Re: Quote","body":"Thanks! We'll sign next week.","from":"cfo@acme.com","to":"owner@corchcrm.com"}
+Related:
+{"deal":{"id":"deal_1","stage":"proposal","probability":0.6,"owner_email":"owner@corchcrm.com"}}
+Output:
+{"actions":[
+  {"type":"create_ai_draft","target":"ai_drafts","data":{"source_type":"email","related_id":"deal_1","draft_text":"Hi! Great to hear — shall we schedule a quick call to finalize details for next week?"},"reason":"Draft response to inbound email","confidence":0.9},
+  {"type":"update_entity","target":"deals","id":"deal_1","changes":{"stage":"negotiation","probability":0.8},"reason":"Move to negotiation based on signing intent","confidence":0.85}
+]}
 
-**Input Context:**
-- Interaction: {{interaction}}
-- Related Entities: {{related_entities}}
+[Example 2 - outbound follow-up in 5 days]
+Interaction:
+{"source":"email","direction":"outbound","subject":"Proposal sent","body":"Sharing proposal for your review.","from":"owner@corchcrm.com","to":"vp@client.com","timestamp":"2025-11-08T10:00:00Z"}
+Related:
+{"deal":{"id":"deal_9","stage":"proposal","owner_email":"owner@corchcrm.com"}}
+Output:
+{"actions":[
+  {"type":"create_task","target":"tasks","data":{"deal_id":"deal_9","title":"Follow up on outbound email","due_date":"2025-11-13T10:00:00Z","owner_email":"owner@corchcrm.com"},"reason":"Schedule follow-up for outbound email","confidence":0.88}
+]}
+
+[Example 3 - meeting request]
+Interaction:
+{"source":"email","direction":"inbound","subject":"Schedule demo","body":"Can we do Thursday 3pm CET?","from":"vp@client.com","to":"owner@corchcrm.com","timestamp":"2025-11-10T09:00:00Z"}
+Related:
+{"deal":{"id":"deal_7","stage":"prospect","owner_email":"owner@corchcrm.com"}}
+Output:
+{"actions":[
+  {"type":"create_ai_draft","target":"ai_drafts","data":{"source_type":"email","related_id":"deal_7","draft_text":"Thursday 3pm CET works — sending invite now."},"reason":"Draft response to inbound email","confidence":0.86},
+  {"type":"create_meeting","target":"meetings","data":{"deal_id":"deal_7","title":"Product demo","proposed_time":"2025-11-13T15:00:00Z","participants":["vp@client.com","owner@corchcrm.com"]},"reason":"Schedule meeting as requested in email","confidence":0.84}
+]}
+
+Now generate actions for the actual input.
+
+Interaction:
+{{interaction}}
+
+Related:
+{{related_entities}}
+
+Policy:
+{{policy}}
 
 Return JSON strictly matching the output schema.
 `
 });
 
-/* ---------- Flow ---------- */
+/* ---------- Flow con fallback (nunca vacío) ---------- */
 
 const orchestrateInteractionFlow = ai.defineFlow(
   { name: 'orchestrateInteractionFlow', inputSchema: OrchestratorInputSchema, outputSchema: OrchestratorOutputSchema },
@@ -103,23 +134,75 @@ const orchestrateInteractionFlow = ai.defineFlow(
     }
     try {
       const res = await orchestratePrompt(input);
-      const output = res.output;
+      const out = typeof (res as any)?.output === 'function'
+        ? (res as any).output()
+        : (res as any)?.output;
 
-      if (!output || !Array.isArray(output.actions)) {
-        console.warn('AI did not return a valid action array.');
-        return { actions: [] };
+      const actions = Array.isArray(out?.actions) ? out.actions : [];
+
+      // Filtro defensivo
+      const validTypes = new Set(['update_entity','create_ai_draft','create_meeting','create_task']);
+      const validTargets = new Set(['companies','contacts','deals','emails','tasks','ai_drafts','meetings']);
+      const concrete = actions.filter(a => validTypes.has(a?.type) && validTargets.has(a?.target));
+
+      if (concrete.length > 0) return { actions: concrete };
+
+      // --------- Fallback determinista según direction ---------
+      const dir = input.interaction.direction || 'inbound';
+      const subj = (input.interaction.subject || '').trim();
+      const body = (input.interaction.body || '').trim();
+      const title = (subj || body.slice(0, 60) || 'Follow up').replace(/\s+/g, ' ').trim();
+      const owner = input.related_entities?.deal?.owner_email
+                 || input.related_entities?.contact?.owner_email
+                 || input.interaction.to
+                 || undefined;
+      const dealId = input.related_entities?.deal?.id;
+
+      const base = input.interaction.timestamp ? new Date(input.interaction.timestamp) : new Date();
+      const plusDays = (n:number) => new Date(base.getTime() + n*24*3600*1000).toISOString();
+
+      if (dir === 'inbound') {
+        const draft: Action = {
+          type: 'create_ai_draft',
+          target: 'ai_drafts',
+          data: {
+            source_type: 'email',
+            related_id: dealId,
+            draft_text: `Hi — thanks for your message. ${title}. Happy to proceed; let me know the best time to sync.`
+          },
+          reason: 'Draft response to inbound email',
+          confidence: 0.6
+        };
+        return { actions: [draft] };
+      } else {
+        const task: Action = {
+          type: 'create_task',
+          target: 'tasks',
+          data: {
+            deal_id: dealId,
+            title: 'Follow up on outbound email',
+            due_date: plusDays(5),
+            owner_email: owner
+          },
+          reason: 'Schedule follow-up for outbound email',
+          confidence: 0.6
+        };
+        return { actions: [task] };
       }
-
-      // Defensive filtering to ensure only allowed actions are returned.
-      const validTypes = new Set(['update_entity', 'create_ai_draft', 'create_meeting', 'create_task']);
-      const validTargets = new Set(['companies', 'contacts', 'deals', 'emails', 'tasks', 'ai_drafts', 'meetings']);
-
-      const concreteActions = output.actions.filter(a => a && validTypes.has(a.type) && validTargets.has(a.target));
-      return { actions: concreteActions };
-
     } catch (e:any) {
       console.error('[orchestrateInteractionFlow]', e?.message || e);
-      return { actions: [] }; // Return empty on error
+      // Fallback mínimo en error grave: tratar como outbound follow-up
+      const base = new Date();
+      const due = new Date(base.getTime() + 5*24*3600*1000).toISOString();
+      return {
+        actions: [{
+          type: 'create_task',
+          target: 'tasks',
+          data: { title: 'Follow up (fallback)', due_date: due },
+          reason: 'Schedule follow-up for outbound email',
+          confidence: 0.5
+        }]
+      };
     }
   }
 );
