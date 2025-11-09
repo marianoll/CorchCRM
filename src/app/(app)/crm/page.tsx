@@ -144,15 +144,13 @@ export default function CrmPage() {
     const stageColorMap = useMemo(() => {
         if (!settings?.pipelineStages) return {};
         return settings.pipelineStages.reduce((acc, stage) => {
-            acc[stage.name] = stage.color;
+            acc[stage.name.toLowerCase()] = stage.color;
             return acc;
         }, {} as Record<string, string>);
     }, [settings]);
 
     const getStageBadge = (stageName: string) => {
-        const colorClass = stageColorMap[stageName] || 'bg-gray-400';
-        // We use a Badge here but with custom styling to apply the dynamic color,
-        // as Badge variants are pre-defined in CSS.
+        const colorClass = stageColorMap[stageName.toLowerCase()] || 'bg-gray-400';
         return (
             <span className={`px-2.5 py-0.5 text-xs font-semibold text-white rounded-full ${colorClass}`}>
                 {stageName}
