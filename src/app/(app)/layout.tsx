@@ -30,6 +30,7 @@ import {
   Mail,
   ClipboardCheck,
   Upload,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -41,6 +42,7 @@ import { auth } from '@/firebase/client';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/tasks', label: 'Tasks', icon: ClipboardCheck },
