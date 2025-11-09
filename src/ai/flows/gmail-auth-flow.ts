@@ -15,11 +15,6 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-// Credentials are hardcoded here to ensure availability in the server environment.
-// In a production environment, these should be managed through secure secrets management.
-const GOOGLE_CLIENT_ID = "77290063661-i90gk0dqgnknmvnqiocvaktfmh3atdjj.apps.googleusercontent.com";
-const GOOGLE_CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"; // Replace with your actual secret
-
 
 const GMAIL_SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -46,8 +41,8 @@ export const getGmailAuthUrl = ai.defineFlow(
   async ({ redirectUri }) => {
     // Initialize the OAuth2 client inside the flow to ensure env vars are loaded.
     const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
       redirectUri
     );
 
@@ -81,6 +76,9 @@ export const processGmailAuthCode = ai.defineFlow(
     outputSchema: processAuthCodeOutputSchema,
   },
   async ({ code, userId, redirectUri }) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return { success: false, message: 'Google API credentials are not configured on the server.' };
+    }
     if (!code) {
       return { success: false, message: 'Authorization code is missing.' };
     }
@@ -89,8 +87,8 @@ export const processGmailAuthCode = ai.defineFlow(
     }
 
     const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
       redirectUri
     );
 
