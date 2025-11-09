@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * A Genkit flow for summarizing a given text into a single line.
@@ -21,7 +22,7 @@ export type SummarizeTextOutput = z.infer<typeof SummarizeTextOutputSchema>;
 // ---- Prompt ----
 const summarizeTextPrompt = ai.definePrompt({
   name: 'summarizeTextPrompt',
-  model: googleAI.model('gemini-2.0-flash-lite-001'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: SummarizeTextInputSchema },
   output: { schema: SummarizeTextOutputSchema },
   // Reglas para asegurar una sola línea y sin ruido

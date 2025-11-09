@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow that translates natural language into a structured database query.
@@ -36,7 +37,7 @@ export type NaturalLanguageSearchOutput = z.infer<typeof NaturalLanguageSearchOu
 
 const searchPrompt = ai.definePrompt({
   name: 'naturalLanguageSearchPrompt',
-  model: googleAI.model('gemini-2.0-flash-lite-001'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: NaturalLanguageSearchInputSchema },
   output: { schema: NaturalLanguageSearchOutputSchema },
   prompt: `You are a helpful CRM data analyst. Your task is to interpret the user's natural language query, find the relevant data from the provided CRM context, and return a concise, helpful answer formatted in Markdown.
@@ -55,13 +56,13 @@ const searchPrompt = ai.definePrompt({
 **CRM Context Data:**
 
 *   **Contacts:**
-    {{{json contacts}}}
+    {{contacts}}
 
 *   **Companies:**
-    {{{json companies}}}
+    {{companies}}
 
 *   **Deals:**
-    {{{json deals}}}
+    {{deals}}
 
 **User Query:**
 ---

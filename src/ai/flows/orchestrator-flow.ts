@@ -101,7 +101,7 @@ export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 // FIX 1: modelo vigente
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.0-flash-lite-001'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   // Pasa objetos; Genkit serializa. Evita {{{json ...}}}
@@ -156,16 +156,12 @@ const orchestrateInteractionFlow = ai.defineFlow(
 
     try {
       const res = await orchestratePrompt(input);
-
-      // FIX 2: Genkit suele exponer output como función
-      const out = typeof (res as any)?.output === 'function'
-        ? (res as any).output()
-        : (res as any)?.output;
+      const out = res.output;
 
       // FIX 3: Normalización defensiva
       const actions = Array.isArray(out?.actions) ? out.actions : [];
       return { actions };
-    } catch (err) {
+    } catch (err: any) {
       console.error('[orchestrateInteractionFlow] Error:', err);
       return {
         actions: [{
