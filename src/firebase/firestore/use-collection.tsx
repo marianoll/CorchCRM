@@ -8,6 +8,7 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
+  Timestamp,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -36,6 +37,18 @@ export interface InternalQuery extends Query<DocumentData> {
     }
   }
 }
+
+function processDoc<T>(doc: DocumentData): WithId<T> {
+    const data = doc.data() as T;
+    // Recursively convert Timestamps to Dates for serialization
+    for (const key in data) {
+        if (data[key] instanceof Timestamp) {
+            (data as any)[key] = (data[key] as Timestamp).toDate();
+        }
+    }
+    return { ...data, id: doc.id };
+}
+
 
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
@@ -76,10 +89,7 @@ export function useCollection<T = any>(
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = [];
-        for (const doc of snapshot.docs) {
-          results.push({ ...(doc.data() as T), id: doc.id });
-        }
+        const results = snapshot.docs.map(doc => processDoc<T>(doc));
         setData(results);
         setError(null);
         setIsLoading(false);
