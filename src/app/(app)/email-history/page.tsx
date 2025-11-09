@@ -43,6 +43,7 @@ import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 import { analyzeEmailContent, type AnalysisOutput } from '@/ai/flows/analyze-email-flow';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import { suggestMeetingTime } from '@/ai/flows/suggest-meeting-time-flow';
 
 type ActionStatus = 'approved' | 'rejected' | 'pending' | null;
 type ActionType = 'reply' | 'analyze' | 'meeting' | 'task' | 'create_task' | 'stage_change' | 'data_update' | 'create_meeting';
@@ -131,6 +132,8 @@ export default function EmailHistoryPage() {
     const [selectedEmailForMeeting, setSelectedEmailForMeeting] = useState<Email | null>(null);
     const [meetingDate, setMeetingDate] = useState<Date | undefined>(undefined);
     const [meetingTime, setMeetingTime] = useState<string>('10:00');
+    const [isSuggestingDate, setIsSuggestingDate] = useState(false);
+
 
     // Orchestrator Dialog State
     const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
@@ -466,24 +469,23 @@ export default function EmailHistoryPage() {
         setIsAnalyzeDialogOpen(true);
     };
 
-    const handleScheduleMeeting = (email: Email) => {
-        // Simple regex to find dates. In a real app, use a proper library.
-        const dateRegex = /(\d{1,2}(st|nd|rd|th)?\s(of\s)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-zA-Z]*)|(tomorrow)|(next\s(week|monday|tuesday|wednesday|thursday|friday))/i;
-        const match = email.body_excerpt.match(dateRegex);
-        let suggestedDate = addDays(new Date(), 3);
-        if (match && match[0]) {
-            try {
-                // This is a very basic parsing attempt.
-                let parsedDate = new Date(match[0]);
-                if (!isNaN(parsedDate.getTime())) {
-                    suggestedDate = parsedDate;
-                }
-            } catch(e) { /* ignore parsing errors */ }
-        }
-
-        setMeetingDate(suggestedDate);
+    const handleScheduleMeeting = async (email: Email) => {
+        setIsSuggestingDate(true);
         setSelectedEmailForMeeting(email);
         setIsMeetingDialogOpen(true);
+
+        try {
+            const result = await suggestMeetingTime({
+                emailBody: email.body_excerpt,
+                emailDate: toDate(email.ts).toISOString(),
+            });
+            setMeetingDate(new Date(result.suggestedDate));
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Date Suggestion Failed', description: err.message });
+            setMeetingDate(addDays(new Date(), 3)); // Fallback
+        } finally {
+            setIsSuggestingDate(false);
+        }
     };
 
     const confirmMeeting = async (status: ActionStatus) => {
@@ -1057,17 +1059,23 @@ export default function EmailHistoryPage() {
                     <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-2">
                             <Label>Meeting Date</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !meetingDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {meetingDate ? format(meetingDate, 'PPP') : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={meetingDate} onSelect={setMeetingDate} initialFocus />
-                                </PopoverContent>
-                            </Popover>
+                             {isSuggestingDate ? (
+                                <div className="flex items-center justify-center h-10 border rounded-md">
+                                    <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !meetingDate && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {meetingDate ? format(meetingDate, 'PPP') : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={meetingDate} onSelect={setMeetingDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="meeting-time">Meeting Time</Label>
