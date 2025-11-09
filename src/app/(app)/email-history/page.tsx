@@ -592,11 +592,9 @@ export default function EmailHistoryPage() {
         const batch = writeBatch(db);
         for (const email of filteredEmails) {
             setActionState(email.id, 'reply', 'approved');
-            const draftRef = doc(collection(db, 'users', user.uid, 'ai_drafts'));
             const isReplying = email.direction === 'inbound';
             const subjectPrefix = email.subject.toLowerCase().startsWith('re:') ? '' : 'Re: ';
             const draftData = {
-                id: draftRef.id,
                 source_type: 'email_reply', related_id: email.id,
                 to: isReplying ? email.from_email : email.to_email,
                 from: user.email, subject: isReplying ? `${subjectPrefix}${email.subject}` : `Following up on: ${email.subject}`,
@@ -604,15 +602,14 @@ export default function EmailHistoryPage() {
                 body: `Auto-generated reply for: ${email.subject}`,
                 status: 'draft', createdAt: new Date().toISOString(), userId: user.uid,
             };
-            batch.set(draftRef, draftData);
 
             const logRef = doc(collection(db, 'audit_logs'));
-            batch.set(logRef, { ts: new Date().toISOString(), actor_type: 'user', actor_id: user.uid, action: 'create_ai_draft', entity_type: 'ai_drafts', entity_id: draftRef.id, table: 'ai_drafts', source: 'ui-bulk-approval', after_snapshot: draftData });
+            batch.set(logRef, { ts: new Date().toISOString(), actor_type: 'user', actor_id: user.uid, action: 'send_email', entity_type: 'emails', entity_id: `simulated_${email.id}`, table: 'emails', source: 'ui-bulk-approval', after_snapshot: draftData });
         }
 
         try {
             await batch.commit();
-            toast({ title: "All replies approved!", description: `${filteredEmails.length} reply drafts have been created.` });
+            toast({ title: "All replies approved!", description: `${filteredEmails.length} email actions have been logged.` });
         } catch (error) {
             toast({ variant: "destructive", title: "Error", description: "Could not approve all replies." });
         } finally {
@@ -828,8 +825,6 @@ export default function EmailHistoryPage() {
                     {filteredEmails.map((email) => {
                         const company = getCompanyName(email.company_id);
                         const deal = getDeal(email.deal_id);
-                        const showMeetingButton = email.direction === 'inbound' && checkKeywords(email.body_excerpt, ['meeting', 'talk', 'chat', 'schedule']);
-                        const showTaskButton = checkKeywords(email.body_excerpt, ['POC', 'SLA terms', 'align', 'scope']);
                         
                         const isProcessingRow = processingActionsId === email.id;
 
@@ -947,30 +942,26 @@ export default function EmailHistoryPage() {
                                                 <span className="sr-only">Stage Status</span>
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent><p>Stage Status</p></TooltipContent>
+                                        <TooltipContent><p>Analyze Stage</p></TooltipContent>
                                     </Tooltip>
-                                    {showMeetingButton && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow}>
-                                                    <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
-                                                    <span className="sr-only">Schedule Meeting</span>
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent><p>Schedule Meeting</p></TooltipContent>
-                                        </Tooltip>
-                                    )}
-                                     {showTaskButton && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for task dialog */ toast({title: 'Not Implemented'})}} disabled={isProcessingRow}>
-                                                    <FileText className={cn("h-4 w-4", getIconClass('task'))} />
-                                                    <span className="sr-only">Create Task</span>
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent><p>Create Task</p></TooltipContent>
-                                        </Tooltip>
-                                    )}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow}>
+                                                <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
+                                                <span className="sr-only">Schedule Meeting</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Schedule Meeting</p></TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for task dialog */ toast({title: 'Not Implemented'})}} disabled={isProcessingRow}>
+                                                <FileText className={cn("h-4 w-4", getIconClass('task'))} />
+                                                <span className="sr-only">Create Task</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Create Task</p></TooltipContent>
+                                    </Tooltip>
                                 </div>
                             </TableCell>
                         </TableRow>
