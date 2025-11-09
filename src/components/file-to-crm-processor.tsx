@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { UploadCloud, LoaderCircle, FileText, CheckCircle, XCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { UploadCloud, LoaderCircle, FileText, CheckCircle, XCircle, FileType } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
@@ -10,6 +10,7 @@ import { speechToText } from '@/ai/flows/speech-to-text-flow';
 import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
 import { collection, doc, setDoc } from 'firebase/firestore';
+import { Button } from './ui/button';
 
 
 type CrmData = {
@@ -160,6 +161,29 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     }
   };
 
+  const handleProcessSampleEmail = async () => {
+    if (processingState !== 'idle' && processingState !== 'done' && processingState !== 'error') return;
+
+    toast({ title: 'Processing Sample Email...', description: 'Fetching and analyzing the sample .eml file.' });
+    
+    try {
+        const response = await fetch('/mail_sample.eml');
+        if (!response.ok) {
+            throw new Error('Sample email file not found.');
+        }
+        const blob = await response.blob();
+        const file = new File([blob], 'mail_sample.eml', { type: 'message/rfc822' });
+        await handleFile(file);
+    } catch (error: any) {
+        console.error('Error processing sample email:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Sample Processing Failed',
+            description: error.message || 'Could not process the sample email file.',
+        });
+    }
+  };
+
   const isProcessing = processingState !== 'idle' && processingState !== 'done' && processingState !== 'error';
 
   return (
@@ -168,7 +192,7 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
         <CardTitle>File-to-CRM</CardTitle>
         <CardDescription>Upload an audio, video, or .eml file to automatically extract insights and update your CRM.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent>
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -198,7 +222,7 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
         </div>
 
         {processingState !== 'idle' && (
-             <div className="space-y-4 rounded-lg border bg-secondary/50 p-4">
+             <div className="space-y-4 rounded-lg border bg-secondary/50 p-4 mt-4">
                 <div className="flex items-center gap-3">
                     {isProcessing ? <LoaderCircle className="h-5 w-5 animate-spin"/> :
                      processingState === 'done' ? <CheckCircle className="h-5 w-5 text-green-500" /> :
@@ -226,10 +250,13 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
                )}
             </div>
         )}
-
       </CardContent>
+      <CardFooter>
+        <Button onClick={handleProcessSampleEmail} variant="secondary" disabled={isProcessing}>
+            <FileType className="mr-2 h-4 w-4" />
+            Use Sample Email
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
-
-    
