@@ -15,6 +15,7 @@ import { Briefcase, Building, Mail, Phone, User, Users, FileText, ArrowRight, Ar
 import { format } from 'date-fns';
 import type { Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 // Types matching the CRM page
 type Company = { id: string; name: string; domain?: string; industry?: string; };
@@ -186,7 +187,13 @@ export function CrmDetailsDialog({
 
   const renderDealDetails = (deal: Deal) => {
     const contact = contacts.find(c => c.id === deal.primary_contact_id);
+    const dealEmails = emails
+        .filter(e => e.deal_id === deal.id)
+        .sort((a, b) => toDate(b.ts).getTime() - toDate(a.ts).getTime())
+        .slice(0, 10); // Get latest 10
+
     return (
+        <TooltipProvider>
         <>
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2"><Briefcase /> {deal.title}</DialogTitle>
@@ -194,25 +201,73 @@ export function CrmDetailsDialog({
                     {formatCurrency(deal.amount)}
                 </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 py-4 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Stage</span>
-                    <Badge>{deal.stage}</Badge>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Expected Close</span>
-                    <span>{format(toDate(deal.close_date), 'PPP')}</span>
-                </div>
-                {contact && (
-                     <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Primary Contact</span>
-                         <Button variant="link" className="p-0 h-auto" onClick={() => onEntityClick(contact, 'Contact')}>
-                           {contact.full_name}
-                        </Button>
+            <div className="space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Stage</span>
+                        <Badge>{deal.stage}</Badge>
                     </div>
-                )}
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Expected Close</span>
+                        <span>{format(toDate(deal.close_date), 'PPP')}</span>
+                    </div>
+                    {contact && (
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Primary Contact</span>
+                            <Button variant="link" className="p-0 h-auto" onClick={() => onEntityClick(contact, 'Contact')}>
+                            {contact.full_name}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                <div>
+                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Mail /> Recent Conversations</h4>
+                    {dealEmails.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[80px]">Date</TableHead>
+                                    <TableHead className="w-[50px]">I/O</TableHead>
+                                    <TableHead>AI Summary</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {dealEmails.map(e => (
+                                    <TableRow key={e.id}>
+                                        <TableCell>{format(toDate(e.ts), 'dd/MMM')}</TableCell>
+                                        <TableCell>
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    {e.direction === 'inbound' ? 
+                                                        <ArrowRight className="h-4 w-4 text-green-500" /> : 
+                                                        <ArrowLeft className="h-4 w-4 text-blue-500" />}
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>{e.direction === 'inbound' ? 'Inbound' : 'Outbound'}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                             <Tooltip>
+                                                <TooltipTrigger className="text-left">
+                                                    <p className="truncate max-w-sm">{e.ai_summary || e.body_excerpt}</p>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-md">
+                                                    <p className="font-bold mb-1">{e.subject}</p>
+                                                    <p>{e.body_excerpt}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : <p className="text-sm text-muted-foreground">No emails found for this deal.</p>}
+                </div>
             </div>
         </>
+        </TooltipProvider>
     );
   };
 
