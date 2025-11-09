@@ -101,6 +101,7 @@ export default function EmailHistoryPage() {
     const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
     const [selectedEmailForMeeting, setSelectedEmailForMeeting] = useState<Email | null>(null);
     const [meetingDate, setMeetingDate] = useState<Date | undefined>(undefined);
+    const [meetingTime, setMeetingTime] = useState<string>('10:00');
 
 
     // Data fetching
@@ -406,17 +407,21 @@ export default function EmailHistoryPage() {
     const confirmMeeting = async () => {
         if (!user || !selectedEmailForMeeting || !meetingDate) return;
         
-        const batch = writeBatch(db);
-        const logRef = doc(collection(db, 'audit_logs'));
+        const [hours, minutes] = meetingTime.split(':').map(Number);
+        const finalMeetingDate = new Date(meetingDate);
+        finalMeetingDate.setHours(hours, minutes);
 
+        const batch = writeBatch(db);
+        
+        // 1. Log the meeting creation
+        const meetingLogRef = doc(collection(db, 'audit_logs'));
         const meetingData = {
             title: `Meeting about: ${selectedEmailForMeeting.subject}`,
-            proposed_time: meetingDate.toISOString(),
+            proposed_time: finalMeetingDate.toISOString(),
             participants: [selectedEmailForMeeting.from_email, selectedEmailForMeeting.to_email],
             deal_id: selectedEmailForMeeting.deal_id
         };
-
-        batch.set(logRef, {
+        batch.set(meetingLogRef, {
             ts: new Date().toISOString(),
             actor_type: 'user',
             actor_id: user.uid,
@@ -428,9 +433,31 @@ export default function EmailHistoryPage() {
             after_snapshot: meetingData,
         });
 
+        // 2. Log the email sending simulation
+        const emailLogRef = doc(collection(db, 'audit_logs'));
+        const emailLogData = {
+            to: selectedEmailForMeeting.from_email,
+            from: selectedEmailForMeeting.to_email,
+            subject: `Meeting Confirmed: ${selectedEmailForMeeting.subject}`,
+            body: `Hi, \n\nThis is to confirm our meeting on ${format(finalMeetingDate, 'PPp')}. \n\nMeeting link: https://meet.google.com/lookup/${Math.random().toString(36).substring(2, 10)} \n\nBest,`,
+            deal_id: selectedEmailForMeeting.deal_id
+        };
+        batch.set(emailLogRef, {
+            ts: new Date().toISOString(),
+            actor_type: 'system_ai',
+            actor_id: 'system',
+            action: 'send_email',
+            entity_type: 'emails',
+            entity_id: `email_log_${Date.now()}`,
+            table: 'emails',
+            source: 'ui-suggestion',
+            after_snapshot: emailLogData
+        });
+
+
         try {
             await batch.commit();
-            toast({ title: 'Meeting Scheduled!', description: `A meeting for ${format(meetingDate, 'PPp')} has been logged.` });
+            toast({ title: 'Meeting Scheduled!', description: `A meeting for ${format(finalMeetingDate, 'PPp')} has been logged.` });
             setIsMeetingDialogOpen(false);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not log the meeting.' });
@@ -734,15 +761,6 @@ export default function EmailHistoryPage() {
                                     </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleOrchestrate(email)}>
-                                                <Gem className="h-4 w-4" />
-                                                <span className="sr-only">Orchestrate</span>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Orchestrate</p></TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)}>
                                                 <RefreshCw className="h-4 w-4" />
                                                 <span className="sr-only">Analyze</span>
@@ -754,7 +772,7 @@ export default function EmailHistoryPage() {
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)}>
-                                                    <CalendarPlus className="h-4 w-4 text-amber-500" />
+                                                    <CalendarPlus className="h-4 w-4" />
                                                     <span className="sr-only">Schedule Meeting</span>
                                                 </Button>
                                             </TooltipTrigger>
@@ -807,26 +825,40 @@ export default function EmailHistoryPage() {
       )}
       {selectedEmailForMeeting && (
         <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting</DialogTitle>
                     <DialogDescription>
-                        Confirm the date to schedule a meeting based on the email about "{selectedEmailForMeeting.subject}".
+                        Confirm date and time to schedule a meeting. An event and a confirmation email will be logged.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <Label>Meeting Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !meetingDate && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {meetingDate ? format(meetingDate, 'PPP') : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={meetingDate} onSelect={setMeetingDate} initialFocus />
-                        </PopoverContent>
-                    </Popover>
+                <div className="py-4 space-y-4">
+                    <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
+                        <h4 className="font-semibold text-sm">Original Email</h4>
+                        <p className="text-sm font-medium">{selectedEmailForMeeting.subject}</p>
+                        <p className="text-xs text-muted-foreground">From: {selectedEmailForMeeting.from_email}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-3">"{selectedEmailForMeeting.body_excerpt}"</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-2">
+                            <Label>Meeting Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !meetingDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {meetingDate ? format(meetingDate, 'PPP') : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={meetingDate} onSelect={setMeetingDate} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="meeting-time">Meeting Time</Label>
+                            <Input id="meeting-time" type="time" value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)} />
+                        </div>
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsMeetingDialogOpen(false)}>Cancel</Button>
