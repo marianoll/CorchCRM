@@ -115,21 +115,27 @@ export default function LandingPage() {
             <div className="rounded-2xl bg-white border border-ink/10 p-6">
               <h3 className="font-semibold">Zero‑Click Inbox</h3>
               <p className="mt-2 text-sm text-ink/70">Approve AI suggestions collected from voice, email and meetings.</p>
-              <div className="mt-4 aspect-video rounded-lg bg-lavender/30"></div>
+              <div className="mt-4 aspect-video rounded-lg bg-lavender/30 overflow-hidden">
+                <Image src="/land_zero.png" alt="Zero-Click Inbox" width={1280} height={720} className="w-full h-full object-cover"/>
+              </div>
               <p className="mt-3 text-xs text-ink/60">“Meetings, calls and emails auto‑organized by AI.”</p>
             </div>
             {/* Deal card with AI summary */}
             <div className="rounded-2xl bg-white border border-ink/10 p-6">
               <h3 className="font-semibold">Deal View</h3>
               <p className="mt-2 text-sm text-ink/70">See AI summaries, next steps and stakeholders in one place.</p>
-              <div className="mt-4 aspect-video rounded-lg bg-honey/30"></div>
+              <div className="mt-4 aspect-video rounded-lg bg-honey/30 overflow-hidden">
+                 <Image src="/land_crm.png" alt="CRM Deal View" width={1280} height={720} className="w-full h-full object-cover"/>
+              </div>
               <p className="mt-3 text-xs text-ink/60">“Auto‑updated pipeline. Nothing slips.”</p>
             </div>
             {/* NLQ search */}
             <div className="rounded-2xl bg-white border border-ink/10 p-6">
               <h3 className="font-semibold">Natural‑Language Search</h3>
               <p className="mt-2 text-sm text-ink/70">Ask: “deals without a reply in 10 days” — get answers instantly.</p>
-              <div className="mt-4 aspect-video rounded-lg bg-mint/30"></div>
+              <div className="mt-4 aspect-video rounded-lg bg-mint/30 overflow-hidden">
+                <Image src="/land_chatbot.png" alt="Natural Language Chatbot" width={1280} height={720} className="w-full h-full object-cover"/>
+              </div>
               <p className="mt-3 text-xs text-ink/60">“Search by intent, not by filters.”</p>
             </div>
           </div>
