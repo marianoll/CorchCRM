@@ -7,6 +7,7 @@ import {
   DocumentData,
   FirestoreError,
   DocumentSnapshot,
+  Timestamp,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -23,6 +24,18 @@ export interface UseDocResult<T> {
   isLoading: boolean;       // True if loading.
   error: FirestoreError | Error | null; // Error object, or null.
 }
+
+function processDoc<T>(doc: DocumentSnapshot<DocumentData>): WithId<T> {
+    const data = doc.data() as T;
+    // Recursively convert Timestamps to Dates for serialization
+    for (const key in data) {
+        if (data[key] instanceof Timestamp) {
+            (data as any)[key] = (data[key] as Timestamp).toDate();
+        }
+    }
+    return { ...data, id: doc.id };
+}
+
 
 /**
  * React hook to subscribe to a single Firestore document in real-time.
@@ -57,13 +70,12 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
-          setData({ ...(snapshot.data() as T), id: snapshot.id });
+          setData(processDoc<T>(snapshot));
         } else {
           // Document does not exist
           setData(null);
