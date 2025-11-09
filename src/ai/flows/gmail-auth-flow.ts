@@ -12,8 +12,6 @@ import { z } from 'zod';
 import { google } from 'googleapis';
 import { initializeFirebaseServer } from '@/firebase/server-init';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 
 const GMAIL_SCOPES = [

@@ -32,7 +32,8 @@ export function initializeFirebaseServer(): FirebaseServerServices {
         'Automatic server initialization failed. This is expected in local development. Falling back to service account key.'
       );
       try {
-        const serviceAccount = require('../../serviceAccountKey.json');
+        // In a local environment, it will look for a serviceAccountKey.json file
+        const serviceAccount = require('../../../serviceAccountKey.json');
         firebaseApp = initializeApp({
           credential: cert(serviceAccount),
         });

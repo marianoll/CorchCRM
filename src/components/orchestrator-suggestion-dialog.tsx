@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -99,7 +100,15 @@ export function OrchestratorSuggestionDialog({
         // Remove action from list optimistically
         setResult(prev => prev ? ({ ...prev, actions: prev.actions.filter(a => a !== action) }) : null);
     } catch (error) {
-        // Handle error
+        if (error instanceof FirestorePermissionError) {
+             errorEmitter.emit('permission-error', error);
+        } else {
+             toast({
+                variant: 'destructive',
+                title: 'Approval Error',
+                description: 'Could not save the action. Please try again.',
+            });
+        }
     } finally {
         setIsSaving(false);
     }
@@ -161,9 +170,13 @@ export function OrchestratorSuggestionDialog({
                             <TableCell>{action.date ? format(new Date(action.date), 'PP') : 'Now'}</TableCell>
                             <TableCell className="text-right">
                                 <div className="flex gap-2 justify-end">
-                                    <Button size="sm" variant="outline" onClick={() => handleReject(action)} disabled={isSaving}>Rechazar</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleReject(action)} disabled={isSaving}>
+                                        <X className="h-4 w-4 mr-1" />
+                                        Rechazar
+                                    </Button>
                                     <Button size="sm" onClick={() => handleApprove(action)} disabled={isSaving}>
-                                        {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin"/> : 'Aprobar'}
+                                        {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4 mr-1" />}
+                                        Aprobar
                                     </Button>
                                 </div>
                             </TableCell>

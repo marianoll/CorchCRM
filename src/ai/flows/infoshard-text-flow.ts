@@ -36,7 +36,7 @@ export type OrchestrateTextInput = z.infer<typeof OrchestrateTextInputSchema>;
 
 const orchestrateTextPrompt = ai.definePrompt({
   name: 'orchestrateTextPrompt',
-  model: googleAI.model('gemini-2.0-flash-lite'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: OrchestrateTextInputSchema },
   output: { schema: OrchestrateTextOutputSchema },
   prompt: `You are an expert CRM data analyst. Your task is to analyze the provided text and determine if it contains information that could create or update CRM records. Compare the information in the text against the existing CRM data (contacts, companies, deals) to avoid duplicates.

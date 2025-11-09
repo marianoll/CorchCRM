@@ -1,3 +1,4 @@
+
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -15,9 +16,9 @@ const ActionSchema = z.object({
     'companies','contacts','deals','emails','tasks','ai_drafts','meetings','notifications'
   ]),
   id: z.string().optional(),              // para update_*
-  data: z.record(z.any()).optional(),     // para create_*
-  changes: z.record(z.any()).optional(),  // para update_*
-  reason: z.string().optional(),
+  data: z.record(z.any()).describe('An object containing the full data for the new entity.').optional(),     // para create_*
+  changes: z.record(z.any()).describe('An object containing only the fields to be changed.').optional(),  // para update_*
+  reason: z.string().describe("A concise, one-line explanation of the action to be performed, e.g., 'Update deal amount to $50,000' or 'Create task to send follow-up email.'").optional(),
   confidence: z.number().min(0).max(1).optional(),
   date: z.string().optional()
 });
@@ -48,7 +49,7 @@ export type Interaction = z.infer<typeof OrchestratorInputSchema>['interaction']
 
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.0-flash-lite'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input:  { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   prompt: `
@@ -62,7 +63,7 @@ DO NOT output "log_action" or "suggest" under any circumstance.
 Rules:
 - Output at least ONE concrete action per interaction.
 - Prefer small, atomic actions.
-- Each action should include a short "reason".
+- Each action MUST include a short, clear "reason" field explaining the action, e.g., "Update deal amount to $50,000" or "Create task to send follow-up email."
 - Include "confidence" (0..1) when making decisions.
 - Use ISO UTC timestamps when proposing dates.
 - If updating deals.stage, consider adjusting probability.
@@ -91,20 +92,23 @@ const orchestrateInteractionFlow = ai.defineFlow(
     }
     try {
       const res = await orchestratePrompt(input);
-      const out = typeof (res as any)?.output === 'function'
-        ? (res as any).output()
-        : (res as any)?.output;
+      
+      // Ensure the output is a valid object, even if the model returns something unexpected.
+      const output = res.output || { actions: [] };
 
-      const actions = Array.isArray(out?.actions) ? out.actions : [];
-      // Filtro defensivo por si el modelo insiste en colar tipos no permitidos
+      // Defensive filtering to ensure only allowed actions are returned.
       const validTypes = new Set(['update_entity','create_entity','create_task','create_ai_draft','create_meeting','notify_user']);
       const validTargets = new Set(['companies','contacts','deals','emails','tasks','ai_drafts','meetings','notifications']);
 
-      const concrete = actions.filter(a => validTypes.has(a?.type) && validTargets.has(a?.target));
-      return { actions: concrete };
+      if (Array.isArray(output.actions)) {
+        const concreteActions = output.actions.filter(a => a && validTypes.has(a.type) && validTargets.has(a.target));
+        return { actions: concreteActions };
+      }
+
+      return { actions: [] };
     } catch (e:any) {
       console.error('[orchestrateInteractionFlow]', e?.message || e);
-      return { actions: [] }; // Nada de log_action aquí
+      return { actions: [] }; // Return empty on error, no logging actions here.
     }
   }
 );
