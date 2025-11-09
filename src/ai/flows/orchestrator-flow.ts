@@ -1,3 +1,4 @@
+
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -6,7 +7,7 @@ import { z } from 'zod';
 
 /* ---------- Schemas (Acciones específicas) ---------- */
 
-const ActionSchema = z.object({
+export const ActionSchema = z.object({
   type: z.enum([
     'update_entity',      // update data
     'create_ai_draft',    // email draft

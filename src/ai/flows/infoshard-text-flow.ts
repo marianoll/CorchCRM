@@ -14,11 +14,12 @@ import { googleAI } from '@genkit-ai/google-genai';
 import { initializeFirebaseServer } from '@/firebase/server-init';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import type { Action } from './orchestrator-flow';
+import { ActionSchema } from './orchestrator-flow';
 
 
 // Re-define ActionSchema locally if it's complex, or import if simple
 const OrchestrateTextOutputSchema = z.object({
-  actions: z.array(z.any()).describe("List of actions to perform, like create_entity or update_entity"),
+  actions: z.array(ActionSchema).describe("List of actions to perform, like create_entity or update_entity"),
 });
 
 export type OrchestrateTextOutput = z.infer<typeof OrchestrateTextOutputSchema>;
