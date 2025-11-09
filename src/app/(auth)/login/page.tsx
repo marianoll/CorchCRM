@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, User } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -30,76 +30,71 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
-  const [isProcessingRedirect, setIsProcessingRedirect] = useState(true);
+  const [isProcessingLogin, setIsProcessingLogin] = useState(false);
 
   useEffect(() => {
     // If user is already authenticated (and not loading), redirect to home immediately.
     if (!isUserLoading && user) {
       router.replace('/home');
-      return; // Stop further execution in this effect
     }
-
-    // Only process redirect result if auth is available and we're not already logged in.
-    if (auth && firestore && !user) {
-      getRedirectResult(auth)
-        .then((result) => {
-          if (result && result.user) {
-            // User successfully signed in via redirect.
-            const loggedInUser = result.user;
-            
-            // Now, we can create the user document.
-            const userRef = doc(firestore, 'users', loggedInUser.uid);
-            const userData = {
-                id: loggedInUser.uid,
-                email: loggedInUser.email,
-                firstName: loggedInUser.displayName?.split(' ')[0] || '',
-                lastName: loggedInUser.displayName?.split(' ').slice(1).join(' ') || '',
-            };
-            
-            setDoc(userRef, userData, { merge: true }).catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: userRef.path,
-                    operation: 'write',
-                    requestResourceData: userData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-
-            toast({ title: "Successfully signed in!" });
-            // The redirection to '/home' will be handled by the useUser hook updating and
-            // this effect re-running, which is a more reliable flow.
-          }
-          // Whether there was a result or not, we are done processing.
-          setIsProcessingRedirect(false);
-        })
-        .catch((error) => {
-          console.error("Redirect Result Error:", error);
-          toast({
-            variant: 'destructive',
-            title: 'Authentication Failed',
-            description: error.message || 'Could not process sign-in redirect.',
-          });
-          setIsProcessingRedirect(false);
-        });
-    } else if (!isUserLoading && !user) {
-        // If there's no user and we're not loading, we're done processing.
-        setIsProcessingRedirect(false);
-    }
-  }, [auth, firestore, toast, router, user, isUserLoading]);
+  }, [user, isUserLoading, router]);
 
 
   const handleSignIn = async () => {
-    if (!auth) {
+    if (!auth || !firestore) {
         toast({ variant: 'destructive', title: 'Authentication service not available.' });
         return;
     }
+    setIsProcessingLogin(true);
     const provider = new GoogleAuthProvider();
-    // Use signInWithRedirect instead of signInWithPopup
-    await signInWithRedirect(auth, provider);
+    
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const loggedInUser = result.user;
+
+        // Create user document in Firestore
+        const userRef = doc(firestore, 'users', loggedInUser.uid);
+        const userData = {
+            id: loggedInUser.uid,
+            email: loggedInUser.email,
+            firstName: loggedInUser.displayName?.split(' ')[0] || '',
+            lastName: loggedInUser.displayName?.split(' ').slice(1).join(' ') || '',
+        };
+        
+        await setDoc(userRef, userData, { merge: true });
+
+        toast({ title: "Successfully signed in!" });
+        // The useEffect hook will handle the redirection to '/home'
+        
+    } catch (error: any) {
+         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            toast({
+                variant: 'default',
+                title: 'Sign-in cancelled',
+                description: 'The sign-in window was closed before completion.',
+            });
+        } else if (error instanceof FirestorePermissionError) {
+             errorEmitter.emit('permission-error', error);
+             toast({
+                variant: 'destructive',
+                title: 'Permission Denied',
+                description: 'Could not save user data after login.',
+            });
+        } else {
+            console.error("Sign-in Error:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Authentication Failed',
+                description: error.message || 'An unexpected error occurred during sign-in.',
+            });
+        }
+    } finally {
+        setIsProcessingLogin(false);
+    }
   };
 
-  // Show a loader while the user session is loading or the redirect is being processed.
-  if (isUserLoading || isProcessingRedirect) {
+  // Show a loader while the user session is loading.
+  if (isUserLoading) {
     return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
             <LoaderCircle className="h-10 w-10 animate-spin text-primary" />
@@ -119,8 +114,8 @@ export default function LoginPage() {
           <CardDescription>Sign in to access your CRM dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleSignIn} className="w-full" disabled={!auth}>
-            <GoogleIcon />
+          <Button onClick={handleSignIn} className="w-full" disabled={isProcessingLogin || !auth}>
+            {isProcessingLogin ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
             Sign in with Google
           </Button>
         </CardContent>
