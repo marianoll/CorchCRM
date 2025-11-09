@@ -26,13 +26,14 @@ import {
   Mail,
   Upload,
   Inbox,
+  Bot,
+  LoaderCircle,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LoaderCircle } from 'lucide-react';
 import { auth } from '@/firebase/client';
 import { SeedDatabaseButton } from '@/components/seed-database-button';
 
