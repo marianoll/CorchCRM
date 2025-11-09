@@ -4,9 +4,9 @@
 /**
  * @fileOverview Natural Language Search flow for CRM data.
  *
- * - naturalLanguageSearch - A function that accepts a natural language query and returns relevant CRM data.
- * - NaturalLanguageSearchInput - The input type for the naturalLanguageSearch function.
- * - NaturalLanguageSearchOutput - The return type for the naturalLanguageSearch function.
+ * - naturalLanguageSearchFlow - A function that accepts a natural language query and returns relevant CRM data.
+ * - NaturalLanguageSearchInput - The input type for the naturalLanguageSearchFlow function.
+ * - NaturalLanguageSearchOutput - The return type for the naturalLanguageSearchFlow function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -27,10 +27,6 @@ const NaturalLanguageSearchOutputSchema = z.object({
 });
 export type NaturalLanguageSearchOutput = z.infer<typeof NaturalLanguageSearchOutputSchema>;
 
-export async function naturalLanguageSearch(input: NaturalLanguageSearchInput): Promise<NaturalLanguageSearchOutput> {
-  return naturalLanguageSearchFlow(input);
-}
-
 const prompt = ai.definePrompt({
   name: 'naturalLanguageSearchPrompt',
   input: {schema: NaturalLanguageSearchInputSchema},
@@ -47,7 +43,7 @@ Here is the data context you have access to:
   user: `Question: {{{query}}}`,
 });
 
-const naturalLanguageSearchFlow = ai.defineFlow(
+export const naturalLanguageSearchFlow = ai.defineFlow(
   {
     name: 'naturalLanguageSearchFlow',
     inputSchema: NaturalLanguageSearchInputSchema,

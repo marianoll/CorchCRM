@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { LoaderCircle, MessageCircle, Send, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { naturalLanguageSearch, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
+import { naturalLanguageSearchFlow, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import ReactMarkdown from 'react-markdown';
 
@@ -57,7 +57,7 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
             return newDeal;
         });
 
-        const res = await naturalLanguageSearch({ 
+        const res = await naturalLanguageSearchFlow({ 
             query,
             context: {
                 contacts: contacts || [],
