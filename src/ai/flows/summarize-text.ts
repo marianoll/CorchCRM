@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * A Genkit flow for summarizing a given text into a single line.
