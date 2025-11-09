@@ -55,25 +55,27 @@ const searchPrompt = ai.definePrompt({
 
 **Instructions:**
 
-1.  **Analyze the Query:** Understand what the user is asking for.
-2.  **Filter the Data:** Based on the query, filter the provided 'contacts', 'companies', and 'deals' arrays. You must only use the data provided in the context.
+1.  **Analyze the Query:** Understand what the user is asking for (e.g., filtering by amount, date, stage, name).
+2.  **Filter the Data:** Based on the query, filter the provided 'contacts', 'companies', and 'deals' arrays using their properties.
 3.  **Handle Ambiguity:** If the user's query is ambiguous or doesn't match any data, **do not say you can't find results.** Instead, return a relevant default dataset (like the 5 most recent deals) and add a message encouraging the user to refine their query.
 4.  **Format the Output:**
     *   Your entire response MUST be a single JSON object.
     *   The object should have a 'response' key. The value should be an object with 'headers' (an array of strings) and 'rows' (an array of arrays).
-    *   Include relevant columns only. For deals, use 'Title', 'Amount', and 'Stage'. For contacts, use 'Name' and 'Email'. For companies, use 'Name' and 'Industry'.
     *   Do not invent data. Only use the context provided below.
 
-**CRM Context Data:**
+**CRM Context Data & Schemas:**
 
 *   **Contacts:**
-    {{contacts}}
+    *   Schema: { id: string, full_name: string, email_primary: string, phone?: string, title?: string, seniority?: string, company_id?: string }
+    *   Data: {{contacts}}
 
 *   **Companies:**
-    {{companies}}
+    *   Schema: { id: string, name: string, domain?: string, industry?: string, size?: string, region?: string }
+    *   Data: {{companies}}
 
 *   **Deals:**
-    {{deals}}
+    *   Schema: { id: string, title: string, amount: number, stage: string, close_date: string, primary_contact_id: string, company_id?: string }
+    *   Data: {{deals}}
 
 **User Query:**
 ---
