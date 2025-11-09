@@ -10,7 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { orchestrateInteraction, OrchestratorOutputSchema } from './orchestrator-flow';
+import { orchestrateInteraction, type OrchestratorOutput } from './orchestrator-flow';
 
 // ---- Schemas ----
 
@@ -26,7 +26,7 @@ const OrchestrateTextInputSchema = z.object({
   deals: z.array(CrmEntitySchema).describe('List of existing deals for entity resolution.'),
 });
 export type OrchestrateTextInput = z.infer<typeof OrchestrateTextInputSchema>;
-export type OrchestrateTextOutput = z.infer<typeof OrchestratorOutputSchema>;
+export type OrchestrateTextOutput = OrchestratorOutput;
 
 
 // ---- Flow ----
@@ -34,9 +34,9 @@ const orchestrateTextFlow = ai.defineFlow(
   {
     name: 'orchestrateTextFlow',
     inputSchema: OrchestrateTextInputSchema,
-    outputSchema: OrchestratorOutputSchema,
+    // The output schema is inferred from the return type of the flow function.
   },
-  async (input) => {
+  async (input): Promise<OrchestratorOutput> => {
     if (!input.text || input.text.trim().length < 10) {
       return { actions: [] };
     }

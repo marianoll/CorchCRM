@@ -42,7 +42,7 @@ export type Action = z.infer<typeof ActionSchema>;
 /* ------------------------------- Esquemas I/O ------------------------------- */
 
 // Interacción flexible pero tipada en lo esencial
-export const InteractionSchema = z.object({
+const InteractionSchema = z.object({
   source: z.enum(['email','voice','meeting','note']).describe('Origen de la interacción'),
   subject: z.string().optional(),
   body: z.string().optional(),         // transcript o cuerpo de email
@@ -76,7 +76,7 @@ const RelatedEntitiesSchema = z.object({
   }).optional()
 });
 
-export const OrchestratorInputSchema = z.object({
+const OrchestratorInputSchema = z.object({
   interaction: InteractionSchema,
   related_entities: RelatedEntitiesSchema.optional(),
   // Opcional: reglas del usuario para personalizar (umbral IA, business hours, etc.)
@@ -92,7 +92,7 @@ export const OrchestratorInputSchema = z.object({
 
 export type OrchestratorInput = z.infer<typeof OrchestratorInputSchema>;
 
-export const OrchestratorOutputSchema = z.object({
+const OrchestratorOutputSchema = z.object({
   actions: z.array(ActionSchema).default([])
 });
 export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
@@ -137,7 +137,7 @@ Return JSON that matches the output schema strictly.
 
 /* ----------------------------------- Flow ----------------------------------- */
 
-export const orchestrateInteractionFlow = ai.defineFlow(
+const orchestrateInteractionFlow = ai.defineFlow(
   {
     name: 'orchestrateInteractionFlow',
     inputSchema: OrchestratorInputSchema,
