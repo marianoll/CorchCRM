@@ -62,7 +62,7 @@ export function EmailReplyDialog({
         from: user.email || '',
         to: isReplying ? email.from_email : email.to_email,
         subject: isReplying ? `${subjectPrefix}${email.subject}` : `Following up on: ${email.subject}`,
-        date: isReplying ? new Date() : addDays(new Date(), 5),
+        date: isReplying ? addDays(new Date(), 1) : addDays(new Date(), 5),
         body: isReplying 
             ? `Hi,
 
@@ -213,9 +213,6 @@ ${user.displayName?.split(' ')[0] || ''}`
             <X className="mr-2 h-4 w-4" />
             Reject
           </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            Cancel
-          </Button>
            <Button onClick={() => handleAction('approved')} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white">
             {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
             Approve & Save
@@ -225,3 +222,5 @@ ${user.displayName?.split(' ')[0] || ''}`
     </Dialog>
   );
 }
+
+    

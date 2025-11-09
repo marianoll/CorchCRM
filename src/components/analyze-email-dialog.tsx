@@ -224,9 +224,9 @@ export function AnalyzeEmailDialog({
                 <AlertDescription>
                     <p className="mb-3">{analysisResult.stageSuggestion.reason}</p>
                     <div className="flex items-center gap-4 mb-3">
-                        <Badge variant="outline">{deal?.stage}</Badge>
+                        <Badge variant="outline">{deal?.stage.toLowerCase()}</Badge>
                         <span>→</span>
-                        <Badge>{analysisResult.stageSuggestion.newStage}</Badge>
+                        <Badge>{analysisResult.stageSuggestion.newStage.toLowerCase()}</Badge>
                     </div>
                     <div className="space-y-2">
                         <Label>Confidence: {Math.round(analysisResult.stageSuggestion.probability * 100)}%</Label>
@@ -259,9 +259,6 @@ export function AnalyzeEmailDialog({
 
         <DialogFooter className="flex justify-end gap-2">
           <Button variant="destructive" onClick={handleRejection}>Reject</Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
           <Button onClick={handleApproval} disabled={isSaving || isLoading || !hasSuggestions} className="bg-green-600 hover:bg-green-700 text-white">
             {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-2 h-4 w-4" />}
             Approve All
@@ -271,3 +268,5 @@ export function AnalyzeEmailDialog({
     </Dialog>
   );
 }
+
+    

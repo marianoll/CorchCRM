@@ -475,9 +475,9 @@ export default function EmailHistoryPage() {
         toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
     };
 
-    const handleOrchestrationClick = (email: Email) => {
-        setSelectedEmailForOrchestration(email);
-        setIsOrchestratorOpen(true);
+    const handleGenerateReply = (email: Email) => {
+        setSelectedEmailForReply(email);
+        setIsReplyDialogOpen(true);
     };
 
     const handleAnalyzeEmail = (email: Email) => {
@@ -822,7 +822,7 @@ export default function EmailHistoryPage() {
                                 <div className="flex items-center gap-1">
                                      <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleOrchestrationClick(email)} disabled={isProcessingRow}>
+                                            <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)} disabled={isProcessingRow}>
                                                 <MailPlus className={cn("h-4 w-4", getIconClass('reply'))} />
                                                 <span className="sr-only">Generate Reply</span>
                                             </Button>
@@ -909,9 +909,18 @@ export default function EmailHistoryPage() {
             user={user}
         />
       )}
+       {selectedEmailForReply && user && (
+        <EmailReplyDialog
+            open={isReplyDialogOpen}
+            onOpenChange={setIsReplyDialogOpen}
+            onStatusChange={(status) => setActionState(selectedEmailForReply.id, 'reply', status)}
+            email={selectedEmailForReply}
+            user={user}
+        />
+      )}
       {selectedEmailForMeeting && (
         <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting</DialogTitle>
                     <DialogDescription>
@@ -919,11 +928,11 @@ export default function EmailHistoryPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
-                    <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
+                    <div className="p-4 border rounded-lg bg-muted/50 space-y-2 max-h-48 overflow-y-auto">
                         <h4 className="font-semibold text-sm">Original Email</h4>
                         <p className="text-sm font-medium">{selectedEmailForMeeting.subject}</p>
                         <p className="text-xs text-muted-foreground">From: {selectedEmailForMeeting.from_email}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-3">"{selectedEmailForMeeting.body_excerpt}"</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedEmailForMeeting.body_excerpt}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-2">
@@ -948,7 +957,6 @@ export default function EmailHistoryPage() {
                 </div>
                 <DialogFooter>
                     <Button variant="destructive" onClick={() => confirmMeeting('rejected')}>Reject</Button>
-                    <Button variant="outline" onClick={() => setIsMeetingDialogOpen(false)}>Cancel</Button>
                     <Button onClick={() => confirmMeeting('approved')} className="bg-green-600 hover:bg-green-700 text-white">Approve & Log Meeting</Button>
                 </DialogFooter>
             </DialogContent>
@@ -958,3 +966,5 @@ export default function EmailHistoryPage() {
     </TooltipProvider>
   );
 }
+
+    
