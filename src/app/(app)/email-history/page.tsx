@@ -7,7 +7,7 @@ import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval } from 'date-fns';
-import { Mail, ArrowRight, Database, LoaderCircle, Zap, Calendar as CalendarIcon, X } from 'lucide-react';
+import { Mail, ArrowRight, Database, LoaderCircle, Zap, Calendar as CalendarIcon, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -55,8 +55,8 @@ export default function EmailHistoryPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
-    const [isSummarizing, startSummaryTransition] = useTransition();
     const [summaries, setSummaries] = useState<Record<string, string>>({});
+    const [summarizingId, setSummarizingId] = useState<string | null>(null);
 
 
     // Filter states
@@ -191,37 +191,25 @@ export default function EmailHistoryPage() {
         setContactFilter('');
     }
 
-    const handleSummarize = () => {
-        if (!filteredEmails || filteredEmails.length === 0) {
-            toast({ variant: 'destructive', title: 'No Emails', description: 'There are no emails to summarize.' });
+    const handleSummarizeOne = async (emailId: string, text: string) => {
+        if (!text) {
+            toast({ variant: 'destructive', title: 'No Content', description: 'Email body is empty, cannot summarize.' });
             return;
         }
 
-        startSummaryTransition(async () => {
-            toast({ title: 'Generating Summaries...', description: `Processing ${filteredEmails.length} emails.` });
-
-            const summaryPromises = filteredEmails.map(email => 
-                summarizeText({ text: email.body_excerpt })
-                    .then(result => ({ id: email.id, summary: result.summary }))
-                    .catch(err => {
-                        console.error(`Failed to summarize email ${email.id}:`, err);
-                        return { id: email.id, summary: 'AI summary failed.' };
-                    })
-            );
-
-            const results = await Promise.all(summaryPromises);
-
-            setSummaries(prev => {
-                const newSummaries = { ...prev };
-                results.forEach(result => {
-                    newSummaries[result.id] = result.summary;
-                });
-                return newSummaries;
-            });
-
-            toast({ title: 'Summaries Generated!', description: 'AI summaries have been added for visible emails.' });
-        });
+        setSummarizingId(emailId);
+        try {
+            const result = await summarizeText({ text });
+            setSummaries(prev => ({ ...prev, [emailId]: result.summary }));
+            toast({ title: 'Summary Generated!', description: 'AI summary has been updated.' });
+        } catch (err) {
+            console.error(`Failed to summarize email ${emailId}:`, err);
+            toast({ variant: 'destructive', title: 'AI Error', description: 'Could not generate summary.' });
+        } finally {
+            setSummarizingId(null);
+        }
     };
+
 
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
@@ -313,10 +301,6 @@ export default function EmailHistoryPage() {
                         Clear Filters
                     </Button>
                 )}
-                 <Button onClick={handleSummarize} disabled={isSummarizing}>
-                    {isSummarizing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-                    Generate AI Summaries
-                </Button>
             </div>
         </div>
 
@@ -373,8 +357,23 @@ export default function EmailHistoryPage() {
                             </div>
                         </TableCell>
                         <TableCell>{getCompanyName(email.company_id)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground italic line-clamp-2">
-                            {summaries[email.id] || email.body_excerpt}
+                        <TableCell className="text-xs text-muted-foreground italic">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
+                                    disabled={summarizingId === email.id}
+                                    className="h-6 w-6"
+                                >
+                                    {summarizingId === email.id ? (
+                                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="h-4 w-4" />
+                                    )}
+                                </Button>
+                                <span className="line-clamp-2">{summaries[email.id] || email.body_excerpt}</span>
+                            </div>
                         </TableCell>
                         <TableCell>
                             {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
