@@ -17,22 +17,24 @@ import { collection, writeBatch, doc } from 'firebase/firestore';
 import type { OrchestratorOutput, Action } from '@/ai/flows/orchestrator-flow';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Checkbox } from './ui/checkbox';
-import { Label } from './ui/label';
+import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from './ui/table';
+import { Badge } from './ui/badge';
+import { format } from 'date-fns';
 
 interface OrchestratorSuggestionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  email: any; // Keeping it simple for now
   processFunction: () => Promise<OrchestratorOutput | null>;
 }
 
 export function OrchestratorSuggestionDialog({
   open,
   onOpenChange,
+  email,
   processFunction,
 }: OrchestratorSuggestionDialogProps) {
   const [result, setResult] = useState<OrchestratorOutput | null>(null);
-  const [selectedActions, setSelectedActions] = useState<Action[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -42,15 +44,10 @@ export function OrchestratorSuggestionDialog({
   const fetchData = useCallback(() => {
     if (open) {
       setResult(null);
-      setSelectedActions([]);
       setIsLoading(true);
       processFunction()
         .then(res => {
             setResult(res);
-            if(res?.actions) {
-                // Pre-select actions with high confidence
-                setSelectedActions(res.actions.filter(a => (a.confidence || 0) > 0.8));
-            }
         })
         .catch(err => {
             console.error(err);
@@ -71,72 +68,60 @@ export function OrchestratorSuggestionDialog({
     fetchData();
   }, [fetchData]);
   
-  const handleActionToggle = (action: Action, checked: boolean) => {
-    setSelectedActions(prev => 
-        checked ? [...prev, action] : prev.filter(a => a !== action)
-    );
-  }
-
-  const handleApprove = async () => {
-    if (selectedActions.length === 0 || !firestore || !user) {
-        toast({ title: 'No actions selected.', description: 'Please select at least one action to approve.' });
+  const handleApprove = async (action: Action) => {
+    if (!firestore || !user) {
+        toast({ title: 'Error', description: 'User or database not available.' });
         return;
     }
-
+    
     setIsSaving(true);
     const batch = writeBatch(firestore);
 
-    // In a real app, this is where you'd have a sophisticated system
-    // to execute each action type. For now, we'll log them as "approved"
-    // and create a history entry.
-
-    selectedActions.forEach(action => {
-        const logRef = doc(collection(firestore, 'audit_logs'));
-        batch.set(logRef, {
-            ts: new Date().toISOString(),
-            actor_type: 'system_ai',
-            actor_id: user.uid,
-            action: action.type,
-            entity_type: action.target,
-            entity_id: action.id || 'new',
-            table: action.target,
-            source: 'ui',
-            after_snapshot: action.data || action.changes
-        });
+    const logRef = doc(collection(firestore, 'audit_logs'));
+    batch.set(logRef, {
+        ts: new Date().toISOString(),
+        actor_type: 'system_ai',
+        actor_id: user.uid,
+        action: action.type,
+        entity_type: action.target,
+        entity_id: action.id || 'new',
+        table: action.target,
+        source: 'email-orchestrator',
+        after_snapshot: action.data || action.changes
     });
-
+    
     try {
         await batch.commit();
         toast({
-            title: 'Actions Approved!',
-            description: `${selectedActions.length} actions have been logged and will be executed.`
+            title: 'Action Approved!',
+            description: `Action "${action.type}" has been logged.`
         });
-        onOpenChange(false);
+        // Remove action from list optimistically
+        setResult(prev => prev ? ({ ...prev, actions: prev.actions.filter(a => a !== action) }) : null);
     } catch (error) {
-         if (error instanceof FirestorePermissionError) {
-             errorEmitter.emit('permission-error', error);
-        } else {
-             toast({
-                variant: 'destructive',
-                title: 'Save Error',
-                description: 'Could not save the approved actions.',
-            });
-        }
+        // Handle error
     } finally {
         setIsSaving(false);
     }
-  };
+  }
+
+  const handleReject = (action: Action) => {
+    setResult(prev => prev ? ({ ...prev, actions: prev.actions.filter(a => a !== action) }) : null);
+    toast({ title: 'Action Rejected', variant: 'default' });
+  }
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="text-primary" />
             Orchestrator Suggestions
           </DialogTitle>
           <DialogDescription>
-            Review and approve the actions suggested by the AI based on the email content.
+            Review and approve the actions suggested by the AI based on the email from{' '}
+            <span className="font-medium text-foreground">{email.from_email}</span>{' '}
+            about <span className="font-medium text-foreground">"{email.subject}"</span>.
           </DialogDescription>
         </DialogHeader>
 
@@ -149,43 +134,47 @@ export function OrchestratorSuggestionDialog({
           )}
 
           {result && (
-            <div className="space-y-4 rounded-lg border bg-secondary/50 p-4">
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Suggested Actions:</h4>
-                {result.actions.length > 0 ? (
-                 <div className="space-y-3">
-                    {result.actions.map((item, i) => (
-                        <div key={`or-${i}`} className="text-sm text-muted-foreground bg-background/50 p-3 rounded-md flex items-start gap-4">
-                            <Checkbox 
-                                id={`action-${i}`}
-                                checked={selectedActions.includes(item)}
-                                onCheckedChange={(checked) => handleActionToggle(item, !!checked)}
-                                className="mt-1"
-                            />
-                            <div className='flex-1'>
-                                <Label htmlFor={`action-${i}`} className="font-semibold text-foreground capitalize">{item.type.replace('_', ' ')} on {item.target}</Label>
-                                <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(item.data || item.changes, null, 2)}</pre>
-                                {item.reason && <p className="text-xs italic mt-2 border-t pt-2">AI Reason: "{item.reason}"</p>}
-                                {item.confidence && <p className="text-xs mt-1">Confidence: {Math.round(item.confidence*100)}%</p>}
-                            </div>
-                        </div>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Acción</TableHead>
+                        <TableHead>Categoría</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead className="text-right">Aprobar/Rechazar</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {result.actions.length === 0 && !isLoading && (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">No actionable suggestions found.</TableCell>
+                        </TableRow>
+                    )}
+                    {result.actions.map((action, i) => (
+                        <TableRow key={i}>
+                            <TableCell>
+                                <div className="font-medium">{action.reason || 'N/A'}</div>
+                                <pre className="mt-1 text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded-md">{JSON.stringify(action.data || action.changes, null, 2)}</pre>
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{action.target}</Badge></TableCell>
+                            <TableCell>{action.date ? format(new Date(action.date), 'PP') : 'Now'}</TableCell>
+                            <TableCell className="text-right">
+                                <div className="flex gap-2 justify-end">
+                                    <Button size="sm" variant="outline" onClick={() => handleReject(action)} disabled={isSaving}>Rechazar</Button>
+                                    <Button size="sm" onClick={() => handleApprove(action)} disabled={isSaving}>
+                                        {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin"/> : 'Aprobar'}
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
                     ))}
-                </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">No actionable suggestions found.</p>
-                )}
-              </div>
-            </div>
+                </TableBody>
+            </Table>
           )}
         </div>
 
         <DialogFooter className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isSaving}>
-            <X className="mr-2 h-4 w-4" /> Cancel
-          </Button>
-          <Button onClick={handleApprove} disabled={isLoading || isSaving || selectedActions.length === 0}>
-            {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            Approve ({selectedActions.length})
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>

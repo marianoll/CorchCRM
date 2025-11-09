@@ -30,8 +30,6 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
-import { CrystalsSuggestionDialog } from '@/components/crystals-suggestion-dialog';
 import { syncGmail } from '@/ai/flows/sync-gmail-flow';
 import { OrchestratorSuggestionDialog } from '@/components/orchestrator-suggestion-dialog';
 import { orchestrateInteraction, type OrchestratorOutput, type Interaction } from '@/ai/flows/orchestrator-flow';
@@ -97,10 +95,6 @@ export default function EmailHistoryPage() {
     const [detailsEntity, setDetailsEntity] = useState<CrmEntity | null>(null);
     const [detailsEntityType, setDetailsEntityType] = useState<'Company' | 'Contact' | 'Deal' | null>(null);
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-
-    // Crystals Dialog state
-    const [isCrystalsDialogOpen, setIsCrystalsDialogOpen] = useState(false);
-    const [selectedEmailForCrystals, setSelectedEmailForCrystals] = useState<Email | null>(null);
 
     // Orchestrator Dialog state
     const [isOrchestratorDialogOpen, setIsOrchestratorDialogOpen] = useState(false);
@@ -372,31 +366,10 @@ export default function EmailHistoryPage() {
         toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
     };
 
-    const handleExtractCrystals = (email: Email) => {
-        setSelectedEmailForCrystals(email);
-        setIsCrystalsDialogOpen(true);
-    };
-
     const handleOrchestrate = (email: Email) => {
         setSelectedEmailForOrchestrator(email);
         setIsOrchestratorDialogOpen(true);
     };
-
-    const processCrystals = useCallback(async (): Promise<OrchestrateTextOutput | null> => {
-        if (!selectedEmailForCrystals || crmDataLoading) {
-            toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
-            return null;
-        }
-
-        const inputText = `Subject: ${selectedEmailForCrystals.subject}\n\n${selectedEmailForCrystals.body_excerpt}`;
-        const crmContext = {
-            contacts: contacts?.map(c => ({ id: c.id, name: c.full_name })) || [],
-            companies: companies?.map(c => ({ id: c.id, name: c.name })) || [],
-            deals: deals?.map(d => ({ id: d.id, name: d.title })) || [],
-        };
-        
-        return await orchestrateText({ text: inputText, ...crmContext });
-    }, [selectedEmailForCrystals, contacts, companies, deals, crmDataLoading, toast]);
 
     const processOrchestration = useCallback(async (): Promise<OrchestratorOutput | null> => {
         if (!selectedEmailForOrchestrator || crmDataLoading) {
@@ -653,17 +626,8 @@ export default function EmailHistoryPage() {
                                 <div className="flex items-center gap-1">
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleExtractCrystals(email)}>
-                                                <Gem className="h-4 w-4" />
-                                                <span className="sr-only">View Crystals</span>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Extract Crystals</p></TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleOrchestrate(email)}>
-                                                <PianoIcon className="h-4 w-4" />
+                                                <Gem className="h-4 w-4" />
                                                 <span className="sr-only">Orchestrate</span>
                                             </Button>
                                         </TooltipTrigger>
@@ -688,19 +652,11 @@ export default function EmailHistoryPage() {
         deals={deals || []}
         emails={emails || []}
       />
-      {selectedEmailForCrystals && (
-        <CrystalsSuggestionDialog
-            open={isCrystalsDialogOpen}
-            onOpenChange={setIsCrystalsDialogOpen}
-            emailBody={`Subject: ${selectedEmailForCrystals.subject}\n\n${selectedEmailForCrystals.body_excerpt}`}
-            emailSourceIdentifier={selectedEmailForCrystals.id}
-            processFunction={processCrystals}
-        />
-      )}
        {selectedEmailForOrchestrator && (
         <OrchestratorSuggestionDialog
             open={isOrchestratorDialogOpen}
             onOpenChange={setIsOrchestratorDialogOpen}
+            email={selectedEmailForOrchestrator}
             processFunction={processOrchestration}
         />
       )}

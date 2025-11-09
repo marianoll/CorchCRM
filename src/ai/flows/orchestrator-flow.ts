@@ -33,7 +33,8 @@ const ActionSchema = z.object({
   data: z.record(z.any()).optional().describe('An object containing the full data for a new entity when type is create_entity.'),
   changes: z.record(z.any()).optional().describe('An object containing only the fields to be modified when type is update_entity.'),
   reason: z.string().optional(),
-  confidence: z.number().min(0).max(1).optional()
+  confidence: z.number().min(0).max(1).optional(),
+  date: z.string().optional().describe('Optional date for the action, in ISO format. Default is now.'),
 });
 
 export type Action = z.infer<typeof ActionSchema>;
