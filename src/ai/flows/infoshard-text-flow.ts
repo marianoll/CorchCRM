@@ -13,8 +13,8 @@ import { z } from 'zod';
 import { googleAI } from '@genkit-ai/google-genai';
 import { initializeFirebaseServer } from '@/firebase/server-init';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import type { Action } from './orchestrator-flow';
-import { ActionSchema } from './orchestrator-flow';
+import type { Action } from './orchestrator-schemas';
+import { ActionSchema } from './orchestrator-schemas';
 
 
 // Re-define ActionSchema locally if it's complex, or import if simple
