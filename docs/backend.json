@@ -109,7 +109,12 @@
           "description": "Due date for the task.",
           "format": "date-time"
         },
-        "completed": {
+        "createdAt": {
+          "type": "string",
+          "description": "Creation date for the task.",
+          "format": "date-time"
+        },
+        "done": {
           "type": "boolean",
           "description": "Indicates if the task is completed."
         },
@@ -126,7 +131,8 @@
         "id",
         "description",
         "dueDate",
-        "completed"
+        "createdAt",
+        "done"
       ]
     },
     "GmailIntegration": {
