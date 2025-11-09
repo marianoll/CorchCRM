@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCollection } from '@/firebase/firestore/hooks';
-import { useUser } from '@/firebase/auth/hooks';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
 import { collection, orderBy, query } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCollection } from '@/firebase/firestore/hooks';
-import { useUser } from '@/firebase/auth/hooks';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
 import { collection, orderBy, query } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,7 +29,7 @@ type AuditLog = {
     id: string;
     ts: string;
     actor_type: 'user' | 'system_ai' | 'system_job';
-    action: 'create' | 'update' | 'delete' | 'restore';
+    action: 'create' | 'update' | 'delete' | 'restore' | 'create_ai_draft' | 'create_meeting' | 'create_task' | 'send_email';
     entity_type: string;
     entity_id: string;
     table: string;
@@ -50,6 +50,7 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
     create_ai_draft: 'default',
     create_meeting: 'default',
     create_task: 'default',
+    send_email: 'default',
 };
 
 export default function OrquestratorPage() {
