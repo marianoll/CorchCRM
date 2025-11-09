@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useRef, useEffect } from 'react';
-import { LoaderCircle, Gem, Mic, Square } from 'lucide-react';
+import { LoaderCircle, Gem, Mic, Square, FileAudio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -131,6 +131,47 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
       setIsRecording(false);
     }
   };
+
+  const handleProcessSampleAudio = async () => {
+      setIsProcessing(true);
+      setResult(null);
+      setInputText('');
+      toast({ title: 'Processing Sample Audio...', description: 'Fetching, transcribing, and analyzing the sample.' });
+
+      try {
+          // 1. Fetch the sample audio file from the public directory
+          const response = await fetch('/audio_sample.mp3');
+          if (!response.ok) {
+              throw new Error('Sample audio file not found.');
+          }
+          const audioBlob = await response.blob();
+
+          // 2. Convert to Base64 Data URI
+          const reader = new FileReader();
+          const dataUrlPromise = new Promise<string>((resolve, reject) => {
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(audioBlob);
+          });
+          const audioDataUri = await dataUrlPromise;
+
+          // 3. Transcribe using speechToText flow
+          const { transcript } = await speechToText({ audioDataUri });
+          setInputText(transcript);
+
+          // 4. Process the transcript to get CRM actions
+          await handleProcess(transcript);
+
+      } catch (error: any) {
+          console.error('Error processing sample audio:', error);
+          toast({
+              variant: 'destructive',
+              title: 'Sample Processing Failed',
+              description: error.message || 'Could not process the sample audio file.',
+          });
+          setIsProcessing(false);
+      }
+  };
   
   const parseDetails = (details: Record<string, any> | undefined) => {
     if (!details) return {};
@@ -184,8 +225,8 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex gap-2">
-         <Button onClick={() => handleProcess(inputText)} disabled={isProcessing || crmDataLoading || isRecording} className="w-full">
+      <CardFooter className="grid grid-cols-1 md:grid-cols-3 gap-2">
+         <Button onClick={() => handleProcess(inputText)} disabled={isProcessing || crmDataLoading || isRecording}>
           {isProcessing ? (
             <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -197,7 +238,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
             onClick={isRecording ? handleStopRecording : handleStartRecording} 
             disabled={isProcessing || crmDataLoading}
             variant="outline"
-            className={cn("w-full", isRecording && "bg-red-500/10 text-red-500 border-red-500/50 hover:bg-red-500/20 hover:text-red-500")}
+            className={cn(isRecording && "bg-red-500/10 text-red-500 border-red-500/50 hover:bg-red-500/20 hover:text-red-500")}
         >
           {isRecording ? (
               <>
@@ -211,9 +252,11 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
               </>
           )}
         </Button>
+        <Button onClick={handleProcessSampleAudio} disabled={isProcessing || crmDataLoading || isRecording} variant="secondary">
+            <FileAudio className="mr-2 h-4 w-4" />
+            Use Sample Audio
+        </Button>
       </CardFooter>
     </Card>
   );
 }
-
-    
