@@ -14,8 +14,8 @@ export const ActionSchema = z.object({
     'companies','contacts','deals','emails','tasks','ai_drafts','meetings'
   ]),
   id: z.string().optional(),              // for update_entity
-  data: z.record(z.any()).optional(),     // for create_*
-  changes: z.record(z.any()).optional(),  // for update_entity
+  data: z.any().optional(),     // for create_*
+  changes: z.any().optional(),  // for update_entity
   reason: z.string(),
   confidence: z.number().min(0).max(1).optional(),
   date: z.string().optional()             // ISO UTC for scheduled items
