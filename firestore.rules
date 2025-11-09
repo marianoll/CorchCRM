@@ -179,11 +179,13 @@ service cloud.firestore {
      match /audit_logs/{logId} {
         allow read: if isSignedIn() || isFirebaseAdmin();
         allow create: if isSignedIn() || isFirebaseAdmin();
-        allow update, delete, list: if false;
+        allow update, delete: if false;
      }
 
     match /audit_logs {
         allow list: if isSignedIn() || isFirebaseAdmin();
+        allow write: if isSignedIn() || isFirebaseAdmin();
+        allow read: if isSignedIn() || isFirebaseAdmin();
     }
 
      /**
@@ -193,7 +195,7 @@ service cloud.firestore {
       match /crystals/{crystalId} {
          allow read: if isSignedIn() || isFirebaseAdmin();
          allow create: if isSignedIn() || isFirebaseAdmin();
-         allow update, delete, list: if false;
+         allow update, delete: if false;
       }
     
     match /crystals {
@@ -239,5 +241,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
