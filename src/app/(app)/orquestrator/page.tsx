@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Calendar, TrendingUp, Bot } from 'lucide-react';
+import { Mail, Calendar, TrendingUp, Bot, Inbox } from 'lucide-react';
 
 
 type AuditLog = {
@@ -77,8 +77,8 @@ export default function OrquestratorPage() {
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
-            <Bot className="h-7 w-7" />
-            Orchestrator
+            <Inbox className="h-7 w-7" />
+            Zero-Click Inbox
           </h1>
           <p className="text-muted-foreground">An immutable audit trail of all automated and manual actions.</p>
         </div>

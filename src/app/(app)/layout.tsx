@@ -26,6 +26,7 @@ import {
   Mail,
   Upload,
   Bot,
+  Inbox,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -40,7 +41,7 @@ const navItems = [
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/email-history', label: 'Email History', icon: Mail },
   { href: '/upload-history', label: 'Upload History', icon: Upload },
-  { href: '/orquestrator', label: 'Orquestrator', icon: Bot },
+  { href: '/orquestrator', label: 'Zero-Click Inbox', icon: Inbox },
 ];
 
 function MainNav() {
