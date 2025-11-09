@@ -167,7 +167,11 @@ const orchestrateInteractionFlow = ai.defineFlow(
         actions: [{
           type: 'log_action',
           target: 'history',
-          data: { action: 'error', explanation: 'Model call failed' },
+          data: { 
+            action: 'error', 
+            explanation: 'Model call failed',
+            details: err.message || JSON.stringify(err)
+          },
           reason: 'Model error',
           confidence: 0
         }]
