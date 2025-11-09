@@ -1,42 +1,45 @@
+
 'use server';
 /**
- * @fileOverview A Genkit flow for summarizing a given text into a single line.
- *
- * - summarizeText - A function that takes a string of text and returns a one-line summary.
- * - SummarizeTextInput - The input type for the summarizeText function.
- * - SummarizeTextOutput - The return type for the summarizeText function.
+ * A Genkit flow for summarizing a given text into a single line.
  */
 
 import { ai } from '@/ai';
 import { z } from 'zod';
 import { googleAI } from '@genkit-ai/google-genai';
 
-// Define the input schema for the flow
+// ---- Schemas ----
 const SummarizeTextInputSchema = z.object({
   text: z.string().describe('The text to be summarized.'),
 });
 export type SummarizeTextInput = z.infer<typeof SummarizeTextInputSchema>;
 
-// Define the output schema for the flow
 const SummarizeTextOutputSchema = z.object({
   summary: z.string().describe('The one-line summary of the text.'),
 });
 export type SummarizeTextOutput = z.infer<typeof SummarizeTextOutputSchema>;
 
-// Define the prompt that will be used by the AI model
+// ---- Prompt ----
+// Cambiado a un modelo vigente: gemini-2.5-flash
 const summarizeTextPrompt = ai.definePrompt({
   name: 'summarizeTextPrompt',
   model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: SummarizeTextInputSchema },
   output: { schema: SummarizeTextOutputSchema },
-  prompt: `Summarize the following text into a single, concise line:
+  // Reglas para asegurar una sola línea y sin ruido
+  prompt: `You are a concise assistant.
+Return a single-line summary (max 160 characters). No newlines, no quotes, no prefaces.
 
+Text:
 ---
 {{text}}
----`,
+---
+
+Return JSON that matches the output schema:
+{"summary": "<one line>"}`,
 });
 
-// Define the main flow function
+// ---- Flow ----
 const summarizeTextFlow = ai.defineFlow(
   {
     name: 'summarizeTextFlow',
@@ -44,21 +47,33 @@ const summarizeTextFlow = ai.defineFlow(
     outputSchema: SummarizeTextOutputSchema,
   },
   async (input) => {
-    // If the input text is empty or too short, return a default message
+    // Guard clause por inputs muy cortos
     if (!input.text || input.text.trim().length < 10) {
       return { summary: 'Not enough text to summarize.' };
     }
-    
-    // Call the prompt with the provided input
-    const response = await summarizeTextPrompt(input);
-    const output = response.output();
 
-    // Return the generated summary or a fallback message
-    return output || { summary: 'Could not generate summary.' };
+    try {
+      const res = await summarizeTextPrompt(input);
+      // Genkit: defensivo por si la forma cambia
+      const out = (typeof res?.output === 'function')
+        ? res.output()
+        : (res as any)?.output ?? null;
+
+      let summary = out?.summary ?? '';
+
+      // Normaliza siempre a una sola línea
+      summary = summary.replace(/\s+/g, ' ').trim();
+      if (!summary) summary = 'Could not generate summary.';
+
+      return { summary };
+    } catch (err) {
+      console.error('[summarizeTextFlow] Error:', err);
+      return { summary: 'Could not generate summary.' };
+    }
   }
 );
 
-// Export a wrapper function to be easily called from client components
+// ---- API ----
 export async function summarizeText(
   input: SummarizeTextInput
 ): Promise<SummarizeTextOutput> {
