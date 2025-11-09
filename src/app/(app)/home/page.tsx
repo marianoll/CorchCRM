@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { InfoshardProcessor } from '@/components/infoshard-processor';
 import { RecentActivity } from '@/components/recent-activity';
 import { UpcomingTasks } from '@/components/upcoming-tasks';
@@ -9,6 +9,7 @@ import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
 import { FileToCrmProcessor } from '@/components/file-to-crm-processor';
+import { WelcomeSeedDialog } from '@/components/welcome-seed-dialog';
 
 
 // Define types based on new schema
@@ -34,6 +35,20 @@ type Deal = {
 
 export default function HomePage() {
   const { user } = useUser();
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  useEffect(() => {
+    // Check if the user has seen the welcome modal before
+    const hasSeenModal = localStorage.getItem('corchcrm_welcome_modal_seen');
+    if (!hasSeenModal) {
+      setShowWelcomeModal(true);
+    }
+  }, []);
+
+  const handleModalClose = () => {
+    localStorage.setItem('corchcrm_welcome_modal_seen', 'true');
+    setShowWelcomeModal(false);
+  };
 
   // Fetch all CRM data needed for the infoshard processor context
   const contactsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'contacts')) : null, [user]);
@@ -56,6 +71,7 @@ export default function HomePage() {
 
 
   return (
+    <>
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold tracking-tight mb-6 font-headline">
@@ -73,5 +89,7 @@ export default function HomePage() {
         </div>
       </div>
     </main>
+    <WelcomeSeedDialog open={showWelcomeModal} onOpenChange={setShowWelcomeModal} onSeeded={handleModalClose}/>
+    </>
   );
 }

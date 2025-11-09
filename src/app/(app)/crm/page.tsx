@@ -6,16 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Pencil, Database } from 'lucide-react';
+import { PlusCircle, Pencil } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { useUser } from '@/firebase/auth/use-user';
-import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase/client';
-import { useToast } from '@/hooks/use-toast';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { format } from 'date-fns';
 
@@ -107,11 +106,9 @@ const toDate = (dateValue: any): Date => {
 
 export default function CrmPage() {
     const { user, isUserLoading: userLoading } = useUser();
-    const { toast } = useToast();
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
     const [isCreateCompanyOpen, setCreateCompanyOpen] = useState(false);
-    const [isSeeding, setIsSeeding] = useState(false);
     
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -173,114 +170,6 @@ export default function CrmPage() {
         setIsDetailsDialogOpen(true);
     };
 
-    const handleSeedDatabase = async () => {
-        if (!db || !user) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
-            return;
-        }
-        setIsSeeding(true);
-        toast({ title: 'Seeding Database...', description: 'Please wait while we populate your CRM.' });
-
-        try {
-            const batch = writeBatch(db);
-
-            const [companiesRes, contactsRes, dealsRes, emailsRes] = await Promise.all([
-                fetch('/companies_seed.csv'),
-                fetch('/contacts_seed.csv'),
-                fetch('/deals_seed.csv'),
-                fetch('/emails_seed.csv')
-            ]);
-
-            const [companiesCsv, contactsCsv, dealsCsv, emailsCsv] = await Promise.all([
-                companiesRes.text(),
-                contactsRes.text(),
-                dealsRes.text(),
-                emailsRes.text()
-            ]);
-
-            const parseCsv = (csvText: string): Record<string, string>[] => {
-                const lines = csvText.trim().split(/\r?\n/);
-                if (lines.length < 2) return [];
-                const headerLine = lines.shift();
-                if (!headerLine) return [];
-                const headers = headerLine.split(',');
-
-                return lines.map(line => {
-                    if (!line.trim()) return null;
-                    const values = line.split(',');
-                    const obj: Record<string, string> = {};
-                    headers.forEach((header, index) => {
-                        obj[header] = values[index];
-                    });
-                    return obj;
-                }).filter((obj): obj is Record<string, string> => obj !== null);
-            };
-            
-            const companiesData = parseCsv(companiesCsv);
-            companiesData.forEach(companyObj => {
-                if (companyObj.id) {
-                    const companyRef = doc(db, 'users', user.uid, 'companies', companyObj.id);
-                    batch.set(companyRef, { ...companyObj });
-                }
-            });
-
-            const contactsData = parseCsv(contactsCsv);
-            contactsData.forEach(contactObj => {
-                if (contactObj.id) {
-                    const contactRef = doc(db, 'users', user.uid, 'contacts', contactObj.id);
-                    const contactData: {[key: string]: any} = {};
-                    for (const key in contactObj) {
-                        if (Object.prototype.hasOwnProperty.call(contactObj, key)) {
-                           if(contactObj[key]) {
-                             contactData[key] = contactObj[key];
-                           }
-                        }
-                    }
-                    batch.set(contactRef, contactData);
-                }
-            });
-
-            const dealsData = parseCsv(dealsCsv);
-            dealsData.forEach(dealObj => {
-                if (dealObj.id) {
-                    const dealRef = doc(db, 'users', user.uid, 'deals', dealObj.id);
-                    const dealData: any = { ...dealObj };
-                    if (dealData.amount) dealData.amount = Number(dealData.amount);
-                    if (dealData.probability) dealData.probability = Number(dealData.probability);
-                    if (dealData.close_date) dealData.close_date = new Date(dealData.close_date);
-                    if (dealData.last_interaction_at) dealData.last_interaction_at = new Date(dealData.last_interaction_at);
-                    batch.set(dealRef, dealData);
-                }
-            });
-
-            const emailsData = parseCsv(emailsCsv);
-            emailsData.forEach(emailObj => {
-                if (emailObj.id) {
-                    const emailRef = doc(db, 'users', user.uid, 'emails', emailObj.id);
-                    const emailData: any = { ...emailObj };
-                    
-                    // Validate and convert timestamp
-                    if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
-                        emailData.ts = new Date(emailData.ts);
-                    } else {
-                        delete emailData.ts; // Remove invalid or empty timestamp
-                    }
-
-                    batch.set(emailRef, emailData);
-                }
-            });
-            
-            await batch.commit();
-
-            toast({ title: 'Database Seeded!', description: 'Your CRM has been populated with sample data.' });
-        } catch (error) {
-            console.error("Seeding error:", error);
-            toast({ variant: 'destructive', title: 'Seeding Failed', description: 'Could not populate the database. Check console for details.' });
-        } finally {
-            setIsSeeding(false);
-        }
-    };
-
 
     const handleEditContact = (contact: Contact) => {
         setEditingContact(contact);
@@ -327,7 +216,6 @@ export default function CrmPage() {
                 <p className="text-muted-foreground">Browse your deals, contacts and companies.</p>
             </div>
             <div className="flex gap-2">
-                <Button onClick={handleSeedDatabase} disabled={isSeeding} variant="outline"><Database className="mr-2 h-4 w-4" /> Seed Database</Button>
                 <Button onClick={() => { setEditingContact(null); setCreateContactOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Contact</Button>
                 <Button onClick={() => { setEditingDeal(null); setCreateDealOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Deal</Button>
                 <Button onClick={() => { setEditingCompany(null); setCreateCompanyOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> New Company</Button>
