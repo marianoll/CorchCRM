@@ -120,24 +120,22 @@ export default function EmailHistoryPage() {
 
             const emailsData = parseCsv(emailsCsv);
             emailsData.forEach(emailObj => {
-                if (emailObj.id) {
-                    const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
-                    const emailData: any = { ...emailObj };
-                    
-                    Object.keys(emailData).forEach(key => {
-                        if (emailData[key] === undefined || emailData[key] === null || emailData[key] === '') {
-                            delete emailData[key];
-                        }
-                    });
-
-                    if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
-                      emailData.ts = new Date(emailData.ts);
-                    } else {
-                      delete emailData.ts; // Remove invalid date
+                const emailRef = doc(collection(firestore, 'users', user.uid, 'emails'));
+                const emailData: any = { ...emailObj, id: emailRef.id };
+                
+                Object.keys(emailData).forEach(key => {
+                    if (emailData[key] === undefined || emailData[key] === null || emailData[key] === '') {
+                        delete emailData[key];
                     }
+                });
 
-                    batch.set(emailRef, emailData);
+                if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
+                  emailData.ts = new Date(emailData.ts);
+                } else {
+                  delete emailData.ts; // Remove invalid date
                 }
+
+                batch.set(emailRef, emailData);
             });
             
             await batch.commit();
