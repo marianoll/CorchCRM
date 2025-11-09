@@ -164,7 +164,15 @@ export default function CrmPage() {
             contactsData.forEach(contactObj => {
                 if (contactObj.id) {
                     const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactObj.id);
-                    batch.set(contactRef, { ...contactObj });
+                    const contactData: {[key: string]: any} = {};
+                    for (const key in contactObj) {
+                        if (Object.prototype.hasOwnProperty.call(contactObj, key)) {
+                           if(contactObj[key]) {
+                             contactData[key] = contactObj[key];
+                           }
+                        }
+                    }
+                    batch.set(contactRef, contactData);
                 }
             });
 
