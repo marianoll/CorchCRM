@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { naturalLanguageSearch, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import ReactMarkdown from 'react-markdown';
+import { Timestamp } from 'firebase/firestore';
 
 type SearchChatbotProps = {
   open: boolean;
@@ -45,11 +46,23 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
     setResult(null);
     startTransition(async () => {
       try {
+        // Convert Firestore Timestamps to strings before sending to the server action.
+        const serializableDeals = deals?.map(deal => {
+            const newDeal = { ...deal };
+            for (const key in newDeal) {
+                if (newDeal[key] instanceof Timestamp) {
+                    newDeal[key] = newDeal[key].toDate().toISOString();
+                }
+            }
+            return newDeal;
+        });
+
+
         const res = await naturalLanguageSearch({ 
             query,
             context: {
                 contacts: contacts || [],
-                deals: deals || [],
+                deals: serializableDeals || [],
                 companies: companies || [],
             }
         });
