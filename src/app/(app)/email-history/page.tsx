@@ -202,9 +202,9 @@ export default function EmailHistoryPage() {
             const result = await summarizeText({ text });
             setSummaries(prev => ({ ...prev, [emailId]: result.summary }));
             toast({ title: 'Summary Generated!', description: 'AI summary has been updated.' });
-        } catch (err) {
+        } catch (err: any) {
             console.error(`Failed to summarize email ${emailId}:`, err);
-            toast({ variant: 'destructive', title: 'AI Error', description: 'Could not generate summary.' });
+            toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not generate summary.' });
         } finally {
             setSummarizingId(null);
         }

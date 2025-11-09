@@ -19,7 +19,6 @@ const SummarizeTextOutputSchema = z.object({
 export type SummarizeTextOutput = z.infer<typeof SummarizeTextOutputSchema>;
 
 // ---- Prompt ----
-// Cambiado a un modelo vigente: gemini-2.5-flash
 const summarizeTextPrompt = ai.definePrompt({
   name: 'summarizeTextPrompt',
   model: googleAI.model('gemini-1.5-flash-latest'),
@@ -53,21 +52,19 @@ const summarizeTextFlow = ai.defineFlow(
 
     try {
       const res = await summarizeTextPrompt(input);
-      // Genkit: defensivo por si la forma cambia
-      const out = (typeof res?.output === 'function')
-        ? res.output()
-        : (res as any)?.output ?? null;
+      const output = res.output;
 
-      let summary = out?.summary ?? '';
+      let summary = output?.summary ?? '';
 
       // Normaliza siempre a una sola línea
       summary = summary.replace(/\s+/g, ' ').trim();
       if (!summary) summary = 'Could not generate summary.';
 
       return { summary };
-    } catch (err) {
+    } catch (err: any) {
       console.error('[summarizeTextFlow] Error:', err);
-      return { summary: 'Could not generate summary.' };
+      // Propagate the actual error message for better debugging on the client
+      throw new Error(err.message || 'Could not generate summary.');
     }
   }
 );
