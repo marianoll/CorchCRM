@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -7,7 +6,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, Gem } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, Gem, MailPlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +32,7 @@ import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { infoshardText, type InfoshardTextOutput } from '@/ai/flows/infoshard-text-flow';
 import { CrystalsSuggestionDialog } from '@/components/crystals-suggestion-dialog';
+import { syncGmail } from '@/ai/flows/sync-gmail-flow';
 
 
 type Email = {
@@ -80,6 +80,7 @@ export default function EmailHistoryPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
     const [isSummarizingAll, setIsSummarizingAll] = useState(false);
 
@@ -130,6 +131,49 @@ export default function EmailHistoryPage() {
         setDetailsEntityType(type);
         setIsDetailsDialogOpen(true);
     };
+
+    const handleSyncGmail = async () => {
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'User not logged in.' });
+            return;
+        }
+        setIsSyncing(true);
+        toast({ title: 'Syncing Gmail...', description: 'Fetching today\'s emails.' });
+
+        try {
+            const result = await syncGmail({ userId: user.uid });
+
+            if (result.success && result.emails.length > 0) {
+                const batch = writeBatch(firestore);
+                result.emails.forEach(email => {
+                    const emailRef = doc(collection(firestore, 'users', user.uid, 'emails'));
+                    batch.set(emailRef, {
+                        ...email,
+                        id: emailRef.id,
+                        ts: new Date(email.ts as string), // Convert string timestamp back to Date
+                    });
+                });
+                await batch.commit();
+                toast({
+                    title: 'Sync Complete!',
+                    description: `${result.emails.length} new email(s) have been added.`,
+                });
+            } else if (result.success) {
+                 toast({
+                    title: 'No new emails',
+                    description: 'Your email history is already up to date.',
+                });
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error: any) {
+            console.error("Gmail sync error:", error);
+            toast({ variant: 'destructive', title: 'Sync Failed', description: error.message || 'Could not sync emails from Gmail.' });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
 
     const handleSeedEmails = async () => {
         if (!firestore || !user) {
@@ -253,7 +297,11 @@ export default function EmailHistoryPage() {
             const emailRef = doc(firestore, 'users', user.uid, 'emails', emailId);
             const summaryData = { ai_summary: result.summary };
 
-            await setDoc(emailRef, summaryData, { merge: true });
+            setDoc(emailRef, summaryData, { merge: true }).catch(error => {
+                const permissionError = new FirestorePermissionError({ path: emailRef.path, operation: 'update', requestResourceData: summaryData });
+                errorEmitter.emit('permission-error', permissionError);
+                throw error;
+            });
             
             if (setEmails) {
                  setEmails(prevEmails => {
@@ -264,10 +312,8 @@ export default function EmailHistoryPage() {
 
             toast({ title: 'Summary Generated!', description: 'AI summary has been saved.' });
         } catch (err: any) {
-            console.error(`Failed to summarize email ${emailId}:`, err);
-             if (err instanceof FirestorePermissionError) {
-                errorEmitter.emit('permission-error', err);
-            } else {
+            // Error is already emitted, toast is a fallback if emission fails.
+             if (!(err instanceof FirestorePermissionError)) {
                  toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not generate or save summary.' });
             }
         } finally {
@@ -296,9 +342,12 @@ export default function EmailHistoryPage() {
             try {
                 const result = await summarizeText({ text: email.body_excerpt });
                 const emailRef = doc(firestore, 'users', user.uid, 'emails', email.id);
-                await setDoc(emailRef, { ai_summary: result.summary }, { merge: true });
+                
+                setDoc(emailRef, { ai_summary: result.summary }, { merge: true }).catch(err => {
+                    console.warn(`Permission error summarizing email ${email.id}, skipping.`, err);
+                });
 
-                // Update UI state for this specific email
+                // Optimistically update UI state for this specific email
                 if (setEmails) {
                     setEmails(prevEmails => {
                         if (!prevEmails) return null;
@@ -308,7 +357,6 @@ export default function EmailHistoryPage() {
                 successCount++;
             } catch (err) {
                 console.warn(`Could not summarize email ${email.id}. Skipping.`, err);
-                // Optionally show a toast for each failure
             } finally {
                 setSummarizingId(null); // Hide loader for this row
             }
@@ -353,6 +401,10 @@ export default function EmailHistoryPage() {
                 <p className="text-muted-foreground">A log of all emails processed by the system.</p>
             </div>
             <div className="flex gap-2">
+                <Button onClick={handleSyncGmail} disabled={isSyncing}>
+                    {isSyncing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <MailPlus className="mr-2 h-4 w-4" />}
+                    Sync Today's Gmail
+                </Button>
                 <Button onClick={handleSummarizeAll} disabled={isSummarizingAll}>
                     {isSummarizingAll ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                     Summarize All Missing
