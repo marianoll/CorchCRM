@@ -26,18 +26,17 @@ const orchestratePrompt = ai.definePrompt({
 You are CorchCRM's Orchestrator AI.
 Return ONLY a JSON object with an "actions" array. No extra text.
 
-Allowed actions: create_ai_draft, create_task, update_entity, create_meeting.
-Allowed targets: companies, contacts, deals, emails, tasks, ai_drafts, meetings.
+Allowed actions: create_task, update_entity, create_meeting.
+Allowed targets: companies, contacts, deals, emails, tasks, meetings.
 
 Business rules (MANDATORY):
 - Always produce AT LEAST ONE action.
-- If interaction.direction == "inbound": MUST add create_ai_draft (reason: "Draft response to inbound email") to respond now.
+- If interaction.direction == "inbound" and the user is being asked for something, suggest a follow-up task.
 - If interaction.direction == "outbound": MUST add create_task (reason: "Schedule follow-up for outbound email") dated 5 days from interaction.timestamp (or now).
 - If email mentions demo/call/meeting with date/time, add create_meeting.
 - If body implies data change (stage/amount/contact info), add update_entity with minimal "changes".
 
 Hints:
-- create_ai_draft.data: { "source_type": "email", "related_id": dealIdIfAny, "draft_text": "<short reply>" }
 - create_task.data:    { "deal_id": dealIdIfAny, "title": "<concise>", "due_date": "<ISO>", "owner_email": "<owner if available>" }
 - create_meeting.data: { "deal_id": dealIdIfAny, "title": "Meeting/Demo", "proposed_time": "<ISO>", "participants": ["from","to"] }
 
@@ -50,7 +49,6 @@ Related:
 {"deal":{"id":"deal_1","stage":"proposal","probability":0.6,"owner_email":"owner@corchcrm.com"}}
 Output:
 {"actions":[
-  {"type":"create_ai_draft","target":"ai_drafts","data":{"source_type":"email","related_id":"deal_1","draft_text":"Hi! Great to hear — shall we schedule a quick call to finalize details for next week?"},"reason":"Draft response to inbound email","confidence":0.9},
   {"type":"update_entity","target":"deals","id":"deal_1","changes":{"stage":"negotiation","probability":0.8},"reason":"Move to negotiation based on signing intent","confidence":0.85}
 ]}
 
@@ -71,7 +69,6 @@ Related:
 {"deal":{"id":"deal_7","stage":"prospect","owner_email":"owner@corchcrm.com"}}
 Output:
 {"actions":[
-  {"type":"create_ai_draft","target":"ai_drafts","data":{"source_type":"email","related_id":"deal_7","draft_text":"Thursday 3pm CET works — sending invite now."},"reason":"Draft response to inbound email","confidence":0.86},
   {"type":"create_meeting","target":"meetings","data":{"deal_id":"deal_7","title":"Product demo","proposed_time":"2025-11-13T15:00:00Z","participants":["vp@client.com","owner@corchcrm.com"]},"reason":"Schedule meeting as requested in email","confidence":0.84}
 ]}
 
@@ -109,8 +106,8 @@ const orchestrateInteractionFlow = ai.defineFlow(
       const actions = Array.isArray(out?.actions) ? out.actions : [];
 
       // Filtro defensivo
-      const validTypes = new Set(['update_entity','create_ai_draft','create_meeting','create_task']);
-      const validTargets = new Set(['companies','contacts','deals','emails','tasks','ai_drafts','meetings']);
+      const validTypes = new Set(['update_entity','create_meeting','create_task']);
+      const validTargets = new Set(['companies','contacts','deals','emails','tasks','meetings']);
       const concrete = actions.filter(a => a && validTypes.has(a?.type) && validTargets.has(a?.target));
 
       if (concrete.length > 0) return { actions: concrete };
@@ -129,39 +126,25 @@ const orchestrateInteractionFlow = ai.defineFlow(
       const base = input.interaction.timestamp ? new Date(input.interaction.timestamp) : new Date();
       const plusDays = (n:number) => new Date(base.getTime() + n*24*3600*1000).toISOString();
 
-      if (dir === 'inbound') {
-        return {
-          actions: [{
-            type: 'create_ai_draft',
-            target: 'ai_drafts',
-            data: {
-              source_type: 'email',
-              related_id: dealId,
-              draft_text: `Hi — thanks for your message. ${title}. Happy to proceed; let me know a good time to sync.`
-            },
-            reason: 'Draft response to inbound email',
-            confidence: 0.6
-          } as Action]
-        };
-      } else {
-        return {
-          actions: [{
-            type: 'create_task',
-            target: 'tasks',
-            data: {
-              deal_id: dealId,
-              title: 'Follow up on outbound email',
-              due_date: plusDays(5),
-              owner_email: owner
-            },
-            reason: 'Schedule follow-up for outbound email',
-            confidence: 0.6
-          } as Action]
-        };
-      }
+      
+      return {
+        actions: [{
+          type: 'create_task',
+          target: 'tasks',
+          data: {
+            deal_id: dealId,
+            title: `Follow up on: ${title}`,
+            due_date: plusDays(dir === 'inbound' ? 2 : 5),
+            owner_email: owner
+          },
+          reason: 'Default follow-up task',
+          confidence: 0.6
+        } as Action]
+      };
+      
     } catch (e:any) {
       console.error('[orchestrateInteractionFlow]', e?.message || e);
-      // Fallback mínimo en error grave: generar un borrador de correo de seguimiento
+      // Fallback mínimo en error grave: generar una tarea de seguimiento
       const base = new Date();
       const plus5Days = new Date(base.getTime() + 5 * 24 * 3600 * 1000).toISOString();
       
@@ -170,16 +153,14 @@ const orchestrateInteractionFlow = ai.defineFlow(
 
       return {
         actions: [{
-          type: 'create_ai_draft',
-          target: 'ai_drafts',
+          type: 'create_task',
+          target: 'tasks',
           data: {
-            title: 'Follow up (fallback)',
+            title: `Manual follow-up required for email: ${subject}`,
             to: to || 'contact@example.com',
-            date: plus5Days,
-            subject: subject || 'Follow up',
-            body: `Hi,\n\nJust following up on our last conversation.\n\nBest,\n`
+            date: plus5Days
           },
-          reason: 'Fallback: Create follow-up email draft due to processing error.',
+          reason: 'Fallback: Create follow-up task due to processing error.',
           confidence: 0.5
         } as Action]
       };

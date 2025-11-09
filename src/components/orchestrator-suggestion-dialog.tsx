@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -28,16 +29,6 @@ interface OrchestratorSuggestionDialogProps {
   email: any; // Keeping it simple for now
   processFunction: () => Promise<OrchestratorOutput | null>;
 }
-
-const FallbackDraftDisplay = ({ data }: { data: any }) => (
-    <div className="mt-1 text-xs font-mono bg-muted p-3 rounded-md space-y-1">
-        <p><strong className="text-foreground/80">To:</strong> {data.to}</p>
-        <p><strong className="text-foreground/80">Date:</strong> {format(new Date(data.date), 'PPp')}</p>
-        <p><strong className="text-foreground/80">Subject:</strong> {data.subject}</p>
-        <div className="border-t mt-2 pt-2 whitespace-pre-wrap">{data.body}</div>
-    </div>
-);
-
 
 export function OrchestratorSuggestionDialog({
   open,
@@ -88,17 +79,6 @@ export function OrchestratorSuggestionDialog({
     const batch = writeBatch(db);
 
     try {
-        if (action.type === 'create_ai_draft') {
-            const draftRef = doc(collection(db, 'users', user.uid, 'ai_drafts'));
-            batch.set(draftRef, {
-                ...action.data,
-                id: draftRef.id,
-                status: 'draft',
-                createdAt: new Date().toISOString(),
-                userId: user.uid,
-            });
-        }
-        
         // Always log the action that was approved
         const logRef = doc(collection(db, 'audit_logs'));
         batch.set(logRef, {
@@ -183,13 +163,11 @@ export function OrchestratorSuggestionDialog({
                         <TableRow key={i}>
                             <TableCell>
                                 <div className="font-medium">{action.reason}</div>
-                                {action.type === 'create_ai_draft' && action.reason?.startsWith('Fallback') ? (
-                                    <FallbackDraftDisplay data={action.data} />
-                                ) : (
+                                {
                                     (action.data || action.changes) && (
                                         <pre className="mt-1 text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded-md">{JSON.stringify(action.data || action.changes, null, 2)}</pre>
                                     )
-                                )}
+                                }
                             </TableCell>
                             <TableCell><Badge variant="outline">{action.type}</Badge></TableCell>
                             <TableCell>{action.date ? format(new Date(action.date), 'PP') : 'Now'}</TableCell>

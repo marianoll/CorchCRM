@@ -6,12 +6,11 @@ import { z } from 'zod';
 export const ActionSchema = z.object({
   type: z.enum([
     'update_entity',      // update data
-    'create_ai_draft',    // email draft
     'create_meeting',     // schedule meeting
     'create_task'         // follow-up task
   ]),
   target: z.enum([
-    'companies','contacts','deals','emails','tasks','ai_drafts','meetings'
+    'companies','contacts','deals','emails','tasks','meetings'
   ]),
   id: z.string().optional(),              // for update_entity
   data: z.any().optional(),     // for create_*

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -30,7 +31,7 @@ type AuditLog = {
     id: string;
     ts: string;
     actor_type: 'user' | 'system_ai' | 'system_job';
-    action: 'create' | 'update' | 'delete' | 'restore' | 'create_ai_draft' | 'create_meeting' | 'create_task' | 'send_email';
+    action: 'create' | 'update' | 'delete' | 'restore' | 'create_meeting' | 'create_task' | 'send_email';
     entity_type: string;
     entity_id: string;
     table: string;
@@ -53,7 +54,6 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
     update: 'secondary',
     delete: 'destructive',
     restore: 'default',
-    create_ai_draft: 'default',
     create_meeting: 'default',
     create_task: 'default',
     send_email: 'default',

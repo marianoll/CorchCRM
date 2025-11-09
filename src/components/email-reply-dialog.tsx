@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -112,36 +113,6 @@ ${user.displayName?.split(' ')[0] || ''}`
     const batch = writeBatch(db);
 
     try {
-        const draftRef = doc(collection(db, 'users', user.uid, 'ai_drafts'));
-        const draftData = {
-            id: draftRef.id,
-            source_type: 'email_reply',
-            related_id: email.id,
-            draft_text: draft.body,
-            to: draft.to,
-            from: draft.from,
-            subject: draft.subject,
-            scheduled_at: draft.date.toISOString(),
-            status: 'draft',
-            createdAt: new Date().toISOString(),
-            userId: user.uid,
-        };
-        batch.set(draftRef, draftData);
-        
-        // Log Draft Creation
-        const createLogRef = doc(collection(db, 'audit_logs'));
-        batch.set(createLogRef, {
-            ts: new Date().toISOString(),
-            actor_type: 'user', 
-            actor_id: user.uid,
-            action: 'create_ai_draft',
-            entity_type: 'ai_drafts',
-            entity_id: draftRef.id,
-            table: 'ai_drafts',
-            source: 'ui-reply-generator',
-            after_snapshot: draftData
-        });
-
         // Log Simulated Email "Send"
         const sendLogRef = doc(collection(db, 'audit_logs'));
         batch.set(sendLogRef, {
@@ -150,7 +121,7 @@ ${user.displayName?.split(' ')[0] || ''}`
             actor_id: user.uid,
             action: 'send_email',
             entity_type: 'emails',
-            entity_id: draftRef.id, // Reference the draft that triggered this
+            entity_id: `simulated_send_${Date.now()}`,
             table: 'emails',
             source: 'ui-reply-generator',
             after_snapshot: {
@@ -164,15 +135,15 @@ ${user.displayName?.split(' ')[0] || ''}`
         await batch.commit();
 
         toast({
-            title: 'Draft Approved!',
-            description: `A draft reply has been saved and a send action was logged.`
+            title: 'Reply Approved!',
+            description: `An email sending action has been logged for ${format(draft.date, 'PP')}.`
         });
         
     } catch (error) {
         const contextualError = new FirestorePermissionError({
-            path: 'ai_drafts or audit_logs',
+            path: 'audit_logs',
             operation: 'create',
-            requestResourceData: draft,
+            requestResourceData: { action: 'send_email' },
         });
         errorEmitter.emit('permission-error', contextualError);
     } finally {
@@ -227,7 +198,7 @@ ${user.displayName?.split(' ')[0] || ''}`
           </Button>
            <Button onClick={() => handleAction('approved')} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white">
             {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            Approve & Save
+            Approve & Log Send Action
           </Button>
         </DialogFooter>
       </DialogContent>
