@@ -247,25 +247,40 @@ export default function EmailHistoryPage() {
                 
                 if (result.actions.length > 0 && db) {
                     const batch = writeBatch(db);
+                    const actionDocs: {ref: any, data: any}[] = [];
+
                     result.actions.forEach((action: Action) => {
-                         const actionRef = doc(collection(db, 'users', user.uid, 'emails', email.id, 'actions'));
-                         batch.set(actionRef, {
+                        const actionRef = doc(collection(db, 'users', user.uid, 'emails', email.id, 'actions'));
+                        const actionData = {
                             id: actionRef.id,
                             type: action.type,
                             description: action.reason,
                             details: action.data || action.changes,
                             status: 'pending'
-                         });
+                        };
+                        batch.set(actionRef, actionData);
+                        actionDocs.push({ ref: actionRef, data: actionData });
                     });
-                    await batch.commit();
+                    
+                    batch.commit().catch(err => {
+                        actionDocs.forEach(actionDoc => {
+                            const permissionError = new FirestorePermissionError({
+                                path: actionDoc.ref.path,
+                                operation: 'create',
+                                requestResourceData: actionDoc.data,
+                            });
+                            errorEmitter.emit('permission-error', permissionError);
+                        });
+                    });
                 }
 
             } catch (error: any) {
-                console.error(`Failed to process actions for email ${email.id}`, error);
+                // This catch block is for errors from the `orchestrateInteraction` flow itself.
+                console.error(`Failed to process AI actions for email ${email.id}`, error);
             }
         }
         setProcessingActionsId(null);
-        toast({ title: 'AI Actions Generated!', description: 'Review the suggestions in each row.'});
+        toast({ title: 'AI Actions Generation Complete!', description: 'Suggestions are being saved.'});
     };
 
 
