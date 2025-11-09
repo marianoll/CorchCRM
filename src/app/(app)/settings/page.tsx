@@ -48,13 +48,13 @@ type Settings = {
 
 const defaultSettings: Settings = {
     pipelineStages: [
-        { name: 'Prospect', color: 'bg-blue-500' },
-        { name: 'Discovery', color: 'bg-sky-500' },
-        { name: 'Proposal', color: 'bg-amber-500' },
-        { name: 'Negotiation', color: 'bg-orange-500' },
-        { name: 'Closed Won', color: 'bg-green-500' },
-        { name: 'Closed Lost', color: 'bg-red-500' },
-        { name: 'Retention', color: 'bg-purple-500' },
+        { name: 'prospect', color: 'bg-blue-500' },
+        { name: 'discovery', color: 'bg-sky-500' },
+        { name: 'proposal', color: 'bg-amber-500' },
+        { name: 'negotiation', color: 'bg-orange-500' },
+        { name: 'closed won', color: 'bg-green-500' },
+        { name: 'closed lost', color: 'bg-red-500' },
+        { name: 'retention', color: 'bg-purple-500' },
     ],
     defaultDealSorting: 'probability',
     darkMode: false,

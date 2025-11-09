@@ -179,48 +179,6 @@ export default function EmailHistoryPage() {
         setIsDetailsDialogOpen(true);
     };
 
-    const handleSyncGmail = async () => {
-        if (!db || !user) {
-            toast({ variant: 'destructive', title: 'Error', description: 'User not logged in.' });
-            return;
-        }
-        setIsSyncing(true);
-        toast({ title: 'Syncing Gmail...', description: 'Fetching today\'s emails.' });
-
-        try {
-            const result = await syncGmail({ userId: user.uid });
-
-            if (result.success && result.emails.length > 0) {
-                const batch = writeBatch(db);
-                result.emails.forEach(email => {
-                    const emailRef = doc(collection(db, 'users', user.uid, 'emails'));
-                    batch.set(emailRef, {
-                        ...email,
-                        id: emailRef.id,
-                        ts: new Date(email.ts as string), // Convert string timestamp back to Date
-                    });
-                });
-                await batch.commit();
-                toast({
-                    title: 'Sync Complete!',
-                    description: `${result.emails.length} new email(s) have been added.`,
-                });
-            } else if (result.success) {
-                 toast({
-                    title: 'No new emails',
-                    description: 'Your email history is already up to date.',
-                });
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error: any) {
-            console.error("Gmail sync error:", error);
-            toast({ variant: 'destructive', title: 'Sync Failed', description: error.message || 'Could not sync emails from Gmail.' });
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
     const handleGenerateAiActions = async () => {
         if (!user || !filteredEmails || filteredEmails.length === 0) {
             toast({ title: 'No emails to process.' });
@@ -313,10 +271,15 @@ export default function EmailHistoryPage() {
 
                 return lines.map(line => {
                     if (!line.trim()) return null;
-                    const values = line.split(',');
+                     // This is a simple regex to handle commas within quoted fields
+                    const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
                     const obj: Record<string, string> = {};
                     headers.forEach((header, index) => {
-                        obj[header] = values[index];
+                        let value = values[index] || '';
+                        if (value.startsWith('"') && value.endsWith('"')) {
+                            value = value.substring(1, value.length - 1);
+                        }
+                        obj[header] = value;
                     });
                     return obj;
                 }).filter((obj): obj is Record<string, string> => obj !== null);
@@ -437,51 +400,6 @@ export default function EmailHistoryPage() {
         }
     };
     
-    const handleSummarizeAll = async () => {
-        const emailsToSummarize = filteredEmails.filter(e => !e.ai_summary && e.body_excerpt);
-        if (emailsToSummarize.length === 0) {
-            toast({ title: 'All Caught Up!', description: 'No emails need summarizing.' });
-            return;
-        }
-        if (!db || !user) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
-            return;
-        }
-
-        setIsSummarizingAll(true);
-        toast({ title: 'Summarizing All...', description: `Processing ${emailsToSummarize.length} emails.` });
-        
-        let successCount = 0;
-
-        for (const email of emailsToSummarize) {
-            setSummarizingId(email.id); // Show loader for current row
-            try {
-                const result = await summarizeText({ text: email.body_excerpt });
-                const emailRef = doc(db, 'users', user.uid, 'emails', email.id);
-                
-                setDoc(emailRef, { ai_summary: result.summary }, { merge: true }).catch(err => {
-                    console.warn(`Permission error summarizing email ${email.id}, skipping.`, err);
-                });
-
-                // Optimistically update UI state for this specific email
-                if (setEmails) {
-                    setEmails(prevEmails => {
-                        if (!prevEmails) return null;
-                        return prevEmails.map(e => e.id === email.id ? { ...e, ai_summary: result.summary } : e);
-                    });
-                }
-                successCount++;
-            } catch (err) {
-                console.warn(`Could not summarize email ${email.id}. Skipping.`, err);
-            } finally {
-                setSummarizingId(null); // Hide loader for this row
-            }
-        }
-
-        setIsSummarizingAll(false);
-        toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
-    };
-
     const handleGenerateReply = (email: Email) => {
         setSelectedEmailForReply(email);
         setIsReplyDialogOpen(true);
