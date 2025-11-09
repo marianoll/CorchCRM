@@ -119,6 +119,7 @@ service cloud.firestore {
      * @allow (get) Authenticated user can read a task under their user id.
      * @allow (update) Authenticated user can update a task under their user id.
      * @allow (delete) Authenticated user can delete a task under their user id.
+     * @allow (list) Authenticated user can list tasks under their user id.
      * @deny (create) If the user id in the path does not match the authenticated user's id.
      * @deny (get) If the user id in the path does not match the authenticated user's id.
      * @deny (update) If the user id in the path does not match the authenticated user's id.
@@ -126,6 +127,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/tasks/{taskId} {
+      allow list: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
     
