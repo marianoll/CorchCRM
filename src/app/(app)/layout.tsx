@@ -45,8 +45,6 @@ const navItems = [
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/email-history', label: 'Email History', icon: Mail },
   { href: '/upload-history', label: 'Upload History', icon: Upload },
-  { href: '/dashboard', label: 'Orchestrator Log', icon: LayoutDashboard },
-  { href: '/crystals', label: 'Crystals Log', icon: Gem },
 ];
 
 function MainNav() {
