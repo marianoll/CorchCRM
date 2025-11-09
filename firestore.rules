@@ -168,11 +168,12 @@ service cloud.firestore {
 
     /**
      * @description Audit logs are immutable and can only be created by authenticated users.
-     * @path /audit_logs/{logId}
      */
      match /audit_logs/{logId} {
         allow read, create: if isSignedIn() || isFirebaseAdmin();
         allow update, delete: if false;
+     }
+     match /audit_logs {
         allow list: if isSignedIn() || isFirebaseAdmin();
      }
 
