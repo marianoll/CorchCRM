@@ -84,6 +84,11 @@ function MainNav() {
             <span>Debugging</span>
         </SidebarGroupLabel>
         <SidebarMenu>
+             <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/genkit-debug'} className="text-muted-foreground">
+                    <Link href="/genkit-debug"><Bug /><span>Genkit Debugger</span></Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/email-history'} className="text-muted-foreground">
                     <Link href="/email-history"><Mail /><span>Email History</span></Link>
