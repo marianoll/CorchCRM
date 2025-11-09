@@ -46,7 +46,7 @@ export type NaturalLanguageSearchOutput = z.infer<typeof NaturalLanguageSearchOu
 
 const searchPrompt = ai.definePrompt({
   name: 'naturalLanguageSearchPrompt',
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-2.0-flash-lite'),
   input: { schema: NaturalLanguageSearchInputSchema },
   output: { schema: NaturalLanguageSearchOutputSchema },
   prompt: `You are a helpful CRM data analyst. Your task is to interpret the user's natural language query, find the relevant data from the provided CRM context, and return a structured JSON object representing a table.
