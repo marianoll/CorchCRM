@@ -721,8 +721,8 @@ export default function EmailHistoryPage() {
             </div>
         </div>
         
-        <div className="my-4 space-y-2 p-4 border rounded-lg bg-muted/30">
-            <div className="flex items-center justify-between">
+        <div className="my-4 space-y-4 p-4 border rounded-lg bg-muted/30">
+            <div className="flex flex-col items-start space-y-2">
                 <div className="flex items-center space-x-2">
                     <Switch id="approve-replies-switch" checked={isApproveRepliesOn} onCheckedChange={setIsApproveRepliesOn} />
                     <Label htmlFor="approve-replies-switch" className="flex items-center gap-2 cursor-pointer"><MailPlus className="h-4 w-4" /> Approve All Replies</Label>
