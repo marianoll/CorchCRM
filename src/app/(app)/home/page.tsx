@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { InfoshardProcessor } from '@/components/infoshard-processor';
@@ -35,13 +36,13 @@ export default function HomePage() {
 
   // Fetch all CRM data needed for the infoshard processor context
   const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, [firestore, user]);
-  const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
+  const { data: contacts, isLoading: contactsLoading } = useCollection<Contact>(contactsQuery);
   
   const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
-  const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
+  const { data: deals, isLoading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
   const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, [firestore, user]);
-  const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
+  const { data: companies, isLoading: companiesLoading } = useCollection<Company>(companiesQuery);
 
 
   const crmData = {

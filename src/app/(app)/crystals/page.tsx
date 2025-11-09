@@ -1,6 +1,6 @@
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, orderBy, query, type Firestore } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
@@ -23,14 +23,15 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
 
 export default function CrystalsPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const crystalsQuery = useMemoFirebase(() => 
-        firestore 
+        firestore && user
         ? query(collection(firestore as Firestore, 'crystals'), orderBy('createdAt', 'desc')) 
         : null, 
-    [firestore]);
+    [firestore, user]);
 
-    const { data: crystals, loading: crystalsLoading } = useCollection<Crystal>(crystalsQuery);
+    const { data: crystals, isLoading: crystalsLoading } = useCollection<Crystal>(crystalsQuery);
 
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">

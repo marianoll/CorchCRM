@@ -124,13 +124,13 @@ export default function CrmPage() {
 
 
     const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [firestore, user]);
-    const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
+    const { data: contacts, isLoading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
     const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')) : null, [firestore, user]);
-    const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
+    const { data: deals, isLoading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
-    const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
+    const { data: companies, isLoading: companiesLoading } = useCollection<Company>(companiesQuery);
 
     const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails')) : null, [firestore, user]);
     const { data: emails } = useCollection<Email>(emailsQuery);

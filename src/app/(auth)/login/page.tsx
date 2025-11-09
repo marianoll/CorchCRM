@@ -94,7 +94,8 @@ export default function LoginPage() {
   };
 
   // Show a loader while the user session is loading.
-  if (isUserLoading) {
+  // or if we have started the login process but the user object isn't available yet
+  if (isUserLoading || isProcessingLogin) {
     return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
             <LoaderCircle className="h-10 w-10 animate-spin text-primary" />

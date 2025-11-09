@@ -1,7 +1,8 @@
 
+
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, orderBy, query, type Firestore } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
@@ -50,14 +51,15 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
 
 export default function OrquestratorPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const logsQuery = useMemoFirebase(() => 
-        firestore 
+        firestore && user
         ? query(collection(firestore as Firestore, 'audit_logs'), orderBy('ts', 'desc')) 
         : null, 
-    [firestore]);
+    [firestore, user]);
 
-    const { data: logs, loading: logsLoading } = useCollection<AuditLog>(logsQuery);
+    const { data: logs, isLoading: logsLoading } = useCollection<AuditLog>(logsQuery);
 
     const getEntityName = (log: AuditLog) => {
         if (log.after_snapshot && log.after_snapshot.name) {
