@@ -1,125 +1,73 @@
+
 'use server';
-/**
- * CorchCRM Orchestrator — Genkit Flow (FIXED)
- */
 
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
-/* ----------------------------- Tipos de Acciones ----------------------------- */
-
-const ActionType = z.enum([
-  'update_entity',
-  'create_entity',
-  'create_task',
-  'create_ai_draft',
-  'create_meeting',
-  'notify_user',
-  'log_action',
-  'suggest'
-]);
-
-const TargetType = z.enum([
-  'companies', 'contacts', 'deals', 'emails',
-  'tasks', 'ai_drafts', 'meetings', 'notifications', 'history'
-]);
+/* ---------- Esquemas mínimos ---------- */
 
 const ActionSchema = z.object({
-  type: ActionType,
-  target: TargetType,
+  type: z.enum([
+    'update_entity','create_entity','create_task','create_ai_draft',
+    'create_meeting','notify_user','log_action','suggest'
+  ]),
+  target: z.enum([
+    'companies','contacts','deals','emails','tasks','ai_drafts','meetings','notifications','history'
+  ]),
   id: z.string().optional(),
-  data: z.record(z.any()).describe("An object containing the full data for a new entity when type is create_entity.").optional(),
-  changes: z.record(z.any()).describe("An object containing only the fields to be modified when type is update_entity.").optional(),
-  reason: z.string().describe("A concise, one-line summary of the specific action to be taken. E.g., 'Update deal amount to $50,000' or 'Create task to send follow-up email'.").optional(),
+  data: z.record(z.any()).optional(),     // para create_*
+  changes: z.record(z.any()).optional(),  // para update_*
+  reason: z.string().optional(),
   confidence: z.number().min(0).max(1).optional(),
-  date: z.string().optional().describe('Optional date for the action, in ISO format. Default is now.'),
-});
-
-export type Action = z.infer<typeof ActionSchema>;
-
-/* ------------------------------- Esquemas I/O ------------------------------- */
-
-const InteractionSchema = z.object({
-  source: z.enum(['email','voice','meeting','note']),
-  subject: z.string().optional(),
-  body: z.string().optional(),
-  from: z.string().optional(),
-  to: z.string().optional(),
-  timestamp: z.string().optional() // ISO
-});
-export type Interaction = z.infer<typeof InteractionSchema>;
-
-const RelatedEntitiesSchema = z.object({
-  company: z.object({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    domain: z.string().optional(),
-    stage: z.string().optional()
-  }).optional(),
-  contact: z.object({
-    id: z.string().optional(),
-    full_name: z.string().optional(),
-    email: z.string().optional(),
-    title: z.string().optional()
-  }).optional(),
-  deal: z.object({
-    id: z.string().optional(),
-    title: z.string().optional(),
-    stage: z.string().optional(),
-    probability: z.number().optional(),
-    owner_email: z.string().optional(),
-    close_date: z.string().optional()
-  }).optional()
+  date: z.string().optional()
 });
 
 const OrchestratorInputSchema = z.object({
-  interaction: InteractionSchema,
-  related_entities: RelatedEntitiesSchema.optional(),
-  policy: z.object({
-    auto_apply_threshold: z.number().min(0).max(1).optional(),
-    always_review_fields: z.array(z.string()).optional(),
-    // Nota: en Zod basta con valueType si la clave es string
-    followup_days_by_stage: z.record(z.number()).optional(), // {"proposal":3, ...}
-    business_hours: z.object({
-      start: z.string().optional(),
-      end: z.string().optional(),
-      days: z.array(z.number()).optional()
-    }).optional()
-  }).optional()
+  interaction: z.object({
+    source: z.enum(['email','voice','meeting','note']),
+    subject: z.string().optional(),
+    body: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    timestamp: z.string().optional()
+  }),
+  // Simplificados: objetos libres para no pelear con validaciones
+  related_entities: z.record(z.any()).optional(),
+  policy: z.record(z.any()).optional()
 });
-
-export type OrchestratorInput = z.infer<typeof OrchestratorInputSchema>;
 
 const OrchestratorOutputSchema = z.object({
   actions: z.array(ActionSchema).default([])
 });
+
+export type OrchestratorInput  = z.infer<typeof OrchestratorInputSchema>;
 export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
+export type Action = z.infer<typeof ActionSchema>;
+export type Interaction = z.infer<typeof OrchestratorInputSchema>['interaction'];
 
-/* ---------------------------------- Prompt ---------------------------------- */
 
-// FIX 1: modelo vigente
+/* ---------- Prompt mínimo ---------- */
+
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.0-flash-lite'),
-  input: { schema: OrchestratorInputSchema },
+  model: googleAI.model('gemini-2.5-flash'),
+  input:  { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
-  // Pasa objetos; Genkit serializa. Evita {{{json ...}}}
   prompt: `
 You are CorchCRM's Orchestrator AI.
-Output ONLY a JSON object with an "actions" array. No text outside JSON.
+Output ONLY a JSON object with an "actions" array. No extra text.
 
-Entities: companies, contacts, deals, emails, tasks, meetings, notifications, history.
-Action types: update_entity, create_entity, create_task, create_ai_draft, create_meeting, notify_user, log_action, suggest.
+Entities: companies, contacts, deals, emails, tasks, meetings, notifications, ai_drafts, history.
+Actions: update_entity, create_entity, create_task, create_ai_draft, create_meeting, notify_user, log_action, suggest.
 
 Rules:
-- Prefer small, atomic actions.
-- For each action, you MUST provide a "reason" field with a concise, one-line summary of the specific action. For example: "Update deal amount to $50,000" or "Create task to send follow-up email".
-- Include "confidence" (0..1) for decisions.
-- If unsure, use type "suggest".
-- Log all entity changes with a "log_action".
-- Respect user policy (auto_apply_threshold, always_review_fields, followup_days_by_stage, business_hours).
-- Times in ISO UTC. If updating deals.stage, consider probability.
+- Small, atomic actions.
+- Each action should include a concise "reason".
+- Include "confidence" (0..1) when making decisions.
+- If unsure, use "suggest".
+- Log all changes with a "log_action".
+- Use ISO UTC times.
 
 Interaction:
 {{interaction}}
@@ -130,62 +78,30 @@ Related entities:
 Policy:
 {{policy}}
 
-Return JSON matching the output schema strictly.
+Return JSON strictly matching the output schema.
 `
 });
 
-/* ----------------------------------- Flow ----------------------------------- */
+/* ---------- Flow mínimo ---------- */
 
 const orchestrateInteractionFlow = ai.defineFlow(
-  {
-    name: 'orchestrateInteractionFlow',
-    inputSchema: OrchestratorInputSchema,
-    outputSchema: OrchestratorOutputSchema
-  },
+  { name: 'orchestrateInteractionFlow', inputSchema: OrchestratorInputSchema, outputSchema: OrchestratorOutputSchema },
   async (input): Promise<OrchestratorOutput> => {
     if (!input?.interaction?.source) {
-      return {
-        actions: [{
-          type: 'log_action',
-          target: 'history',
-          data: { action: 'error', explanation: 'Missing interaction.source' },
-          reason: 'Invalid input',
-          confidence: 0
-        }]
-      };
+      return { actions: [{ type: 'log_action', target: 'history', reason: 'Invalid input: missing interaction.source', confidence: 0 }] };
     }
-
     try {
       const res = await orchestratePrompt(input);
-      const out = res.output;
-
-      if (!out || !Array.isArray(out.actions)) {
-        console.warn('[orchestrateInteractionFlow] Model returned invalid or empty actions:', out);
-        return { actions: [] };
-      }
-      
-      return { actions: out.actions };
-      
-    } catch (err: any) {
-      console.error('[orchestrateInteractionFlow] Error:', err);
-      return {
-        actions: [{
-          type: 'log_action',
-          target: 'history',
-          data: { 
-            action: 'error', 
-            explanation: 'Model call failed',
-            details: err.message || JSON.stringify(err)
-          },
-          reason: 'Model error',
-          confidence: 0
-        }]
-      };
+      const out = typeof (res as any)?.output === 'function' ? (res as any).output() : (res as any)?.output;
+      return { actions: Array.isArray(out?.actions) ? out.actions : [] };
+    } catch (e:any) {
+      console.error('[orchestrateInteractionFlow]', e?.message || e);
+      return { actions: [{ type: 'log_action', target: 'history', reason: 'Model call failed', confidence: 0 }] };
     }
   }
 );
 
-/* ---------------------------------- Helper ---------------------------------- */
+/* ---------- Helper ---------- */
 
 export async function orchestrateInteraction(input: OrchestratorInput): Promise<OrchestratorOutput> {
   return orchestrateInteractionFlow(input);
