@@ -3,11 +3,11 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, orderBy, query, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +29,8 @@ import { DateRange } from 'react-day-picker';
 import { summarizeText } from '@/ai/flows/summarize-text';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { CrmDetailsDialog } from '@/components/crm-details-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 type Email = {
@@ -41,13 +43,15 @@ type Email = {
     body_excerpt: string;
     labels: string;
     company_id?: string;
+    deal_id?: string;
     ai_summary?: string;
 };
 
-type Company = {
-    id: string;
-    name: string;
-};
+type Company = { id: string; name: string; domain?: string; industry?: string; };
+type Contact = { id: string; company_id?: string; full_name: string; email_primary: string; phone?: string; title?: string; };
+type Deal = { id: string; company_id?: string; primary_contact_id: string; title: string; amount: number; stage: string; close_date: Date | Timestamp | string; };
+type CrmEntity = Company | Contact | Deal;
+
 
 const directionVariant: { [key: string]: 'default' | 'secondary' } = {
   inbound: 'default',
@@ -60,32 +64,48 @@ export default function EmailHistoryPage() {
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
+    const [isSummarizingAll, setIsSummarizingAll] = useState(false);
 
+    // Filters state
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedCompany, setSelectedCompany] = useState<string>('all');
     const [labelFilter, setLabelFilter] = useState<string>('');
     const [keywordFilter, setKeywordFilter] = useState<string>('');
     const [contactFilter, setContactFilter] = useState<string>('');
+    
+    // Details Dialog state
+    const [detailsEntity, setDetailsEntity] = useState<CrmEntity | null>(null);
+    const [detailsEntityType, setDetailsEntityType] = useState<'Company' | 'Contact' | 'Deal' | null>(null);
+    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
-    const emailsQuery = useMemoFirebase(() => 
-        firestore && user
-        ? query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) 
-        : null, 
-    [firestore, user]);
-
-    const companiesQuery = useMemoFirebase(() => 
-        firestore && user
-        ? query(collection(firestore, 'users', user.uid, 'companies'))
-        : null,
-    [firestore, user]);
-
+    // Data fetching
+    const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, [firestore, user]);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
+
+    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, [firestore, user]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
+    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, [firestore, user]);
+    const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
+
+    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
+    const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
+
     const getCompanyName = (companyId?: string) => {
-        if (!companyId || companiesLoading || !companies) return 'N/A';
-        return companies.find(c => c.id === companyId)?.name || 'Unknown';
+        if (!companyId || companiesLoading || !companies) return null;
+        return companies.find(c => c.id === companyId);
     }
+    
+    const getDealTitle = (dealId?: string) => {
+        if (!dealId || dealsLoading || !deals) return null;
+        return deals.find(d => d.id === dealId);
+    }
+    
+    const handleEntityClick = (entity: CrmEntity, type: 'Company' | 'Contact' | 'Deal') => {
+        setDetailsEntity(entity);
+        setDetailsEntityType(type);
+        setIsDetailsDialogOpen(true);
+    };
 
     const handleSeedEmails = async () => {
         if (!firestore || !user) {
@@ -209,7 +229,7 @@ export default function EmailHistoryPage() {
             const emailRef = doc(firestore, 'users', user.uid, 'emails', emailId);
             const summaryData = { ai_summary: result.summary };
 
-            await setDoc(emailRef, summaryData, { merge: true }).catch(error => {
+            setDoc(emailRef, summaryData, { merge: true }).catch(error => {
                 const permissionError = new FirestorePermissionError({
                     path: emailRef.path,
                     operation: 'update',
@@ -236,9 +256,58 @@ export default function EmailHistoryPage() {
             setSummarizingId(null);
         }
     };
+    
+    const handleSummarizeAll = async () => {
+        const emailsToSummarize = filteredEmails.filter(e => !e.ai_summary && e.body_excerpt);
+        if (emailsToSummarize.length === 0) {
+            toast({ title: 'All Caught Up!', description: 'No emails need summarizing.' });
+            return;
+        }
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
+            return;
+        }
+
+        setIsSummarizingAll(true);
+        toast({ title: 'Summarizing All...', description: `Processing ${emailsToSummarize.length} emails. This may take a moment.` });
+
+        const batch = writeBatch(firestore);
+        const newSummaries: { [id: string]: string } = {};
+
+        try {
+            for (const email of emailsToSummarize) {
+                try {
+                    const result = await summarizeText({ text: email.body_excerpt });
+                    newSummaries[email.id] = result.summary;
+                    const emailRef = doc(firestore, 'users', user.uid, 'emails', email.id);
+                    batch.update(emailRef, { ai_summary: result.summary });
+                } catch (err) {
+                    console.warn(`Could not summarize email ${email.id}. Skipping.`, err);
+                }
+            }
+
+            await batch.commit();
+
+            if (setEmails) {
+                setEmails(prevEmails => {
+                    if (!prevEmails) return null;
+                    return prevEmails.map(e => newSummaries[e.id] ? { ...e, ai_summary: newSummaries[e.id] } : e);
+                });
+            }
+
+            toast({ title: 'Summaries Complete!', description: `${Object.keys(newSummaries).length} emails were summarized.` });
+
+        } catch (error) {
+            console.error("Batch summarizing error:", error);
+            toast({ variant: 'destructive', title: 'Batch Failed', description: 'Could not save all summaries. Check console.' });
+        } finally {
+            setIsSummarizingAll(false);
+        }
+    };
 
 
   return (
+    <TooltipProvider>
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
@@ -249,10 +318,16 @@ export default function EmailHistoryPage() {
                 </h1>
                 <p className="text-muted-foreground">A log of all emails processed by the system.</p>
             </div>
-             <Button onClick={handleSeedEmails} disabled={isSeeding}>
-                {isSeeding ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
-                 Seed Database
-            </Button>
+            <div className="flex gap-2">
+                <Button onClick={handleSummarizeAll} disabled={isSummarizingAll}>
+                    {isSummarizingAll ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Summarize All Missing
+                </Button>
+                <Button onClick={handleSeedEmails} disabled={isSeeding}>
+                    {isSeeding ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                    Seed Database
+                </Button>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 items-start gap-4 mb-4 p-4 bg-card border rounded-lg">
@@ -342,50 +417,72 @@ export default function EmailHistoryPage() {
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[180px]">Timestamp</TableHead>
-                        <TableHead className="w-[25%]">Subject</TableHead>
+                        <TableHead className="w-[20%]">Subject</TableHead>
                         <TableHead>From/To</TableHead>
                         <TableHead>Company</TableHead>
-                        <TableHead className="w-[40%]">AI Summary</TableHead>
+                        <TableHead>Deal</TableHead>
+                        <TableHead className="w-[35%]">AI Summary</TableHead>
                         <TableHead>Labels</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {(emailsLoading || companiesLoading) && <TableRow><TableCell colSpan={6} className="text-center">Loading emails...</TableCell></TableRow>}
-                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={6} className="text-center">No emails found.</TableCell></TableRow>}
-                    {filteredEmails.map((email) => (
-                    <TableRow key={email.id}>
-                        <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
-                        <TableCell className="font-medium">
-                           <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button variant="link" className="p-0 h-auto font-medium text-left">{email.subject}</Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-2xl">
-                                    <DialogHeader>
-                                        <DialogTitle>{email.subject}</DialogTitle>
-                                        <DialogDescription>
-                                            {email.from_email} to {email.to_email}
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto">
-                                        <p>{email.body_excerpt}</p>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button type="button" variant="secondary">Close</Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-col text-xs">
-                                <Badge variant={directionVariant[email.direction]} className="mb-1 w-fit">{email.direction}</Badge>
-                                <span className='text-muted-foreground'>From: {email.from_email}</span>
-                                <span className='text-muted-foreground'>To: {email.to_email}</span>
-                            </div>
-                        </TableCell>
-                        <TableCell>{getCompanyName(email.company_id)}</TableCell>
-                        <TableCell>
-                            <div className="flex items-center gap-2">
+                    {(emailsLoading || companiesLoading || contactsLoading || dealsLoading) && <TableRow><TableCell colSpan={7} className="text-center">Loading emails...</TableCell></TableRow>}
+                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={7} className="text-center">No emails found.</TableCell></TableRow>}
+                    {filteredEmails.map((email) => {
+                        const company = getCompanyName(email.company_id);
+                        const deal = getDealTitle(email.deal_id);
+                        return (
+                        <TableRow key={email.id}>
+                            <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
+                            <TableCell className="font-medium">
+                            <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button variant="link" className="p-0 h-auto font-medium text-left">{email.subject}</Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-2xl">
+                                        <DialogHeader>
+                                            <DialogTitle>{email.subject}</DialogTitle>
+                                            <DialogDescription>
+                                                {email.from_email} to {email.to_email}
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto">
+                                            <p>{email.body_excerpt}</p>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="button" variant="secondary">Close</Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </TableCell>
+                            <TableCell>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                         <Badge variant={directionVariant[email.direction]} className="mb-1 w-fit">{email.direction}</Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <div className="flex flex-col text-xs p-1">
+                                            <span>From: {email.from_email}</span>
+                                            <span>To: {email.to_email}</span>
+                                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TableCell>
+                            <TableCell>
+                                {company ? (
+                                    <Button variant="link" className="p-0 h-auto" onClick={() => handleEntityClick(company, 'Company')}>{company.name}</Button>
+                                ) : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                                {deal ? (
+                                    <Button variant="ghost" size="icon" onClick={() => handleEntityClick(deal, 'Deal')}>
+                                        <FileText className="h-4 w-4" />
+                                        <span className="sr-only">View Deal</span>
+                                    </Button>
+                                ) : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
                                 {email.ai_summary ? (
                                     <span className="line-clamp-2">{email.ai_summary}</span>
                                 ) : (
@@ -397,7 +494,7 @@ export default function EmailHistoryPage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
-                                                disabled={summarizingId === email.id}
+                                                disabled={summarizingId === email.id || isSummarizingAll}
                                                 className="h-6 w-6 shrink-0"
                                             >
                                                 <RefreshCw className="h-4 w-4" />
@@ -408,18 +505,28 @@ export default function EmailHistoryPage() {
                                         </span>
                                     </>
                                 )}
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
-                        </TableCell>
-                    </TableRow>
-                    ))}
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
+                            </TableCell>
+                        </TableRow>
+                    )})}
                 </TableBody>
                 </Table>
             </CardContent>
         </Card>
       </div>
+      <CrmDetailsDialog
+        entity={detailsEntity}
+        entityType={detailsEntityType}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        onEntityClick={handleEntityClick}
+        contacts={contacts || []}
+        deals={deals || []}
+      />
     </main>
+    </TooltipProvider>
   );
 }
