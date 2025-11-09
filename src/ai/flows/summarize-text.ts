@@ -39,7 +39,8 @@ export const summarizeText = ai.defineFlow(
         return { summary: 'No text provided.' };
     }
 
-    const { output } = await summarizeTextPrompt(input);
+    const response = await summarizeTextPrompt(input);
+    const output = response.output;
     
     return output || { summary: 'Could not generate summary.' };
   }
