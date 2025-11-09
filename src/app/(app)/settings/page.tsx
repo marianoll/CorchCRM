@@ -29,6 +29,7 @@ type Settings = {
     darkMode: boolean;
     autoApplyConfidenceThreshold: number;
     autoCreateEntities: boolean;
+
     dealStageAutoMove: boolean;
     amountChange: boolean;
     dateChange: boolean;
@@ -164,9 +165,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  const settingsRef = useMemoFirebase(() => 
-    firestore && user ? doc(firestore, 'users', user.uid, 'settings', 'user') : null
-  , [firestore, user]);
+  const settingsRef = useMemoFirebase((firestore, user) => doc(firestore, 'users', user.uid, 'settings', 'user'), []);
 
   const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<Settings>(settingsRef);
 

@@ -5,8 +5,8 @@
 import { InfoshardProcessor } from '@/components/infoshard-processor';
 import { RecentActivity } from '@/components/recent-activity';
 import { UpcomingTasks } from '@/components/upcoming-tasks';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query } from 'firebase/firestore';
 
 
 // Define types based on new schema
@@ -31,17 +31,14 @@ type Deal = {
 };
 
 export default function HomePage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-
   // Fetch all CRM data needed for the infoshard processor context
-  const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, [firestore, user]);
+  const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts')), []);
   const { data: contacts, isLoading: contactsLoading } = useCollection<Contact>(contactsQuery);
   
-  const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
+  const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals')), []);
   const { data: deals, isLoading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-  const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, [firestore, user]);
+  const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies')), []);
   const { data: companies, isLoading: companiesLoading } = useCollection<Company>(companiesQuery);
 
 

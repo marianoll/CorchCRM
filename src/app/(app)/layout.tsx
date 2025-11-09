@@ -37,10 +37,9 @@ import {
 import {
   useUser,
   useCollection,
-  useFirestore,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -160,7 +159,6 @@ function UserProfile() {
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
-    const firestore = useFirestore();
 
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -170,13 +168,13 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     type Deal = { id: string; title: string; [key: string]: any; };
 
     // Fetch all CRM data needed for the search context
-    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, [firestore, user]);
+    const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts')), []);
     const { data: contacts } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
+    const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals')), []);
     const { data: deals } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, [firestore, user]);
+    const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies')), []);
     const { data: companies } = useCollection<Company>(companiesQuery);
 
 

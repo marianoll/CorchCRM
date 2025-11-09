@@ -102,16 +102,16 @@ export default function EmailHistoryPage() {
 
 
     // Data fetching
-    const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, [firestore, user]);
+    const emailsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')), []);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
 
-    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, [firestore, user]);
+    const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies')), []);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
-    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, [firestore, user]);
+    const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts')), []);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
 
-    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
+    const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals')), []);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const crmDataLoading = companiesLoading || contactsLoading || dealsLoading;

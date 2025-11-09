@@ -2,7 +2,7 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore } from 'firebase/firestore';
+import { Firestore, collection, doc, query, orderBy } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
@@ -154,16 +154,29 @@ export const useFirebaseApp = (): FirebaseApp => {
   return firebaseApp;
 };
 
-type MemoFirebase <T> = T & {__memo?: boolean};
+/**
+ * A memoization hook for Firebase queries that intelligently waits for `firestore` and `user` to be ready.
+ *
+ * @param factory A function that takes `firestore` and `user` and returns a Firebase query or reference.
+ * @param deps An optional dependency array for the `useMemo` hook.
+ * @returns A memoized Firebase query/reference, or `null` if dependencies are not ready.
+ */
+export function useMemoFirebase<T>(
+  factory: (firestore: Firestore, user: User) => T,
+  deps: DependencyList
+): T | null {
+    const { firestore, user, isUserLoading } = useFirebase();
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
-  const memoized = useMemo(factory, deps);
-  
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
-  
-  return memoized;
+    return useMemo(() => {
+        // Defer query creation until both firestore and user are available.
+        if (!firestore || isUserLoading || !user) {
+            return null;
+        }
+        return factory(firestore, user);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firestore, user, isUserLoading, ...deps]);
 }
+
 
 /**
  * Hook specifically for accessing the authenticated user's state.

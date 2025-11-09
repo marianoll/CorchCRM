@@ -123,21 +123,19 @@ export default function CrmPage() {
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
 
-    const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [firestore, user]);
+    const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')), []);
     const { data: contacts, isLoading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')) : null, [firestore, user]);
+    const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')), []);
     const { data: deals, isLoading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
+    const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')), []);
     const { data: companies, isLoading: companiesLoading } = useCollection<Company>(companiesQuery);
 
-    const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails')) : null, [firestore, user]);
+    const emailsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'emails')), []);
     const { data: emails } = useCollection<Email>(emailsQuery);
 
-    const settingsRef = useMemoFirebase(() => 
-        firestore && user ? doc(firestore, 'users', user.uid, 'settings', 'user') : null
-    , [firestore, user]);
+    const settingsRef = useMemoFirebase((firestore, user) => doc(firestore, 'users', user.uid, 'settings', 'user'), []);
     const { data: settings, isLoading: isLoadingSettings } = useDoc<Settings>(settingsRef);
 
     const stageColorMap = useMemo(() => {

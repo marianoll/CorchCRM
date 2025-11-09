@@ -2,8 +2,8 @@
 
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, orderBy, query, type Firestore } from 'firebase/firestore';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection, orderBy, query } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -50,14 +50,9 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
 };
 
 export default function OrquestratorPage() {
-    const firestore = useFirestore();
-    const { user } = useUser();
-
-    const logsQuery = useMemoFirebase(() => 
-        firestore && user
-        ? query(collection(firestore as Firestore, 'audit_logs'), orderBy('ts', 'desc')) 
-        : null, 
-    [firestore, user]);
+    const logsQuery = useMemoFirebase((firestore, user) => 
+        query(collection(firestore, 'audit_logs'), orderBy('ts', 'desc')) 
+    , []);
 
     const { data: logs, isLoading: logsLoading } = useCollection<AuditLog>(logsQuery);
 
