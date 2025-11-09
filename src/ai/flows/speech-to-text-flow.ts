@@ -22,7 +22,7 @@ export type SpeechToTextOutput = z.infer<typeof SpeechToTextOutputSchema>;
 
 const transcribePrompt = ai.definePrompt({
     name: 'transcribeAudioPrompt',
-    model: googleAI.model('gemini-1.5-flash-latest'),
+    model: googleAI.model('gemini-1.5-flash'),
     input: { schema: SpeechToTextInputSchema },
     prompt: `Transcribe the following audio recording. Provide only the text content of the speech, without any additional formatting or labels.
 
