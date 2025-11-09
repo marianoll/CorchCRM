@@ -595,35 +595,68 @@ export default function EmailHistoryPage() {
 
     const handleUpgradeHighConfidenceDeals = async () => {
         if (!user || !db || filteredEmails.length === 0) return 0;
-        
+
+        const emailsToAnalyze = filteredEmails.filter(email => 
+            email.actions?.some(a => ['stage_change', 'data_update'].includes(a.type) && a.status === 'pending')
+        );
+
+        if (emailsToAnalyze.length === 0) return 0;
+
         const batch = writeBatch(db);
         let updatedCount = 0;
-
-        for (const email of filteredEmails) {
-            const hasPendingAction = email.actions?.some(a => ['stage_change', 'data_update'].includes(a.type) && a.status === 'pending');
-            if (!hasPendingAction) continue;
-            
+        
+        // Create an array of promises for all AI analysis calls
+        const analysisPromises = emailsToAnalyze.map(email => {
             const deal = getDeal(email.deal_id);
             if (deal) {
-                const analysisResult = await analyzeEmailContent({ emailBody: email.body_excerpt, emailSubject: email.subject, currentDeal: deal });
-                if (analysisResult.stageSuggestion && analysisResult.stageSuggestion.probability > 0.75) {
-                    updatedCount++;
-                    setActionState(email.id, 'analyze', 'approved');
-                    const dealRef = doc(db, 'users', user.uid, 'deals', deal.id);
-                    const changes = { stage: analysisResult.stageSuggestion.newStage };
-                    batch.update(dealRef, changes);
-
-                    const logRef = doc(collection(db, 'audit_logs'));
-                    batch.set(logRef, { ts: new Date().toISOString(), actor_type: 'system_ai', actor_id: user.uid, action: 'update', entity_type: 'deals', entity_id: deal.id, table: 'deals', source: 'ui-bulk-approval', before_snapshot: { stage: deal.stage }, after_snapshot: changes });
-                }
+                return analyzeEmailContent({ emailBody: email.body_excerpt, emailSubject: email.subject, currentDeal: deal })
+                    .then(result => ({ email, deal, result })) // Pass along email and deal for context
+                    .catch(err => {
+                        console.error(`AI analysis failed for email ${email.id}:`, err);
+                        return null; // Return null on failure to filter out later
+                    });
             }
-        }
+            return Promise.resolve(null);
+        });
+
+        // Wait for all analyses to complete
+        const results = await Promise.all(analysisPromises);
+
+        // Process results and prepare batch write
+        results.forEach(item => {
+            if (item && item.result.stageSuggestion && item.result.stageSuggestion.probability > 0.75) {
+                const { email, deal, result } = item;
+                updatedCount++;
+                
+                // Optimistically update UI state (can be done separately or batched at the end)
+                setActionState(email.id, 'analyze', 'approved');
+
+                const dealRef = doc(db, 'users', user.uid, 'deals', deal.id);
+                const changes = { stage: result.stageSuggestion.newStage };
+                batch.update(dealRef, changes);
+
+                const logRef = doc(collection(db, 'audit_logs'));
+                batch.set(logRef, { 
+                    ts: new Date().toISOString(), 
+                    actor_type: 'system_ai', 
+                    actor_id: user.uid, 
+                    action: 'update', 
+                    entity_type: 'deals', 
+                    entity_id: deal.id, 
+                    table: 'deals', 
+                    source: 'ui-bulk-approval', 
+                    before_snapshot: { stage: deal.stage }, 
+                    after_snapshot: changes 
+                });
+            }
+        });
         
         if (updatedCount > 0) {
             await batch.commit();
         }
         return updatedCount;
     };
+
 
     const handleApproveAllMeetings = async () => {
         if (!user || !db) return 0;
@@ -1094,3 +1127,5 @@ export default function EmailHistoryPage() {
     </TooltipProvider>
   );
 }
+
+    
