@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { LoaderCircle, Bot, Send, Sparkles } from 'lucide-react';
+import { LoaderCircle, Bot, Send, Sparkles, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { naturalLanguageSearch, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
 import ReactMarkdown from 'react-markdown';
@@ -102,15 +102,28 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
     }
     onOpenChange(isOpen);
   };
+  
+  const handleNewConversation = () => {
+    setMessages([]);
+    setQuery('');
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl flex flex-col h-[70vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Bot />
-            Natural Language Search
-          </DialogTitle>
+          <div className="flex justify-between items-center">
+            <DialogTitle className="flex items-center gap-2">
+              <Bot />
+              Natural Language Search
+            </DialogTitle>
+            {messages.length > 0 && (
+                <Button variant="ghost" size="icon" onClick={handleNewConversation}>
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="sr-only">New Conversation</span>
+                </Button>
+            )}
+          </div>
           <DialogDescription>
             Ask a question about your CRM data in plain English. The AI will interpret your query.
           </DialogDescription>
