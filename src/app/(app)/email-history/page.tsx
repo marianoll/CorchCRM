@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
-import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp, getDocs } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, addDays } from 'date-fns';
@@ -41,7 +41,7 @@ import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 import { analyzeEmailContent, type AnalysisOutput } from '@/ai/flows/analyze-email-flow';
 
 type ActionStatus = 'approved' | 'rejected' | 'pending' | null;
-type ActionType = 'reply' | 'analyze' | 'meeting' | 'task';
+type ActionType = 'reply' | 'analyze' | 'meeting' | 'task' | 'create_task' | 'stage_change' | 'data_update' | 'create_meeting';
 
 type AIAction = {
     id: string;
@@ -76,6 +76,13 @@ type CrmEntity = Company | Contact | Deal;
 const directionVariant: { [key: string]: 'default' | 'secondary' } = {
   inbound: 'default',
   outbound: 'secondary',
+};
+
+const actionTypeMapping: Record<string, ActionType> = {
+    create_task: 'task',
+    stage_change: 'analyze',
+    data_update: 'analyze',
+    create_meeting: 'meeting',
 };
 
 export default function EmailHistoryPage() {
@@ -127,6 +134,27 @@ export default function EmailHistoryPage() {
     // Data fetching
     const emailsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, [user]);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
+
+    useEffect(() => {
+        if (!user || !emails) return;
+
+        const fetchAllActions = async () => {
+            if (!emails) return;
+            const emailsWithActions = await Promise.all(
+                emails.map(async (email) => {
+                    const actionsQuery = query(collection(db, 'users', user.uid, 'emails', email.id, 'actions'));
+                    const actionsSnapshot = await getDocs(actionsQuery);
+                    const actions = actionsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AIAction));
+                    return { ...email, actions };
+                })
+            );
+            setEmails(emailsWithActions);
+        };
+        fetchAllActions();
+    // We only want to run this when the initial emails are loaded, not when we update them with actions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [emails?.length, user]);
+
 
     const companiesQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'companies')) : null, [user]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
@@ -226,16 +254,22 @@ export default function EmailHistoryPage() {
                         actionDocs.push({ ref: actionRef, data: actionData });
                     });
                     
-                    batch.commit().catch(err => {
-                        actionDocs.forEach(actionDoc => {
-                            const permissionError = new FirestorePermissionError({
-                                path: actionDoc.ref.path,
-                                operation: 'create',
-                                requestResourceData: actionDoc.data,
+                    await batch.commit();
+
+                    // Optimistically update the UI with the new actions
+                     if (setEmails) {
+                        setEmails(prevEmails => {
+                            if (!prevEmails) return null;
+                            return prevEmails.map(e => {
+                                if (e.id === email.id) {
+                                    const newActions = actionDocs.map(ad => ad.data as AIAction);
+                                    return { ...e, actions: [...(e.actions || []), ...newActions] };
+                                }
+                                return e;
                             });
-                            errorEmitter.emit('permission-error', permissionError);
                         });
-                    });
+                    }
+
                 }
 
             } catch (error: any) {
@@ -746,12 +780,17 @@ export default function EmailHistoryPage() {
                         
                         const isProcessingRow = processingActionsId === email.id;
 
+                        const hasAction = (type: ActionType) => {
+                             if (!email.actions) return false;
+                             return email.actions.some(a => actionTypeMapping[a.type] === type || a.type === type);
+                        };
+
                         const getIconClass = (action: ActionType) => {
-                            if (isProcessingRow) return 'text-muted-foreground/30';
                             const status = email.actionStates?.[action];
                             if (status === 'approved') return 'text-green-500';
                             if (status === 'rejected') return 'text-red-500';
-                            return '';
+                            if (hasAction(action)) return 'text-foreground'; // Black
+                            return 'text-muted-foreground'; // Gray
                         };
 
                         return (
@@ -857,7 +896,7 @@ export default function EmailHistoryPage() {
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)} disabled={isProcessingRow}>
                                                 <TrendingUp className={cn("h-4 w-4", getIconClass('analyze'))} />
-                                                <span className="sr-only">Stage Status</span>
+                                                <span className="sr-only">Analyze Stage</span>
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent><p>Analyze Stage</p></TooltipContent>
