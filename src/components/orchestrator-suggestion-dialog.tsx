@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { LoaderCircle, Check, X, Bot } from 'lucide-react';
+import { LoaderCircle, Check, X, Bot, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, writeBatch, doc } from 'firebase/firestore';
@@ -28,6 +28,16 @@ interface OrchestratorSuggestionDialogProps {
   email: any; // Keeping it simple for now
   processFunction: () => Promise<OrchestratorOutput | null>;
 }
+
+const FallbackDraftDisplay = ({ data }: { data: any }) => (
+    <div className="mt-1 text-xs font-mono bg-muted p-3 rounded-md space-y-1">
+        <p><strong className="text-foreground/80">To:</strong> {data.to}</p>
+        <p><strong className="text-foreground/80">Date:</strong> {format(new Date(data.date), 'PPp')}</p>
+        <p><strong className="text-foreground/80">Subject:</strong> {data.subject}</p>
+        <div className="border-t mt-2 pt-2 whitespace-pre-wrap">{data.body}</div>
+    </div>
+);
+
 
 export function OrchestratorSuggestionDialog({
   open,
@@ -78,37 +88,49 @@ export function OrchestratorSuggestionDialog({
     setIsSaving(true);
     const batch = writeBatch(firestore);
 
-    const logRef = doc(collection(firestore, 'audit_logs'));
-    batch.set(logRef, {
-        ts: new Date().toISOString(),
-        actor_type: 'system_ai',
-        actor_id: user.uid,
-        action: action.type,
-        entity_type: action.target,
-        entity_id: action.id || 'new',
-        table: action.target,
-        source: 'email-orchestrator',
-        after_snapshot: action.data || action.changes
-    });
-    
     try {
-        await batch.commit();
-        toast({
-            title: 'Action Approved!',
-            description: `Action "${action.type}" has been logged.`
-        });
-        // Remove action from list optimistically
-        setResult(prev => prev ? ({ ...prev, actions: prev.actions.filter(a => a !== action) }) : null);
-    } catch (error) {
-        if (error instanceof FirestorePermissionError) {
-             errorEmitter.emit('permission-error', error);
-        } else {
-             toast({
-                variant: 'destructive',
-                title: 'Approval Error',
-                description: 'Could not save the action. Please try again.',
+        if (action.type === 'create_ai_draft') {
+            const draftRef = doc(collection(firestore, 'users', user.uid, 'ai_drafts'));
+            batch.set(draftRef, {
+                ...action.data,
+                id: draftRef.id,
+                status: 'draft',
+                createdAt: new Date().toISOString(),
+                userId: user.uid,
             });
         }
+        
+        // Always log the action that was approved
+        const logRef = doc(collection(firestore, 'audit_logs'));
+        batch.set(logRef, {
+            ts: new Date().toISOString(),
+            actor_type: 'system_ai',
+            actor_id: user.uid,
+            action: action.type,
+            entity_type: action.target,
+            entity_id: action.id || 'new',
+            table: action.target,
+            source: 'email-orchestrator',
+            after_snapshot: action.data || action.changes
+        });
+        
+        await batch.commit();
+
+        toast({
+            title: 'Action Approved!',
+            description: `Action "${action.type}" has been logged and executed.`
+        });
+        
+        // Remove action from list optimistically
+        setResult(prev => prev ? ({ ...prev, actions: prev.actions.filter(a => a !== action) }) : null);
+
+    } catch (error) {
+        const contextualError = new FirestorePermissionError({
+            path: 'unknown', // We don't know which write failed specifically
+            operation: 'write',
+            requestResourceData: action.data || action.changes,
+        });
+        errorEmitter.emit('permission-error', contextualError);
     } finally {
         setIsSaving(false);
     }
@@ -161,9 +183,13 @@ export function OrchestratorSuggestionDialog({
                     {result.actions.map((action, i) => (
                         <TableRow key={i}>
                             <TableCell>
-                                <div className="font-medium">{action.reason || 'N/A'}</div>
-                                {(action.data || action.changes) && (
-                                    <pre className="mt-1 text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded-md">{JSON.stringify(action.data || action.changes, null, 2)}</pre>
+                                <div className="font-medium">{action.reason}</div>
+                                {action.type === 'create_ai_draft' && action.reason?.startsWith('Fallback') ? (
+                                    <FallbackDraftDisplay data={action.data} />
+                                ) : (
+                                    (action.data || action.changes) && (
+                                        <pre className="mt-1 text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded-md">{JSON.stringify(action.data || action.changes, null, 2)}</pre>
+                                    )
                                 )}
                             </TableCell>
                             <TableCell><Badge variant="outline">{action.type}</Badge></TableCell>

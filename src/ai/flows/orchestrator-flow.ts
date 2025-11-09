@@ -193,14 +193,25 @@ const orchestrateInteractionFlow = ai.defineFlow(
       }
     } catch (e:any) {
       console.error('[orchestrateInteractionFlow]', e?.message || e);
-      // Fallback mínimo en error grave → tratar como outbound follow-up a +5 días
-      const due = new Date(Date.now() + 5*24*3600*1000).toISOString();
+      // Fallback mínimo en error grave: generar un borrador de correo de seguimiento
+      const base = new Date();
+      const plus5Days = new Date(base.getTime() + 5 * 24 * 3600 * 1000).toISOString();
+      
+      const to = input.interaction.direction === 'inbound' ? input.interaction.from : input.interaction.to;
+      const subject = input.interaction.subject?.startsWith('Re: ') ? input.interaction.subject : `Re: ${input.interaction.subject}`;
+
       return {
         actions: [{
-          type: 'create_task',
-          target: 'tasks',
-          data: { title: 'Follow up (fallback)', due_date: due },
-          reason: 'Schedule follow-up for outbound email',
+          type: 'create_ai_draft',
+          target: 'ai_drafts',
+          data: {
+            title: 'Follow up (fallback)',
+            to: to || 'contact@example.com',
+            date: plus5Days,
+            subject: subject || 'Follow up',
+            body: `Hi,\n\nJust following up on our last conversation.\n\nBest,\n`
+          },
+          reason: 'Fallback: Create follow-up email draft due to processing error.',
           confidence: 0.5
         } as Action]
       };

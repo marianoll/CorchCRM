@@ -122,6 +122,14 @@ service cloud.firestore {
     }
 
     /**
+     * @description Manages AI-generated drafts for a user.
+     * @path /users/{userId}/ai_drafts/{draftId}
+     */
+    match /users/{userId}/ai_drafts/{draftId} {
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
+    }
+
+    /**
      * @description Manages atomic facts (infotopes) for a user.
      * @path /users/{userId}/infotopes/{infotopeId}
      * @allow (read, write) Authenticated user can manage infotopes under their own user id.
