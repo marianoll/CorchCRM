@@ -23,7 +23,7 @@ type ProcessingState = 'idle' | 'uploading' | 'extracting' | 'orchestrating' | '
 const stateDescriptions: Record<ProcessingState, string> = {
     idle: 'Awaiting file upload.',
     uploading: 'Reading file...',
-    extracting: 'Transcribing audio to text...',
+    extracting: 'Extracting text content...',
     orchestrating: 'Generating CRM actions from text...',
     done: 'Processing complete!',
     error: 'An error occurred.',
@@ -42,36 +42,53 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     setResult(null);
     setError(null);
 
-    // Broader check for audio/video types
-    const supportedTypes = ['audio/', 'video/'];
-    if (!supportedTypes.some(type => file.type.startsWith(type))) {
+    const isAudioVideo = file.type.startsWith('audio/') || file.type.startsWith('video/');
+    const isEml = file.name.endsWith('.eml') || file.type === 'message/rfc822';
+
+    if (!isAudioVideo && !isEml) {
       toast({
         variant: 'destructive',
         title: 'Unsupported File Type',
-        description: 'Please upload an audio or video file.',
+        description: 'Please upload an audio, video, or .eml file.',
       });
       setProcessingState('idle');
       return;
     }
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-      const audioDataUri = reader.result as string;
-      
-      try {
-        // Step 1: Transcribe audio to text
-        setProcessingState('extracting');
-        const { transcript } = await speechToText({ audioDataUri });
+    try {
+        let textContent = '';
+        if (isAudioVideo) {
+            setProcessingState('extracting');
+            const reader = new FileReader();
+            const dataUrlPromise = new Promise<string>((resolve, reject) => {
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('Failed to read file as Data URL.'));
+                reader.readAsDataURL(file);
+            });
+            const audioDataUri = await dataUrlPromise;
+            const { transcript } = await speechToText({ audioDataUri });
+            textContent = transcript;
+            stateDescriptions.extracting = 'Transcribing audio to text...';
+        } else if (isEml) {
+            setProcessingState('extracting');
+            const reader = new FileReader();
+             const textPromise = new Promise<string>((resolve, reject) => {
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('Failed to read file as text.'));
+                reader.readAsText(file);
+            });
+            textContent = await textPromise;
+            stateDescriptions.extracting = 'Extracting text from email file...';
+        }
 
-        if (!transcript) {
+        if (!textContent) {
           throw new Error('AI could not extract any text from the file.');
         }
 
         // Step 2: Orchestrate text to generate CRM actions
         setProcessingState('orchestrating');
         const orchestrationResult = await orchestrateText({
-          text: transcript,
+          text: textContent,
           contacts: crmData.contacts,
           companies: crmData.companies,
           deals: crmData.deals,
@@ -91,12 +108,6 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
           description: err.message || 'There was a problem with the AI.',
         });
       }
-    };
-    reader.onerror = () => {
-        setError('Failed to read the file.');
-        setProcessingState('error');
-        toast({ variant: 'destructive', title: 'File Read Error' });
-    };
   }, [toast, crmData]);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -135,7 +146,7 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     <Card>
       <CardHeader>
         <CardTitle>File-to-CRM</CardTitle>
-        <CardDescription>Upload an audio or video file to automatically extract insights and update your CRM.</CardDescription>
+        <CardDescription>Upload an audio, video, or .eml file to automatically extract insights and update your CRM.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
@@ -155,14 +166,14 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
             </label>
             {' '}or drag and drop a file
           </p>
-          <p className="text-xs text-muted-foreground">Audio or Video files</p>
+          <p className="text-xs text-muted-foreground">Audio, Video, or .eml files</p>
           <input
             id="file-upload"
             type="file"
             className="hidden"
             onChange={handleFileChange}
             disabled={isProcessing}
-            accept="audio/*,video/*"
+            accept="audio/*,video/*,.eml,message/rfc822"
           />
         </div>
 
