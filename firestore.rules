@@ -113,7 +113,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages tasks associated with a specific user.
+     * @description Manages tasks associated with a specific user. This rule allows individual document access and collection listing.
      * @path /users/{userId}/tasks/{taskId}
      */
     match /users/{userId}/tasks/{taskId} {
@@ -167,7 +167,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Audit logs are immutable and can only be created by authenticated users.
+     * @description Audit logs are immutable and can only be created by authenticated users. Collection can be listed.
      */
      match /audit_logs/{logId} {
         allow read, create: if isSignedIn() || isFirebaseAdmin();
