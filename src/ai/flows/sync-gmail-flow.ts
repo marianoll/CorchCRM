@@ -1,20 +1,23 @@
+
 'use server';
 /**
- * @fileOverview A Genkit flow to sync emails from Gmail for a given day.
+ * @fileOverview A Genkit flow to sync emails from a user's connected Gmail account.
  *
- * This flow is a placeholder and simulates fetching emails. In a real scenario,
- * it would use the Gmail API with OAuth2 credentials stored for the user.
+ * This flow uses stored OAuth2 tokens to fetch recent emails.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { initializeFirebase } from '@/firebase';
+import { collection, query, getDocs, limit } from 'firebase/firestore';
+import { google } from 'googleapis';
 
-// ---- Schemas (local variables, not exported) ----
+// ---- Schemas ----
 
 const SyncGmailInputSchema = z.object({
   userId: z.string().describe('The ID of the user for whom to sync emails.'),
 });
-export type SyncGmailInput = z.infer<typeof SyncGmailInputSchema>;
+type SyncGmailInput = z.infer<typeof SyncGmailInputSchema>;
 
 const EmailSchema = z.object({
     thread_id: z.string(),
@@ -24,7 +27,7 @@ const EmailSchema = z.object({
     subject: z.string(),
     body_excerpt: z.string(),
     labels: z.string(),
-    ts: z.string().datetime(), // ISO 8601 string
+    ts: z.string().datetime(),
 });
 
 const SyncGmailOutputSchema = z.object({
@@ -44,92 +47,93 @@ const syncGmailFlow = ai.defineFlow(
     outputSchema: SyncGmailOutputSchema,
   },
   async ({ userId }) => {
-    console.log(`Starting Gmail sync for user: ${userId}`);
+    const { firestore } = initializeFirebase();
+    if (!firestore) throw new Error("Firestore not initialized.");
 
-    // STEP 1: (REAL) Authenticate and get API client.
-    // (SIMULATED) We assume we have an authenticated client.
+    // 1. Get the user's Gmail integration credentials from Firestore
+    const integrationsRef = collection(firestore, 'users', userId, 'gmailIntegrations');
+    const q = query(integrationsRef, limit(1));
+    const querySnapshot = await getDocs(q);
 
-    // STEP 2: (REAL) Fetch list of message IDs from today.
-    // (SIMULATED) We generate a list of raw "API-like" responses.
-    const rawEmailsFromApi = [
-        {
-            id: `gmail-id-${Math.random().toString(16).slice(2)}`,
-            threadId: `thread-${Math.random().toString(36).substring(7)}`,
-            payload: {
-                headers: [
-                    { name: 'From', value: 'customer@example.com' },
-                    { name: 'To', value: `sales+${userId.substring(0,5)}@mycompany.com` },
-                    { name: 'Subject', value: 'Following up on our call' },
-                    { name: 'Date', value: new Date().toUTCString() },
-                ],
-                snippet: 'Hi, it was great chatting with you today. I have a few more questions about the proposal you sent over. Can we connect tomorrow?',
-            },
-            labelIds: ['INBOX', 'IMPORTANT'],
-        },
-        {
-            id: `gmail-id-${Math.random().toString(16).slice(2)}`,
-            threadId: `thread-${Math.random().toString(36).substring(7)}`,
-            payload: {
-                 headers: [
-                    { name: 'From', value: `sales+${userId.substring(0,5)}@mycompany.com` },
-                    { name: 'To', value: 'prospect@newlead.com' },
-                    { name: 'Subject', value: 'Intro to CorchCRM' },
-                    { name: 'Date', value: new Date(Date.now() - 2 * 60 * 60 * 1000).toUTCString() },
-                ],
-                snippet: 'Hi Prospect, thanks for your interest in CorchCRM. I\'d love to schedule a 15-minute demo to show you how we can help you seal your funnel. Are you free sometime this week?',
-            },
-            labelIds: ['SENT'],
+    if (querySnapshot.empty) {
+      return { success: false, message: 'No Gmail integration found for this user.', emails: [] };
+    }
+
+    const integrationData = querySnapshot.docs[0].data();
+    const { accessToken, refreshToken, emailAddress } = integrationData;
+
+    // 2. Set up OAuth2 client
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.OAUTH_REDIRECT_URI
+    );
+    oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+    // 3. Create Gmail API client
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    
+    try {
+        // 4. Fetch emails from the last hour
+        const oneHourAgo = Math.floor((Date.now() - 60 * 60 * 1000) / 1000);
+        const listResponse = await gmail.users.messages.list({
+            userId: 'me',
+            q: `after:${oneHourAgo}`,
+        });
+
+        const messages = listResponse.data.messages;
+        if (!messages || messages.length === 0) {
+            return { success: true, message: 'No new emails in the last hour.', emails: [] };
         }
-    ];
 
-    // STEP 3: (REAL & SIMULATED) Process each raw email into our schema.
-    const processedEmails = rawEmailsFromApi.map(rawEmail => {
-        const fromHeader = rawEmail.payload.headers.find(h => h.name === 'From');
-        const toHeader = rawEmail.payload.headers.find(h => h.name === 'To');
-        const subjectHeader = rawEmail.payload.headers.find(h => h.name === 'Subject');
-        const dateHeader = rawEmail.payload.headers.find(h => h.name === 'Date');
+        // 5. Process each email
+        const processedEmails: z.infer<typeof EmailSchema>[] = [];
+        for (const message of messages.slice(0, 10)) { // Limit to 10 for safety
+            if (!message.id) continue;
+            
+            const msgResponse = await gmail.users.messages.get({ userId: 'me', id: message.id });
+            const emailData = msgResponse.data;
 
-        const from_email = fromHeader ? fromHeader.value : 'unknown';
-        const to_email = toHeader ? toHeader.value : 'unknown';
-        
-        // A real implementation would parse the user's email from the auth token
-        const userEmailDomain = 'mycompany.com';
-        const direction = from_email.includes(userEmailDomain) ? 'outbound' : 'inbound';
+            if (!emailData.payload?.headers) continue;
+            
+            const fromHeader = emailData.payload.headers.find(h => h.name === 'From')?.value || 'unknown';
+            const toHeader = emailData.payload.headers.find(h => h.name === 'To')?.value || 'unknown';
+            const subjectHeader = emailData.payload.headers.find(h => h.name === 'Subject')?.value || '(No subject)';
+            const dateHeader = emailData.payload.headers.find(h => h.name === 'Date')?.value || new Date().toISOString();
+
+            processedEmails.push({
+                thread_id: emailData.threadId || emailData.id!,
+                from_email: fromHeader,
+                to_email: toHeader,
+                direction: fromHeader.includes(emailAddress) ? 'outbound' : 'inbound',
+                subject: subjectHeader,
+                body_excerpt: emailData.snippet || '',
+                labels: emailData.labelIds?.join(';') || '',
+                ts: new Date(dateHeader).toISOString(),
+            });
+        }
         
         return {
-            thread_id: rawEmail.threadId,
-            from_email,
-            to_email,
-            direction,
+            success: true,
+            message: `Successfully fetched ${processedEmails.length} emails.`,
+            emails: processedEmails,
+        };
 
-            subject: subjectHeader ? subjectHeader.value : '(No Subject)',
-            body_excerpt: rawEmail.payload.snippet,
-            labels: 'followup;question', // Real implementation would map labelIds
-            ts: dateHeader ? new Date(dateHeader.value).toISOString() : new Date().toISOString(),
-        } as z.infer<typeof EmailSchema>;
-    });
-
-
-    return {
-      success: true,
-      message: `Successfully simulated fetching ${processedEmails.length} emails.`,
-      emails: processedEmails,
-    };
+    } catch (error: any) {
+      console.error('Error fetching emails:', error);
+      // Handle token expiration if needed
+      if (error.response?.status === 401) {
+          // This is where you would use the refresh token to get a new access token
+          return { success: false, message: 'Gmail token expired. Re-authentication needed.', emails: []};
+      }
+      return { success: false, message: 'Failed to fetch emails from Gmail.', emails: [] };
+    }
   }
 );
 
 
-// ---- API (The only async function export) ----
+// ---- API Export ----
 
 export async function syncGmail(input: SyncGmailInput): Promise<SyncGmailOutput> {
-  try {
-    return await syncGmailFlow(input);
-  } catch (error: any) {
-    console.error('[syncGmail] Error executing flow:', error);
-    return {
-      success: false,
-      message: error.message || 'An unexpected error occurred during Gmail sync.',
-      emails: [],
-    };
-  }
+  return await syncGmailFlow(input);
 }

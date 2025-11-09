@@ -11,13 +11,14 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Plus, Palette, LoaderCircle, LogOut } from "lucide-react";
+import { X, Plus, Palette, LoaderCircle, LogOut, Link as LinkIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { signOut } from 'firebase/auth';
+import { getGmailAuthUrl } from '@/ai/flows/gmail-auth-flow';
 
 type Stage = { name: string; color: string; };
 
@@ -143,6 +144,15 @@ const StageEditor = ({ stages, onStagesChange }: { stages: Stage[], onStagesChan
     )
 }
 
+function GmailIcon() {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 7v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7l-8 5.5L4 7z"/>
+            <path d="M20 7l-8 5.5L4 7"/>
+        </svg>
+    )
+}
+
 export default function SettingsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -151,6 +161,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const settingsRef = useMemoFirebase(() => 
     firestore && user ? doc(firestore, 'users', user.uid, 'settings', 'user') : null
@@ -197,6 +208,26 @@ export default function SettingsPage() {
     }
   };
 
+  const handleConnectGmail = async () => {
+    setIsConnecting(true);
+    try {
+      const { url } = await getGmailAuthUrl();
+      if (url) {
+        // Redirect the user to the Google consent screen
+        window.location.href = url;
+      } else {
+        throw new Error('Could not get authentication URL.');
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Connection Failed',
+        description: error.message || 'Could not initiate connection with Google.'
+      });
+      setIsConnecting(false);
+    }
+  };
+
   const handleLogout = async () => {
     if (auth) {
         await signOut(auth);
@@ -240,6 +271,29 @@ export default function SettingsPage() {
               <h1 className="text-3xl font-bold tracking-tight font-headline">Settings</h1>
               <p className="text-muted-foreground">Manage your integrations and application settings.</p>
           </div>
+          
+          {/* Integrations Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Integrations</CardTitle>
+              <CardDescription>Connect your accounts to enable automated workflows.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-4">
+                        <GmailIcon />
+                        <div>
+                            <p className="font-medium">Gmail</p>
+                            <p className="text-sm text-muted-foreground">Sync emails automatically.</p>
+                        </div>
+                    </div>
+                     <Button onClick={handleConnectGmail} disabled={isConnecting}>
+                        {isConnecting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <LinkIcon className="mr-2 h-4 w-4" />}
+                        Connect
+                    </Button>
+                </div>
+            </CardContent>
+          </Card>
 
           {/* Personalization Card */}
           <Card>
