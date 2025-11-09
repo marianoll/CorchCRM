@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview An AI agent that processes raw text into a structured "Infoshard".
+ * @fileOverview An AI agent that processes raw text into a structured "infoshard".
  *
  * - infoshardText - The primary function to process text.
  * - InfoshardTextInput - The input type for the function.
@@ -21,16 +21,6 @@ const InfoshardTextOutputSchema = z.object({
 export type InfoshardTextOutput = z.infer<typeof InfoshardTextOutputSchema>;
 
 
-/**
- * The main exported function that clients call. It wraps the Genkit flow.
- * @param input - The text to be processed.
- * @returns A promise that resolves to the structured infoshard.
- */
-export async function infoshardText(input: InfoshardTextInput): Promise<InfoshardTextOutput> {
-  return infoshardTextFlow(input);
-}
-
-
 const infoshardTextPrompt = ai.definePrompt({
   name: 'infoshardTextPrompt',
   input: { schema: InfoshardTextInputSchema },
@@ -47,23 +37,23 @@ Now, process the user's text.`,
   user: `Text to be processed:\n'''\n{{{text}}}\n'''`,
 });
 
-const infoshardTextFlow = ai.defineFlow(
+export const infoshardText = ai.defineFlow(
   {
-    name: 'infoshardTextFlow',
+    name: 'infoshardText',
     inputSchema: InfoshardTextInputSchema,
     outputSchema: InfoshardTextOutputSchema,
   },
   async (input) => {
-    // Robust validation to prevent crashes, as requested for debugging.
+    // DEBUGGING: Log the input received by the flow.
+    console.log('Infoshard flow received input:', JSON.stringify(input, null, 2));
+
     if (!input || typeof input.text !== 'string' || input.text.trim() === '') {
-        console.error("Infoshard flow received invalid input. Aborting.", { input });
-        // Return a valid, empty output to prevent downstream errors.
+        console.error("Infoshard flow received invalid or empty input. Aborting.");
         return { shard: '' };
     }
 
     const { output } = await infoshardTextPrompt(input);
     
-    // Ensure we always return an object with the correct shape, even if the model returns null.
     return output || { shard: '' };
   }
 );
