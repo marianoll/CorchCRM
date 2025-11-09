@@ -1,4 +1,3 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -65,14 +64,14 @@ Allowed targets: companies, contacts, deals, emails, tasks, ai_drafts, meetings.
 Business rules (MANDATORY):
 - Always produce AT LEAST ONE action.
 - If interaction.direction == "inbound": MUST add create_ai_draft (reason: "Draft response to inbound email") to respond now.
-- If interaction.direction == "outbound": MUST add create_task (reason: "Schedule follow-up for outbound email") dated 5 days from now.
+- If interaction.direction == "outbound": MUST add create_task (reason: "Schedule follow-up for outbound email") dated 5 days from interaction.timestamp (or now).
 - If email mentions demo/call/meeting with date/time, add create_meeting.
 - If body implies data change (stage/amount/contact info), add update_entity with minimal "changes".
 
 Hints:
-- For create_ai_draft use: { "source_type": "email", "related_id": dealIdIfAny, "draft_text": "<short reply>" }
-- For create_task use: { "deal_id": dealIdIfAny, "title": "<concise>", "due_date": "<ISO>", "owner_email": "<owner if available>" }
-- For create_meeting use: { "deal_id": dealIdIfAny, "title": "Meeting/Demo", "proposed_time": "<ISO>", "participants": ["from","to"] }
+- create_ai_draft.data: { "source_type": "email", "related_id": dealIdIfAny, "draft_text": "<short reply>" }
+- create_task.data:    { "deal_id": dealIdIfAny, "title": "<concise>", "due_date": "<ISO>", "owner_email": "<owner if available>" }
+- create_meeting.data: { "deal_id": dealIdIfAny, "title": "Meeting/Demo", "proposed_time": "<ISO>", "participants": ["from","to"] }
 
 Few-shots:
 
@@ -122,6 +121,7 @@ Policy:
 Return JSON strictly matching the output schema.
 `
 });
+
 
 /* ---------- Flow con fallback (nunca vacío) ---------- */
 
