@@ -30,8 +30,8 @@ const ActionSchema = z.object({
   type: ActionType,
   target: TargetType,
   id: z.string().optional(),
-  data: z.any().optional(),
-  changes: z.any().optional(),
+  data: z.record(z.any()).optional().describe('An object containing the full data for a new entity when type is create_entity.'),
+  changes: z.record(z.any()).optional().describe('An object containing only the fields to be modified when type is update_entity.'),
   reason: z.string().optional(),
   confidence: z.number().min(0).max(1).optional()
 });
@@ -158,9 +158,13 @@ const orchestrateInteractionFlow = ai.defineFlow(
       const res = await orchestratePrompt(input);
       const out = res.output;
 
-      // FIX 3: Normalización defensiva
-      const actions = Array.isArray(out?.actions) ? out.actions : [];
-      return { actions };
+      if (!out || !Array.isArray(out.actions)) {
+        console.warn('[orchestrateInteractionFlow] Model returned invalid or empty actions:', out);
+        return { actions: [] };
+      }
+      
+      return { actions: out.actions };
+      
     } catch (err: any) {
       console.error('[orchestrateInteractionFlow] Error:', err);
       return {
