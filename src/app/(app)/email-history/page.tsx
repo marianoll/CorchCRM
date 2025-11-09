@@ -41,7 +41,7 @@ import { EmailReplyDialog } from '@/components/email-reply-dialog';
 import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 import { analyzeEmailContent, type AnalysisOutput } from '@/ai/flows/analyze-email-flow';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { Toggle } from '@/components/ui/toggle';
+import { Switch } from '@/components/ui/switch';
 
 type ActionStatus = 'approved' | 'rejected' | 'pending' | null;
 type ActionType = 'reply' | 'analyze' | 'meeting' | 'task' | 'create_task' | 'stage_change' | 'data_update' | 'create_meeting';
@@ -99,9 +99,9 @@ export default function EmailHistoryPage() {
     const [processingActionsId, setProcessingActionsId] = useState<string | null>(null);
 
     // Bulk actions toggles
-    const [toggleApproveReplies, setToggleApproveReplies] = useState(false);
-    const [toggleUpgradeDeals, setToggleUpgradeDeals] = useState(false);
-    const [toggleApproveMeetings, setToggleApproveMeetings] = useState(false);
+    const [isApproveRepliesOn, setIsApproveRepliesOn] = useState(false);
+    const [isUpgradeDealsOn, setIsUpgradeDealsOn] = useState(false);
+    const [isApproveMeetingsOn, setIsApproveMeetingsOn] = useState(false);
 
     // Bulk actions loading state
     const [isExecutingBulkActions, setIsExecutingBulkActions] = useState(false);
@@ -655,21 +655,21 @@ export default function EmailHistoryPage() {
         let summaryMessages = [];
 
         try {
-            if (toggleApproveReplies) {
+            if (isApproveRepliesOn) {
                 const count = await handleApproveAllReplies();
                 if (count > 0) {
                     summaryMessages.push(`${count} replies approved.`);
                     actionsTaken = true;
                 }
             }
-            if (toggleUpgradeDeals) {
+            if (isUpgradeDealsOn) {
                 const count = await handleUpgradeHighConfidenceDeals();
                  if (count > 0) {
                     summaryMessages.push(`${count} deals upgraded.`);
                     actionsTaken = true;
                 }
             }
-            if (toggleApproveMeetings) {
+            if (isApproveMeetingsOn) {
                 const count = await handleApproveAllMeetings();
                 if (count > 0) {
                     summaryMessages.push(`${count} meetings scheduled.`);
@@ -688,13 +688,13 @@ export default function EmailHistoryPage() {
         } finally {
             setIsExecutingBulkActions(false);
             // Reset toggles after execution
-            setToggleApproveReplies(false);
-            setToggleUpgradeDeals(false);
-            setToggleApproveMeetings(false);
+            setIsApproveRepliesOn(false);
+            setIsUpgradeDealsOn(false);
+            setIsApproveMeetingsOn(false);
         }
     };
 
-    const isAnyToggleActive = toggleApproveReplies || toggleUpgradeDeals || toggleApproveMeetings;
+    const isAnyToggleActive = isApproveRepliesOn || isUpgradeDealsOn || isApproveMeetingsOn;
 
 
   return (
@@ -721,40 +721,47 @@ export default function EmailHistoryPage() {
             </div>
         </div>
         
-        <div className="my-4 flex flex-wrap gap-2 items-center">
-            <Toggle pressed={toggleApproveReplies} onPressedChange={setToggleApproveReplies} aria-label="Toggle approve replies">
-                <MailPlus className="mr-2 h-4 w-4" />
-                Approve All Replies
-            </Toggle>
-            <Toggle pressed={toggleUpgradeDeals} onPressedChange={setToggleUpgradeDeals} aria-label="Toggle upgrade deals">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Upgrade High-Confidence Deals
-            </Toggle>
-            <Toggle pressed={toggleApproveMeetings} onPressedChange={setToggleApproveMeetings} aria-label="Toggle approve meetings">
-                <CalendarPlus className="mr-2 h-4 w-4" />
-                Approve All Meetings
-            </Toggle>
-            
-            {isAnyToggleActive && (
-                 <Button onClick={handleExecuteBulkActions} disabled={isExecutingBulkActions}>
-                    {isExecutingBulkActions ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                    Execute Bulk Actions
-                </Button>
-            )}
+        <div className="my-4 space-y-2 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                    <Switch id="approve-replies-switch" checked={isApproveRepliesOn} onCheckedChange={setIsApproveRepliesOn} />
+                    <Label htmlFor="approve-replies-switch" className="flex items-center gap-2 cursor-pointer"><MailPlus className="h-4 w-4" /> Approve All Replies</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Switch id="upgrade-deals-switch" checked={isUpgradeDealsOn} onCheckedChange={setIsUpgradeDealsOn} />
+                    <Label htmlFor="upgrade-deals-switch" className="flex items-center gap-2 cursor-pointer"><TrendingUp className="h-4 w-4" /> Upgrade High-Confidence Deals</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Switch id="approve-meetings-switch" checked={isApproveMeetingsOn} onCheckedChange={setIsApproveMeetingsOn} />
+                    <Label htmlFor="approve-meetings-switch" className="flex items-center gap-2 cursor-pointer"><CalendarPlus className="h-4 w-4" /> Approve All Meetings</Label>
+                </div>
+            </div>
 
-             {filtersAreActive && (
-                <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
-                    <FilterX className="mr-2 h-4 w-4" />
-                    Clear Filters
-                </Button>
+            {isAnyToggleActive && (
+                <div className="pt-4 mt-2 border-t flex justify-end">
+                    <Button onClick={handleExecuteBulkActions} disabled={isExecutingBulkActions}>
+                        {isExecutingBulkActions ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                        Execute Bulk Actions
+                    </Button>
+                </div>
             )}
         </div>
 
 
         <Card>
             <CardHeader>
-                <CardTitle>Email Logs</CardTitle>
-                <CardDescription>All emails synced or processed by the AI will appear here.</CardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Email Logs</CardTitle>
+                        <CardDescription>All emails synced or processed by the AI will appear here.</CardDescription>
+                    </div>
+                     {filtersAreActive && (
+                        <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
+                            <FilterX className="mr-2 h-4 w-4" />
+                            Clear Filters
+                        </Button>
+                    )}
+                </div>
             </CardHeader>
             <CardContent>
                 <Table>
