@@ -9,6 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
 import { speechToText } from '@/ai/flows/speech-to-text-flow';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/firebase/auth/use-user';
+import { db } from '@/firebase/client';
+import { collection, doc, setDoc } from 'firebase/firestore';
 
 const sampleText = `Just had a great call with Javier Gomez from Tech Solutions. He's very interested in our cloud migration package and mentioned their budget is around $50k. He asked for a detailed proposal by end of day Friday.`;
 
@@ -31,8 +34,21 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
+  const { user } = useUser();
   const { toast } = useToast();
+
+  const saveUpload = async (content: string, source: 'note' | 'file', fileName?: string) => {
+      if (!db || !user) return;
+      const uploadRef = doc(collection(db, 'users', user.uid, 'uploads'));
+      const uploadData = {
+          id: uploadRef.id,
+          createdAt: new Date().toISOString(),
+          source,
+          content,
+          fileName: fileName || null,
+      };
+      await setDoc(uploadRef, uploadData);
+  }
 
   const handleProcess = async (textToProcess: string) => {
     if (!textToProcess) {
@@ -48,6 +64,8 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
     setResult(null);
 
     try {
+      await saveUpload(textToProcess, 'note');
+
       const res = await orchestrateText({ 
           text: textToProcess,
           contacts: crmData.contacts,
@@ -197,3 +215,5 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
     </Card>
   );
 }
+
+    

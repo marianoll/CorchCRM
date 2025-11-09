@@ -7,6 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
 import { speechToText } from '@/ai/flows/speech-to-text-flow';
+import { useUser } from '@/firebase/auth/use-user';
+import { db } from '@/firebase/client';
+import { collection, doc, setDoc } from 'firebase/firestore';
+
 
 type CrmData = {
     contacts: { id: string; name: string }[];
@@ -34,8 +38,21 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
   const [result, setResult] = useState<OrchestrateTextOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-
+  const { user } = useUser();
   const { toast } = useToast();
+
+  const saveUpload = async (content: string, source: 'note' | 'file', fileName?: string) => {
+      if (!db || !user) return;
+      const uploadRef = doc(collection(db, 'users', user.uid, 'uploads'));
+      const uploadData = {
+          id: uploadRef.id,
+          createdAt: new Date().toISOString(),
+          source,
+          content,
+          fileName: fileName || null,
+      };
+      await setDoc(uploadRef, uploadData);
+  }
 
   const handleFile = useCallback(async (file: File) => {
     setProcessingState('uploading');
@@ -85,6 +102,9 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
           throw new Error('AI could not extract any text from the file.');
         }
 
+        // Save the extracted text before orchestration
+        await saveUpload(textContent, 'file', file.name);
+
         // Step 2: Orchestrate text to generate CRM actions
         setProcessingState('orchestrating');
         const orchestrationResult = await orchestrateText({
@@ -108,13 +128,13 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
           description: err.message || 'There was a problem with the AI.',
         });
       }
-  }, [toast, crmData]);
+  }, [toast, crmData, saveUpload]);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     setIsDragOver(false);
-    if (processingState !== 'idle') return;
+    if (processingState !== 'idle' && processingState !== 'done' && processingState !== 'error') return;
     const file = event.dataTransfer.files?.[0];
     if (file) {
       handleFile(file);
@@ -211,3 +231,5 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     </Card>
   );
 }
+
+    

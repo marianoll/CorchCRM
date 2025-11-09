@@ -29,6 +29,7 @@ import {
   Gem,
   Mail,
   ClipboardCheck,
+  Upload,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -89,6 +90,11 @@ function MainNav() {
             <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/email-history'} className="text-muted-foreground">
                     <Link href="/email-history"><Mail /><span>Email History</span></Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/upload-history'} className="text-muted-foreground">
+                    <Link href="/upload-history"><Upload /><span>Upload History</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -257,3 +263,5 @@ function PanelLeftOpenIcon(props: React.SVGProps<SVGSVGElement>) {
       </svg>
     )
   }
+
+    

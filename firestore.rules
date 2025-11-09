@@ -128,6 +128,14 @@ service cloud.firestore {
     match /users/{userId}/tasks/{taskId} {
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
+    
+    /**
+     * @description Manages raw text uploads for a user.
+     * @path /users/{userId}/uploads/{uploadId}
+     */
+    match /users/{userId}/uploads/{uploadId} {
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
+    }
 
     /**
      * @description Manages AI-generated drafts for a user.
@@ -222,3 +230,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
