@@ -33,7 +33,7 @@ export function initializeFirebaseServer(): FirebaseServerServices {
       );
       try {
         // In a local environment, it will look for a serviceAccountKey.json file
-        const serviceAccount = require('../../../serviceAccountKey.json');
+        const serviceAccount = require('../../serviceAccountKey.json');
         firebaseApp = initializeApp({
           credential: cert(serviceAccount),
         });
