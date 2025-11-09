@@ -65,14 +65,16 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="relative">
-            {/* Replace this poster with a real gif/video of: voice → AI card → deal created */}
-            <div className="aspect-video w-full rounded-2xl ring-1 ring-ink/10 bg-gradient-to-br from-mint/20 via-white to-lavender/30 flex items-center justify-center">
-              <div className="text-center p-8">
-                <p className="text-sm text-ink/60">Demo video placeholder</p>
-                <button className="mt-4 inline-flex items-center gap-2 rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-mint hover:text-ink transition">
-                  ▶ Play 45s
-                </button>
-              </div>
+            <div className="aspect-video w-full rounded-2xl ring-1 ring-ink/10 overflow-hidden">
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/lIqz11gQORo" 
+                    title="YouTube video player" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowFullScreen>
+                </iframe>
             </div>
           </div>
         </div>
@@ -131,6 +133,25 @@ export default function LandingPage() {
               <p className="mt-3 text-xs text-ink/60">“Search by intent, not by filters.”</p>
             </div>
           </div>
+        </div>
+      </section>
+
+        {/* TECHNICAL VIDEO SECTION */}
+      <section id="technical-video" className="border-t border-ink/10 bg-white">
+        <div className="mx-auto max-w-4xl px-6 py-20 text-center">
+            <h2 className="text-3xl font-bold">Technical Deep Dive</h2>
+            <p className="mt-3 text-ink/80 max-w-2xl mx-auto">Watch how CorchCRM was built with Firebase and Google's latest generative AI tools.</p>
+            <div className="mt-10 aspect-video w-full rounded-2xl ring-1 ring-ink/10 overflow-hidden shadow-2xl">
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/GXySp8ZndUs" 
+                    title="YouTube video player" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowFullScreen>
+                </iframe>
+            </div>
         </div>
       </section>
 
