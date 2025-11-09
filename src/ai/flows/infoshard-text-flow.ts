@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A Genkit flow to process unstructured text into structured "infotopes" and "orchestrator" commands,
+ * @fileOverview A Genkit flow to process unstructured text into structured "orchestrator" commands,
  * with entity linking against existing CRM data. It includes a "create and retry" mechanism for unfound entities.
  *
  * - infoshardText - A function that calls the Genkit flow.
@@ -27,14 +27,8 @@ const InfoshardTextInputSchema = z.object({
 });
 export type InfoshardTextInput = z.infer<typeof InfoshardTextInputSchema>;
 
-const InfotopeSchema = z.object({
-    entityName: z.string().describe("The name of the entity this fact is linked to (e.g., 'Javier Gomez', 'Tech Solutions')."),
-    entityId: z.string().optional().describe("The 6-character short ID of the matched entity from the CRM context, or 'Not Found' if no match was made."),
-    fact: z.string().describe("The atomic fact extracted from the text (e.g., 'He works at Tech Solutions', 'Budget is around $50k').")
-});
-
 const OrchestratorSchema = z.object({
-    command: z.string().describe("The action to be taken, e.g., 'createContact', 'createDeal', 'createTask', 'updateDeal'."),
+    command: z.string().describe("The action to be taken, e.g., 'createContact', 'createDeal', 'createTask', 'updateDeal', 'scheduleMeeting', 'sendFollowUpEmail'."),
     entityType: z.string().optional().describe("The type of entity, e.g., 'Contact', 'Deal', 'Task'."),
     entityName: z.string().optional().describe("The name of the entity to be created or updated."),
     details: z.string().optional().describe("A JSON string representing a structured object of data for the command, e.g., '{\"email\": \"jane@acme.com\", \"amount\": 50000}'. Must contain all relevant extracted data like emails, titles, company names, etc."),
@@ -42,13 +36,10 @@ const OrchestratorSchema = z.object({
 });
 
 const InfoshardTextOutputSchema = z.object({
-  infotopes: z
-    .array(InfotopeSchema)
-    .describe('A list of atomic facts, each linked to a specific entity.'),
   orchestrators: z
     .array(OrchestratorSchema)
     .describe(
-      'A list of structured command objects for the AI orchestrator based on the text.'
+      'A list of structured, actionable command objects for the AI orchestrator based on the text. These are tasks for the system to execute.'
     ),
 });
 export type InfoshardTextOutput = z.infer<typeof InfoshardTextOutputSchema>;
@@ -60,31 +51,21 @@ const infoshardTextPrompt = ai.definePrompt({
   model: googleAI.model('gemini-2.0-flash-lite-001'),
   input: { schema: InfoshardTextInputSchema },
   output: { schema: InfoshardTextOutputSchema },
-  prompt: `You are an expert text analysis and entity resolution AI for a CRM.
-Your task is to deconstruct unstructured text into "infotopes" (atomic, self-contained facts) and "orchestrators" (structured, actionable command objects for the system) and link them to specific CRM entities.
+  prompt: `You are an expert text analysis AI for a CRM. Your only task is to deconstruct unstructured text into a series of "orchestrators" (structured, actionable command objects for the system). You MUST be proactive and suggest any possible action.
 
 **Instructions:**
 
-1.  **Analyze the Text:** Read the user's unstructured text. Identify individual facts, opinions, questions, and actions.
-2.  **Extract Atomic Facts (Infotopes):**
-    *   Break down the text into the smallest possible, self-contained pieces of information. Each piece is an infotope.
-    *   For each infotope, determine which entity it belongs to (e.g., a fact about a person belongs to a Contact, a fact about a budget belongs to a Deal).
-    *   A single sentence might contain multiple infotopes.
-    *   Example: "He is interested in the Pro plan and his budget is $50k" becomes two infotopes: 1) "is interested in the Pro plan" (linked to the contact) and 2) "budget is $50k" (linked to the deal).
-3.  **Identify Actionable Commands (Orchestrators):**
-    *   Extract any instruction, next step, or task from the text.
-    *   Format it as a structured command object.
-    *   The 'command' should be a camelCase verb like 'createContact', 'createDeal', 'createTask', 'updateDeal'.
+1.  **Analyze the Text:** Read the user's unstructured text and identify ANY potential instruction, next step, task, or entity creation.
+2.  **Extract Actionable Commands (Orchestrators):**
+    *   Format every identified action as a structured command object.
+    *   The 'command' should be a camelCase verb like 'createContact', 'createDeal', 'createTask', 'updateDeal', 'scheduleMeeting', 'sendFollowUpEmail'. BE CREATIVE and suggest actions even if the system might not support them yet.
     *   The 'details' field MUST be a JSON STRING containing all extracted data. Differentiate between a person's full name and their email. If a contact works for a company, include the company's name in the contact's details.
-    *   Example: "Let's create a deal for Julian at InovaCorp for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: "{\\"contactName\\": \\"Julian\\", \\"companyName\\": \\"InovaCorp\\", \\"amount\\": 25000}" }.
+    *   Example: "Let's create a deal for Julian at InovaCorp for $25k" becomes { command: "createDeal", entityName: "Deal for Julian", details: "{\\"contactName\\": \\"Julian\\", \\"companyName\\": \\"InovaCorp\\", \\"amount\\": 25000}" }.
     *   Example: "Create a contact for julian.l@example.com, his name is Julian Lopez who works at InovaCorp" becomes { command: "createContact", entityName: "Julian Lopez", details: "{\\"fullName\\": \\"Julian Lopez\\", \\"email\\": \\"julian.l@example.com\\", \\"companyName\\": \\"InovaCorp\\"}" }.
     *   'sourceText' should contain the original snippet that justifies the command.
-4.  **Link to CRM Entities & Handle Dependencies:**
-    *   For each infotope, match the entity mentioned (e.g., "Javier Gomez", "Tech Solutions") with an entity from the provided CRM Context Data.
-    *   If a match is found, use the entity's name and its ID.
-    *   **If you cannot find a match, use the name from the text and "Not Found" as the ID.**
-    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. 
-    *   **CRITICAL DEPENDENCY LOGIC**: If a contact (e.g. "Julian Lopez") is associated with a company (e.g. "InovaCorp") and "InovaCorp" is also "Not Found", you MUST generate the 'createCompany' command BEFORE the 'createContact' command in the 'orchestrators' array. The system processes commands in order.
+3.  **Handle Dependencies:**
+    *   Use the provided CRM Context Data to check if entities already exist.
+    *   **CRITICAL DEPENDENCY LOGIC**: If a contact (e.g. "Julian Lopez") is associated with a company (e.g. "InovaCorp") and "InovaCorp" is also NOT FOUND in the context, you MUST generate the 'createCompany' command BEFORE the 'createContact' command in the 'orchestrators' array. The system processes commands in order. Always create companies first, then contacts, then deals.
 
 **CRM Context Data:**
 
@@ -118,7 +99,7 @@ const infoshardTextFlow = ai.defineFlow(
   },
   async (input) => {
     if (!input.text || input.text.trim().length < 10) {
-      return { infotopes: [], orchestrators: [{ command: 'error', details: 'Input text is too short.' }] };
+      return { orchestrators: [{ command: 'error', details: 'Input text is too short.' }] };
     }
 
     try {
@@ -129,12 +110,9 @@ const infoshardTextFlow = ai.defineFlow(
         throw new Error('No output from AI model.');
       }
       
-      const hasNotFound = output.infotopes.some(it => it.entityId === 'Not Found');
+      const hasCreationCommands = output.orchestrators.some(cmd => cmd.command.toLowerCase().startsWith('create'));
 
-      if (hasNotFound) {
-        // If any entity was not found, defer saving infotopes and set up for retry.
-        
-        // Define creation priority
+      if (hasCreationCommands) {
         const creationPriority = {
             'createCompany': 1,
             'createContact': 2,
@@ -151,19 +129,20 @@ const infoshardTextFlow = ai.defineFlow(
 
         const otherCommands = output.orchestrators.filter(cmd => !cmd.command.toLowerCase().startsWith('create'));
         
+        // Check if a retry is needed because an entity might be created
+        // which would change the context for subsequent analysis.
+        const shouldRetry = creationCommands.length > 0;
+
         return {
-            infotopes: [], // Do not save any infotopes yet.
             orchestrators: [
-                ...creationCommands, // Prioritized creation commands.
+                ...creationCommands,
                 ...otherCommands,
-                { command: 'retryInfoshard', details: `{ "originalText": "${input.text.replace(/"/g, '\\"')}" }`, sourceText: 'An entity was not found, scheduling a retry.' }
+                ...(shouldRetry ? [{ command: 'retryInfoshard', details: `{ "originalText": "${input.text.replace(/"/g, '\\"')}" }`, sourceText: 'An entity will be created, scheduling a retry to process again with new context.' }] : [])
             ]
         };
 
       } else {
-         // All entities were found, proceed as normal.
         return {
-            infotopes: output.infotopes || [],
             orchestrators: output.orchestrators || [],
         };
       }

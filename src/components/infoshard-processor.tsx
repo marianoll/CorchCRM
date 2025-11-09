@@ -74,7 +74,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
     <Card>
       <CardHeader>
         <CardTitle>Infoshard Processor</CardTitle>
-        <CardDescription>Enter any text (notes, email snippets, thoughts) to create structured infotopes and orchestrator commands.</CardDescription>
+        <CardDescription>Enter any text (notes, email snippets, thoughts) to generate structured orchestrator commands.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Textarea
@@ -93,24 +93,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
         {result && (
           <div className="space-y-4 rounded-lg border bg-secondary/50 p-4">
             <div>
-              <h4 className="font-semibold text-sm mb-2">Infotopes:</h4>
-              {result.infotopes.length > 0 ? (
-                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                  {result.infotopes.map((item, i) => (
-                    <li key={`it-${i}`}>
-                        ({item.entityName}
-                        <span className="font-mono text-xs bg-background/50 px-1 py-0.5 rounded-sm mx-1">
-                            {item.entityId}
-                        </span>, {item.fact})
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">No infotopes extracted.</p>
-              )}
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm mb-2">Orchestrate:</h4>
+              <h4 className="font-semibold text-sm mb-2">Orchestrator Commands:</h4>
               {result.orchestrators.length > 0 ? (
                  <div className="space-y-2">
                     {result.orchestrators.map((item, i) => (
@@ -135,7 +118,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
           ) : (
             <Gem className="mr-2 h-4 w-4" />
           )}
-          Create Infoshard
+          Generate Commands
         </Button>
       </CardFooter>
     </Card>
