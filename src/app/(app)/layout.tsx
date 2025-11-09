@@ -25,11 +25,7 @@ import {
   Settings,
   Mail,
   Upload,
-  Bot,
   Inbox,
-  LayoutDashboard,
-  CheckSquare,
-  Gem,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -38,6 +34,7 @@ import { collection, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LoaderCircle } from 'lucide-react';
 import { auth } from '@/firebase/client';
+import { SeedDatabaseButton } from '@/components/seed-database-button';
 
 const navItems = [
   { href: '/home', label: 'Unstructured Data Input', icon: Home },
@@ -149,8 +146,11 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
             <Sidebar collapsible="icon" className="bg-card border-r">
                 <SidebarHeader className="border-b">
                     <div className="flex w-full items-center justify-between p-2">
-                    <Logo />
-                    <SidebarTrigger className="hidden md:flex" />
+                      <Logo />
+                      <SidebarTrigger className="hidden md:flex" />
+                    </div>
+                    <div className="p-2">
+                       <SeedDatabaseButton />
                     </div>
                 </SidebarHeader>
                 <SidebarContent>
