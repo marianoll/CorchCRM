@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -102,16 +103,16 @@ export default function EmailHistoryPage() {
 
 
     // Data fetching
-    const emailsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')), []);
+    const emailsQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')), []);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
 
-    const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies')), []);
+    const companiesQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'companies')), []);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
-    const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts')), []);
+    const contactsQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'contacts')), []);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
 
-    const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals')), []);
+    const dealsQuery = useMemoFirebase(() => query(collection(firestore, 'users', user.uid, 'deals')), []);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const crmDataLoading = companiesLoading || contactsLoading || dealsLoading;
@@ -372,33 +373,63 @@ export default function EmailHistoryPage() {
     };
 
     const processOrchestration = useCallback(async (): Promise<OrchestratorOutput | null> => {
-        if (!selectedEmailForOrchestrator || crmDataLoading) {
-            toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
-            return null;
+      if (!selectedEmailForOrchestrator || crmDataLoading) {
+        toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
+        return null;
+      }
+
+      // Interaction con direction + timestamp ISO
+      const interaction: Interaction = {
+        source: 'email',
+        subject: selectedEmailForOrchestrator.subject,
+        body: selectedEmailForOrchestrator.body_excerpt,
+        from: selectedEmailForOrchestrator.from_email,
+        to: selectedEmailForOrchestrator.to_email,
+        timestamp: toDate(selectedEmailForOrchestrator.ts).toISOString(),
+        // IMPORTANTE: dirección del correo para la lógica inbound/outbound
+        direction: selectedEmailForOrchestrator.direction,
+      };
+
+      // Contexto enriquecido
+      const company = getCompanyName(selectedEmailForOrchestrator.company_id || undefined);
+      const deal    = getDealTitle(selectedEmailForOrchestrator.deal_id || undefined);
+      const contact = contacts?.find(c =>
+        c.email_primary === selectedEmailForOrchestrator.from_email ||
+        c.email_primary === selectedEmailForOrchestrator.to_email
+      );
+
+      const related_entities: Record<string, any> = {
+        company: company ? {
+          id: company.id, name: company.name, domain: (company as any).domain, industry: (company as any).industry
+        } : undefined,
+        contact: contact ? {
+          id: contact.id, full_name: contact.full_name, email: contact.email_primary, title: contact.title
+        } : undefined,
+        deal: deal ? {
+          id: deal.id, title: deal.title, stage: deal.stage,
+          amount: (deal as any).amount, probability: (deal as any).probability,
+          owner_email: (deal as any).owner_email, close_date: (deal as any).close_date
+        } : undefined
+      };
+
+      try {
+        const result = await orchestrateInteraction({ interaction, related_entities });
+        if (!result || !Array.isArray(result.actions)) {
+          toast({ variant: 'destructive', title: 'Orchestrator error', description: 'No actions returned.' });
+          return null;
         }
 
-        const interaction: Interaction = {
-            source: 'email',
-            subject: selectedEmailForOrchestrator.subject,
-            body: selectedEmailForOrchestrator.body_excerpt,
-            from: selectedEmailForOrchestrator.from_email,
-            to: selectedEmailForOrchestrator.to_email,
-            timestamp: toDate(selectedEmailForOrchestrator.ts).toISOString(),
-        };
-
-        const company = getCompanyName(selectedEmailForOrchestrator.company_id);
-        const deal = getDealTitle(selectedEmailForOrchestrator.deal_id);
-        const contact = contacts?.find(c => c.email_primary === selectedEmailForOrchestrator.from_email || c.email_primary === selectedEmailForOrchestrator.to_email);
-
-        return await orchestrateInteraction({
-            interaction,
-            related_entities: {
-                company: company ? { id: company.id, name: company.name, domain: company.domain } : undefined,
-                contact: contact ? { id: contact.id, full_name: contact.full_name, email: contact.email_primary, title: contact.title } : undefined,
-                deal: deal ? { id: deal.id, title: deal.title, stage: deal.stage } : undefined,
-            }
-        });
-    }, [selectedEmailForOrchestrator, contacts, companies, deals, crmDataLoading, toast]);
+        // Opcional: feedback rápido si vino vacío (no debería por fallback)
+        if (result.actions.length === 0) {
+          toast({ title: 'No actions', description: 'No concrete actions were generated.' });
+        }
+        return result;
+      } catch (err:any) {
+        console.error('processOrchestration error', err);
+        toast({ variant: 'destructive', title: 'AI Error', description: err?.message || 'Could not orchestrate this email.' });
+        return null;
+      }
+    }, [selectedEmailForOrchestrator, contacts, companies, deals, crmDataLoading, toast, getCompanyName, getDealTitle]);
 
 
   return (
