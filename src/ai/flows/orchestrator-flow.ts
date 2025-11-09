@@ -102,7 +102,7 @@ export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-1.5-flash-latest'), // <- modelo vigente
+  model: googleAI.model('gemini-2.0-flash-lite-001'), // <- reverted model
   input: { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   prompt: `
