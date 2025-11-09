@@ -7,7 +7,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, Gem } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -57,6 +57,21 @@ const directionVariant: { [key: string]: 'default' | 'secondary' } = {
   inbound: 'default',
   outbound: 'secondary',
 };
+
+const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M19 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
+        <path d="M5 10h14"/>
+        <path d="M8 10v8"/>
+        <path d="M12 10v8"/>
+        <path d="M16 10v8"/>
+        <path d="M6 6h.01"/>
+        <path d="M10 6h.01"/>
+        <path d="M14 6h.01"/>
+        <path d="M18 6h.01"/>
+    </svg>
+);
+
 
 export default function EmailHistoryPage() {
     const firestore = useFirestore();
@@ -412,11 +427,12 @@ export default function EmailHistoryPage() {
                         <TableHead>Deal</TableHead>
                         <TableHead className="w-[35%]">AI Summary</TableHead>
                         <TableHead>Labels</TableHead>
+                        <TableHead>Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {(emailsLoading || companiesLoading || contactsLoading || dealsLoading) && <TableRow><TableCell colSpan={7} className="text-center">Loading emails...</TableCell></TableRow>}
-                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={7} className="text-center">No emails found.</TableCell></TableRow>}
+                    {(emailsLoading || companiesLoading || contactsLoading || dealsLoading) && <TableRow><TableCell colSpan={8} className="text-center">Loading emails...</TableCell></TableRow>}
+                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={8} className="text-center">No emails found.</TableCell></TableRow>}
                     {filteredEmails.map((email) => {
                         const company = getCompanyName(email.company_id);
                         const deal = getDealTitle(email.deal_id);
@@ -464,31 +480,43 @@ export default function EmailHistoryPage() {
                             </TableCell>
                             <TableCell>
                                 {deal ? (
-                                    <Button variant="ghost" size="icon" onClick={() => handleEntityClick(deal, 'Deal')}>
-                                        <FileText className="h-4 w-4" />
-                                        <span className="sr-only">View Deal</span>
-                                    </Button>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                             <Button variant="ghost" size="icon" onClick={() => handleEntityClick(deal, 'Deal')}>
+                                                <FileText className="h-4 w-4" />
+                                                <span className="sr-only">View Deal</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>{deal.title}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
                                 ) : 'N/A'}
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2">
-                                {email.ai_summary ? (
-                                    <span className="line-clamp-2 text-sm">{email.ai_summary}</span>
+                                {summarizingId === email.id ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : email.ai_summary ? (
+                                    <span className="text-sm">{email.ai_summary}</span>
                                 ) : (
                                     <>
-                                        {summarizingId === email.id ? (
-                                            <LoaderCircle className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
-                                                disabled={isSummarizingAll}
-                                                className="h-6 w-6 shrink-0"
-                                            >
-                                                <RefreshCw className="h-4 w-4" />
-                                            </Button>
-                                        )}
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
+                                                    disabled={isSummarizingAll}
+                                                    className="h-6 w-6 shrink-0"
+                                                >
+                                                    <RefreshCw className="h-4 w-4" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Generate AI Summary</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                         <span className="text-xs text-muted-foreground italic line-clamp-2">
                                             {email.body_excerpt}
                                         </span>
@@ -498,6 +526,28 @@ export default function EmailHistoryPage() {
                             </TableCell>
                             <TableCell>
                                 {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-1">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <Gem className="h-4 w-4" />
+                                                <span className="sr-only">View Crystals</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Extract Crystals</p></TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <PianoIcon className="h-4 w-4" />
+                                                <span className="sr-only">Orchestrate</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Orchestrate</p></TooltipContent>
+                                    </Tooltip>
+                                </div>
                             </TableCell>
                         </TableRow>
                     )})}
