@@ -7,7 +7,7 @@
  * - SummarizeTextOutput - The return type for the summarizeText function.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai } from '@/ai';
 import { z } from 'zod';
 
 // Define the input schema for the flow
