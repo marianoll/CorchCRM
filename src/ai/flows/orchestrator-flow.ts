@@ -30,8 +30,8 @@ const ActionSchema = z.object({
   type: ActionType,
   target: TargetType,
   id: z.string().optional(),
-  data: z.record(z.any()).optional(),
-  changes: z.record(z.any()).optional(),
+  data: z.any().optional(),
+  changes: z.any().optional(),
   reason: z.string().optional(),
   confidence: z.number().min(0).max(1).optional()
 });
