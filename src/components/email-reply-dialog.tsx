@@ -42,6 +42,17 @@ interface EmailReplyDialogProps {
   user: User;
 }
 
+const toDate = (dateValue: any): Date => {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (dateValue instanceof Timestamp) return dateValue.toDate();
+    if (typeof dateValue === 'string') return new Date(dateValue);
+    if (dateValue && typeof dateValue.seconds === 'number') {
+        return new Date(dateValue.seconds * 1000);
+    }
+    return new Date();
+};
+
 export function EmailReplyDialog({
   open,
   onOpenChange,
@@ -57,12 +68,13 @@ export function EmailReplyDialog({
     if (open && email && user) {
       const isReplying = email.direction === 'inbound';
       const subjectPrefix = email.subject.toLowerCase().startsWith('re:') ? '' : 'Re: ';
+      const originalEmailDate = toDate(email.ts);
 
       setDraft({
         from: user.email || '',
         to: isReplying ? email.from_email : email.to_email,
         subject: isReplying ? `${subjectPrefix}${email.subject}` : `Following up on: ${email.subject}`,
-        date: isReplying ? addDays(new Date(), 1) : addDays(new Date(), 5),
+        date: isReplying ? addDays(originalEmailDate, 1) : addDays(originalEmailDate, 5),
         body: isReplying 
             ? `Hi,
 
@@ -222,5 +234,3 @@ ${user.displayName?.split(' ')[0] || ''}`
     </Dialog>
   );
 }
-
-    

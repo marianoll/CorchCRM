@@ -838,11 +838,9 @@ export default function EmailHistoryPage() {
                         const showTaskButton = checkKeywords(email.body_excerpt, ['POC', 'SLA terms', 'align', 'scope']);
                         
                         const isProcessingRow = processingActionsId === email.id;
-                        const actionIconsColor = isProcessingRow ? 'text-muted-foreground/30' : 'text-current';
 
                         const getIconClass = (action: ActionType) => {
                             if (isProcessingRow) return 'text-muted-foreground/30';
-
                             const status = email.actionStates?.[action];
                             if (status === 'approved') return 'text-green-500';
                             if (status === 'rejected') return 'text-red-500';
@@ -867,9 +865,6 @@ export default function EmailHistoryPage() {
                                         <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto">
                                             <p>{email.body_excerpt}</p>
                                         </div>
-                                        <DialogFooter>
-                                            <Button type="button" variant="secondary">Close</Button>
-                                        </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                             </TableCell>
@@ -1054,7 +1049,9 @@ export default function EmailHistoryPage() {
                         <h4 className="font-semibold text-sm">Original Email</h4>
                         <p className="text-sm font-medium">{selectedEmailForMeeting.subject}</p>
                         <p className="text-xs text-muted-foreground">From: {selectedEmailForMeeting.from_email}</p>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedEmailForMeeting.body_excerpt}</p>
+                        <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto">
+                            <p>{selectedEmailForMeeting.body_excerpt}</p>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-2">
