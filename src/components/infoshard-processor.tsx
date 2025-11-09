@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { LoaderCircle, Gem } from 'lucide-react';
+import { useState, useTransition, useRef, useEffect } from 'react';
+import { LoaderCircle, Gem, Mic, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
+import { speechToText } from '@/ai/flows/speech-to-text-flow';
+import { cn } from '@/lib/utils';
 
 const sampleText = `Just had a great call with Javier Gomez from Tech Solutions. He's very interested in our cloud migration package and mentioned their budget is around $50k. He asked for a detailed proposal by end of day Friday.`;
 
@@ -25,11 +27,15 @@ interface InfoshardProcessorProps {
 export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcessorProps) {
   const [inputText, setInputText] = useState(sampleText);
   const [result, setResult] = useState<OrchestrateTextOutput | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const { toast } = useToast();
 
-  const handleProcess = () => {
-    if (!inputText) {
+  const handleProcess = async (textToProcess: string) => {
+    if (!textToProcess) {
       toast({
         variant: 'destructive',
         title: 'Input text is empty',
@@ -38,32 +44,79 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
       return;
     }
     
+    setIsProcessing(true);
     setResult(null);
 
-    startTransition(async () => {
+    try {
+      const res = await orchestrateText({ 
+          text: textToProcess,
+          contacts: crmData.contacts,
+          companies: crmData.companies,
+          deals: crmData.deals,
+      });
+      setResult(res);
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'Processing Failed',
+        description: error.message || 'There was a problem with the AI.',
+      });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
+  const handleStartRecording = async () => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
-        const res = await orchestrateText({ 
-            text: inputText,
-            contacts: crmData.contacts,
-            companies: crmData.companies,
-            deals: crmData.deals,
-        });
-        setResult(res);
-      } catch (error: any) {
-        console.error(error);
-        toast({
-          variant: 'destructive',
-          title: 'Processing Failed',
-          description: error.message || 'There was a problem with the AI.',
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorderRef.current = new MediaRecorder(stream);
+        audioChunksRef.current = [];
+
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorderRef.current.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
+            const base64Audio = reader.result as string;
+            setIsProcessing(true);
+            try {
+              const { transcript } = await speechToText({ audioDataUri: base64Audio });
+              setInputText(transcript);
+              // Automatically trigger processing after transcription
+              await handleProcess(transcript);
+            } catch (error: any) {
+              toast({ variant: 'destructive', title: 'Transcription Failed', description: error.message });
+              setIsProcessing(false);
+            }
+          };
+          // Stop all tracks on the stream to release the microphone
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorderRef.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Microphone Error', description: 'Could not access the microphone.' });
       }
-    });
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
   };
   
   const parseDetails = (details: Record<string, any> | undefined) => {
     if (!details) return {};
     try {
-        // If details is already an object, just return it
         if (typeof details === 'object') return details;
         return JSON.parse(details);
     } catch (e) {
@@ -75,8 +128,8 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Orchestrator Input</CardTitle>
-        <CardDescription>Enter any text (notes, email snippets, thoughts) to generate structured orchestrator commands.</CardDescription>
+        <CardTitle>Note-to-CRM</CardTitle>
+        <CardDescription>Enter any text or record a voice note to generate structured CRM actions.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Textarea
@@ -84,9 +137,9 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           rows={8}
-          disabled={isPending || crmDataLoading}
+          disabled={isProcessing || crmDataLoading || isRecording}
         />
-        {isPending && (
+        {(isProcessing && !isRecording) && (
             <div className="flex items-center justify-center p-8">
                 <LoaderCircle className="mr-2 h-6 w-6 animate-spin" />
                 <span>Processing...</span>
@@ -113,14 +166,32 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
           </div>
         )}
       </CardContent>
-      <CardFooter>
-        <Button onClick={handleProcess} disabled={isPending || crmDataLoading} className="w-full">
-          {(isPending || crmDataLoading) ? (
+      <CardFooter className="flex gap-2">
+         <Button onClick={() => handleProcess(inputText)} disabled={isProcessing || crmDataLoading || isRecording} className="w-full">
+          {isProcessing ? (
             <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Gem className="mr-2 h-4 w-4" />
           )}
           Generate Actions
+        </Button>
+        <Button 
+            onClick={isRecording ? handleStopRecording : handleStartRecording} 
+            disabled={isProcessing || crmDataLoading}
+            variant="outline"
+            className={cn("w-full", isRecording && "bg-red-500/10 text-red-500 border-red-500/50 hover:bg-red-500/20 hover:text-red-500")}
+        >
+          {isRecording ? (
+              <>
+                <Square className="mr-2 h-4 w-4" />
+                Stop Recording
+              </>
+          ) : (
+              <>
+                <Mic className="mr-2 h-4 w-4" />
+                Record Voice Note
+              </>
+          )}
         </Button>
       </CardFooter>
     </Card>
