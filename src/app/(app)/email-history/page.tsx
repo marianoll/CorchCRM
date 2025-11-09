@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useMemo, useTransition } from 'react';
+import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, orderBy, query, writeBatch, doc, Timestamp } from 'firebase/firestore';
+import { collection, orderBy, query, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval } from 'date-fns';
-import { Mail, ArrowRight, Database, LoaderCircle, Zap, Calendar as CalendarIcon, X, RefreshCw } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +27,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { summarizeText } from '@/ai/flows/summarize-text';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 type Email = {
     id: string;
@@ -38,6 +41,7 @@ type Email = {
     body_excerpt: string;
     labels: string;
     company_id?: string;
+    ai_summary?: string;
 };
 
 type Company = {
@@ -55,11 +59,8 @@ export default function EmailHistoryPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
-    const [summaries, setSummaries] = useState<Record<string, string>>({});
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
 
-
-    // Filter states
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedCompany, setSelectedCompany] = useState<string>('all');
     const [labelFilter, setLabelFilter] = useState<string>('');
@@ -78,7 +79,7 @@ export default function EmailHistoryPage() {
         : null,
     [firestore, user]);
 
-    const { data: emails, loading: emailsLoading } = useCollection<Email>(emailsQuery);
+    const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
     const getCompanyName = (companyId?: string) => {
@@ -132,7 +133,7 @@ export default function EmailHistoryPage() {
                 if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
                   emailData.ts = new Date(emailData.ts);
                 } else {
-                  delete emailData.ts; // Remove invalid date
+                  delete emailData.ts; 
                 }
 
                 batch.set(emailRef, emailData);
@@ -196,15 +197,41 @@ export default function EmailHistoryPage() {
             toast({ variant: 'destructive', title: 'No Content', description: 'Email body is empty, cannot summarize.' });
             return;
         }
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
+            return;
+        }
 
         setSummarizingId(emailId);
         try {
             const result = await summarizeText({ text });
-            setSummaries(prev => ({ ...prev, [emailId]: result.summary }));
-            toast({ title: 'Summary Generated!', description: 'AI summary has been updated.' });
+            
+            const emailRef = doc(firestore, 'users', user.uid, 'emails', emailId);
+            const summaryData = { ai_summary: result.summary };
+
+            await setDoc(emailRef, summaryData, { merge: true }).catch(error => {
+                const permissionError = new FirestorePermissionError({
+                    path: emailRef.path,
+                    operation: 'update',
+                    requestResourceData: summaryData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                throw error;
+            });
+
+            if (setEmails) {
+                 setEmails(prevEmails => {
+                    if (!prevEmails) return null;
+                    return prevEmails.map(e => e.id === emailId ? { ...e, ai_summary: result.summary } : e);
+                });
+            }
+
+            toast({ title: 'Summary Generated!', description: 'AI summary has been saved.' });
         } catch (err: any) {
             console.error(`Failed to summarize email ${emailId}:`, err);
-            toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not generate summary.' });
+            if (!(err instanceof FirestorePermissionError)) {
+                toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not generate or save summary.' });
+            }
         } finally {
             setSummarizingId(null);
         }
@@ -315,10 +342,10 @@ export default function EmailHistoryPage() {
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[180px]">Timestamp</TableHead>
-                        <TableHead>Subject</TableHead>
+                        <TableHead className="w-[25%]">Subject</TableHead>
                         <TableHead>From/To</TableHead>
                         <TableHead>Company</TableHead>
-                        <TableHead>AI Summary</TableHead>
+                        <TableHead className="w-[40%]">AI Summary</TableHead>
                         <TableHead>Labels</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -359,23 +386,23 @@ export default function EmailHistoryPage() {
                         <TableCell>{getCompanyName(email.company_id)}</TableCell>
                         <TableCell>
                             <div className="flex items-center gap-2">
-                                {summaries[email.id] ? (
-                                    <span className="line-clamp-2">{summaries[email.id]}</span>
+                                {email.ai_summary ? (
+                                    <span className="line-clamp-2">{email.ai_summary}</span>
                                 ) : (
                                     <>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
-                                            disabled={summarizingId === email.id}
-                                            className="h-6 w-6 shrink-0"
-                                        >
-                                            {summarizingId === email.id ? (
-                                                <LoaderCircle className="h-4 w-4 animate-spin" />
-                                            ) : (
+                                        {summarizingId === email.id ? (
+                                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
+                                                disabled={summarizingId === email.id}
+                                                className="h-6 w-6 shrink-0"
+                                            >
                                                 <RefreshCw className="h-4 w-4" />
-                                            )}
-                                        </Button>
+                                            </Button>
+                                        )}
                                         <span className="text-xs text-muted-foreground italic line-clamp-2">
                                             {email.body_excerpt}
                                         </span>
