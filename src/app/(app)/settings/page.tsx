@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -10,12 +11,13 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Plus, Palette, LoaderCircle } from "lucide-react";
+import { X, Plus, Palette, LoaderCircle, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useAuth } from '@/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { signOut } from 'firebase/auth';
 
 type Stage = { name: string; color: string; };
 
@@ -136,6 +138,8 @@ const StageEditor = ({ stages, onStagesChange }: { stages: Stage[], onStagesChan
 export default function SettingsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -182,6 +186,13 @@ export default function SettingsPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while saving your settings.' });
     } finally {
         setIsSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (auth) {
+        await signOut(auth);
+        router.push('/login');
     }
   };
 
@@ -426,6 +437,19 @@ export default function SettingsPage() {
                     Save All Settings
                 </Button>
             </CardFooter>
+          </Card>
+
+          <Card className="border-destructive">
+            <CardHeader>
+                <CardTitle>Danger Zone</CardTitle>
+                <CardDescription>These actions are irreversible.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <Button variant="destructive" onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log Out
+                </Button>
+            </CardContent>
           </Card>
         </div>
       </main>

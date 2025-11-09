@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -16,8 +16,6 @@ import {
   SidebarInset,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -33,6 +31,7 @@ import {
   LogOut,
   Mail,
   Bug,
+  MessageCircle,
 } from 'lucide-react';
 import {
   useUser,
@@ -48,18 +47,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { SearchChatbot } from '@/components/search-chatbot';
+
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
   { href: '/inbox', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
-  { href: '/search', label: 'Search', icon: Search },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function MainNav() {
   const pathname = usePathname();
-  const isDebugActive = pathname.startsWith('/changes-history') || pathname.startsWith('/crystals') || pathname.startsWith('/email-history');
 
   return (
     <>
@@ -108,15 +107,6 @@ function MainNav() {
 
 function UserProfile() {
     const { user, isUserLoading } = useUser();
-    const auth = useAuth();
-    const router = useRouter();
-
-    const handleLogout = async () => {
-        if (auth) {
-            await signOut(auth);
-            router.push('/login');
-        }
-    };
     
     if (isUserLoading) {
         return (
@@ -148,9 +138,11 @@ function UserProfile() {
             <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                 <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                    </Link>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -160,6 +152,7 @@ function UserProfile() {
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     useEffect(() => {
         // If loading is finished and there's no user, redirect to login.
@@ -202,6 +195,17 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
                     <Logo />
                 </header>
                 {children}
+                <div className="fixed bottom-6 right-6 z-50">
+                    <Button
+                        size="icon"
+                        className="rounded-full w-14 h-14 shadow-lg"
+                        onClick={() => setIsSearchOpen(true)}
+                    >
+                        <MessageCircle className="h-6 w-6" />
+                        <span className="sr-only">Open Search Chat</span>
+                    </Button>
+                </div>
+                 <SearchChatbot open={isSearchOpen} onOpenChange={setIsSearchOpen} />
             </SidebarInset>
         </SidebarProvider>
     );
