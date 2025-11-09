@@ -25,7 +25,7 @@ export type SpeechToTextOutput = z.infer<typeof SpeechToTextOutputSchema>;
 const transcribePrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   // Model con soporte audio multimodal estable
-  model: googleAI.model('gemini-1.5-flash'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: SpeechToTextInputSchema },
   // Nota: {{media url=...}} acepta data URIs
   prompt: `You are an accurate speech transcriber. 
