@@ -474,6 +474,41 @@
         }
       },
       "required": ["id", "thread_id", "from_email", "to_email", "direction", "subject", "ts"]
+    },
+    "Crystal": {
+      "title": "Crystal",
+      "description": "An atomized fact extracted by the AI from a source like an email or voice note.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Crystal."
+        },
+        "fact": {
+          "type": "string",
+          "description": "The atomized fact extracted from the source."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["email", "voice", "meeting", "manual"],
+          "description": "The source of the information."
+        },
+        "sourceIdentifier": {
+          "type": "string",
+          "description": "The ID of the source document (e.g., email ID)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "overwritten"],
+          "description": "The status of the crystal."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the crystal was created."
+        }
+      },
+      "required": ["id", "fact", "source", "sourceIdentifier", "status", "createdAt"]
     }
   },
   "auth": {
@@ -651,6 +686,22 @@
             {
               "name": "infotopeId",
               "description": "The unique identifier for the infotope."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/crystals/{crystalId}",
+        "definition": {
+          "entityName": "Crystal",
+          "schema": {
+            "$ref": "#/backend/entities/Crystal"
+          },
+          "description": "Atomized facts (crystals) extracted by the AI. These are immutable.",
+          "params": [
+            {
+              "name": "crystalId",
+              "description": "The unique identifier for the crystal."
             }
           ]
         }

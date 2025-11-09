@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,6 +31,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { infoshardText, type InfoshardTextOutput } from '@/ai/flows/infoshard-text-flow';
+import { CrystalsSuggestionDialog } from '@/components/crystals-suggestion-dialog';
 
 
 type Email = {
@@ -93,6 +95,11 @@ export default function EmailHistoryPage() {
     const [detailsEntityType, setDetailsEntityType] = useState<'Company' | 'Contact' | 'Deal' | null>(null);
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
+    // Crystals Dialog state
+    const [isCrystalsDialogOpen, setIsCrystalsDialogOpen] = useState(false);
+    const [selectedEmailForCrystals, setSelectedEmailForCrystals] = useState<Email | null>(null);
+
+
     // Data fetching
     const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, [firestore, user]);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
@@ -105,6 +112,8 @@ export default function EmailHistoryPage() {
 
     const dealsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, [firestore, user]);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
+
+    const crmDataLoading = companiesLoading || contactsLoading || dealsLoading;
 
     const getCompanyName = (companyId?: string) => {
         if (!companyId || companiesLoading || !companies) return null;
@@ -309,6 +318,27 @@ export default function EmailHistoryPage() {
         toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
     };
 
+    const handleExtractCrystals = (email: Email) => {
+        setSelectedEmailForCrystals(email);
+        setIsCrystalsDialogOpen(true);
+    };
+
+    const processCrystals = useCallback(async (): Promise<InfoshardTextOutput | null> => {
+        if (!selectedEmailForCrystals || crmDataLoading) {
+            toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
+            return null;
+        }
+
+        const inputText = `Subject: ${selectedEmailForCrystals.subject}\n\n${selectedEmailForCrystals.body_excerpt}`;
+        const crmContext = {
+            contacts: contacts?.map(c => ({ id: c.id, name: c.full_name })) || [],
+            companies: companies?.map(c => ({ id: c.id, name: c.name })) || [],
+            deals: deals?.map(d => ({ id: d.id, name: d.title })) || [],
+        };
+        
+        return await infoshardText({ text: inputText, ...crmContext });
+    }, [selectedEmailForCrystals, contacts, companies, deals, crmDataLoading, toast]);
+
 
   return (
     <TooltipProvider>
@@ -431,7 +461,7 @@ export default function EmailHistoryPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {(emailsLoading || companiesLoading || contactsLoading || dealsLoading) && <TableRow><TableCell colSpan={8} className="text-center">Loading emails...</TableCell></TableRow>}
+                    {(emailsLoading || crmDataLoading) && <TableRow><TableCell colSpan={8} className="text-center">Loading emails...</TableCell></TableRow>}
                     {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={8} className="text-center">No emails found.</TableCell></TableRow>}
                     {filteredEmails.map((email) => {
                         const company = getCompanyName(email.company_id);
@@ -531,7 +561,7 @@ export default function EmailHistoryPage() {
                                 <div className="flex items-center gap-1">
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon">
+                                            <Button variant="ghost" size="icon" onClick={() => handleExtractCrystals(email)}>
                                                 <Gem className="h-4 w-4" />
                                                 <span className="sr-only">View Crystals</span>
                                             </Button>
@@ -566,6 +596,15 @@ export default function EmailHistoryPage() {
         deals={deals || []}
         emails={emails || []}
       />
+      {selectedEmailForCrystals && (
+        <CrystalsSuggestionDialog
+            open={isCrystalsDialogOpen}
+            onOpenChange={setIsCrystalsDialogOpen}
+            emailBody={`Subject: ${selectedEmailForCrystals.subject}\n\n${selectedEmailForCrystals.body_excerpt}`}
+            emailSourceIdentifier={selectedEmailForCrystals.id}
+            processFunction={processCrystals}
+        />
+      )}
     </main>
     </TooltipProvider>
   );
