@@ -54,7 +54,7 @@ const TasksCard = () => {
     const { user } = useUser();
     const [hideCompleted, setHideCompleted] = useState(false);
 
-    const tasksQuery = useMemo(() => null, [user]);
+    const tasksQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'tasks'), orderBy('dueDate', 'asc')) : null, [user]);
     const { data: tasks, loading } = useCollection<Task>(tasksQuery);
     
     const handleToggleDone = async (task: Task) => {
@@ -65,7 +65,8 @@ const TasksCard = () => {
 
     const visibleTasks = useMemo(() => {
         if (!tasks) return [];
-        return hideCompleted ? tasks.filter(t => !t.done) : tasks;
+        const sortedTasks = [...tasks].sort((a, b) => toDate(a.dueDate).getTime() - toDate(b.dueDate).getTime());
+        return hideCompleted ? sortedTasks.filter(t => !t.done) : sortedTasks;
     }, [tasks, hideCompleted]);
 
     return (
@@ -80,7 +81,7 @@ const TasksCard = () => {
                 </Button>
             </CardHeader>
             <CardContent>
-                {true ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
+                {loading ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
                     <ScrollArea className="h-64 pr-4">
                         <div className="space-y-4">
                             {visibleTasks.length === 0 && <p className="text-sm text-muted-foreground text-center">No tasks found.</p>}
