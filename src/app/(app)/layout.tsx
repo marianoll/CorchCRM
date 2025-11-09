@@ -27,6 +27,9 @@ import {
   Upload,
   Bot,
   Inbox,
+  LayoutDashboard,
+  CheckSquare,
+  Gem,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -38,10 +41,12 @@ import { auth } from '@/firebase/client';
 
 const navItems = [
   { href: '/home', label: 'Unstructured Data Input', icon: Home },
+  { href: '/orquestrator', label: 'Zero-Click Inbox', icon: Inbox },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/email-history', label: 'Email History', icon: Mail },
   { href: '/upload-history', label: 'Upload History', icon: Upload },
-  { href: '/orquestrator', label: 'Zero-Click Inbox', icon: Inbox },
+  { href: '/dashboard', label: 'Orchestrator Log', icon: LayoutDashboard },
+  { href: '/crystals', label: 'Crystals Log', icon: Gem },
 ];
 
 function MainNav() {
