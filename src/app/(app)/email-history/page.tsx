@@ -25,6 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
+import { summarizeText } from '@/ai/flows/summarize-text';
 
 type Email = {
     id: string;
@@ -189,8 +190,30 @@ export default function EmailHistoryPage() {
             return;
         }
 
-        toast({ variant: 'destructive', title: 'Feature Not Available', description: 'AI functionality is currently disabled.' });
+        startSummaryTransition(async () => {
+            toast({ title: 'Generating Summaries...', description: `Processing ${filteredEmails.length} emails.` });
 
+            const summaryPromises = filteredEmails.map(email => 
+                summarizeText({ text: email.body_excerpt })
+                    .then(result => ({ id: email.id, summary: result.summary }))
+                    .catch(err => {
+                        console.error(`Failed to summarize email ${email.id}:`, err);
+                        return { id: email.id, summary: 'AI summary failed.' };
+                    })
+            );
+
+            const results = await Promise.all(summaryPromises);
+
+            setSummaries(prev => {
+                const newSummaries = { ...prev };
+                results.forEach(result => {
+                    newSummaries[result.id] = result.summary;
+                });
+                return newSummaries;
+            });
+
+            toast({ title: 'Summaries Generated!', description: 'AI summaries have been added for visible emails.' });
+        });
     };
 
   return (

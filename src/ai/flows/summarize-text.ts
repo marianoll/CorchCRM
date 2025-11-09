@@ -1,64 +1,64 @@
-'use client';
+'use server';
+/**
+ * @fileOverview A Genkit flow for summarizing a given text into a single line.
+ *
+ * - summarizeText - A function that takes a string of text and returns a one-line summary.
+ * - SummarizeTextInput - The input type for the summarizeText function.
+ * - SummarizeTextOutput - The return type for the summarizeText function.
+ */
 
-import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { type Suggestion } from '@/lib/mock-data';
-import { Check, X, LoaderCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
 
-interface SuggestionCardProps {
-  suggestion: Suggestion;
-}
+// Define the input schema for the flow
+const SummarizeTextInputSchema = z.object({
+  text: z.string().describe('The text to be summarized.'),
+});
+export type SummarizeTextInput = z.infer<typeof SummarizeTextInputSchema>;
 
-export function SuggestionCard({ suggestion }: SuggestionCardProps) {
-  const [isPending, startTransition] = useTransition();
-  const [isGone, setIsGone] = useState(false);
-  const { toast } = useToast();
+// Define the output schema for the flow
+const SummarizeTextOutputSchema = z.object({
+  summary: z.string().describe('The one-line summary of the text.'),
+});
+export type SummarizeTextOutput = z.infer<typeof SummarizeTextOutputSchema>;
 
-  const handleAction = (approvalStatus: 'approved' | 'rejected') => {
-    startTransition(async () => {
-      toast({
-        variant: 'destructive',
-        title: 'Feature Not Available',
-        description: 'AI functionality is currently disabled.',
-      });
+// Define the prompt that will be used by the AI model
+const summarizeTextPrompt = ai.definePrompt({
+  name: 'summarizeTextPrompt',
+  input: { schema: SummarizeTextInputSchema },
+  output: { schema: SummarizeTextOutputSchema },
+  prompt: `Summarize the following text into a single, concise line:
 
-      // Simulate a delay and then hide the card
-      setTimeout(() => {
-          if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
-              setIsGone(true);
-          }
-      }, 500);
+---
+{{text}}
+---`,
+});
 
-    });
-  };
+// Define the main flow function
+const summarizeTextFlow = ai.defineFlow(
+  {
+    name: 'summarizeTextFlow',
+    inputSchema: SummarizeTextInputSchema,
+    outputSchema: SummarizeTextOutputSchema,
+  },
+  async (input) => {
+    // If the input text is empty or too short, return a default message
+    if (!input.text || input.text.trim().length < 10) {
+      return { summary: 'Not enough text to summarize.' };
+    }
+    
+    // Call the prompt with the provided input
+    const response = await summarizeTextPrompt(input);
+    const output = response.output();
 
-  if (isGone) {
-    return null;
+    // Return the generated summary or a fallback message
+    return output || { summary: 'Could not generate summary.' };
   }
+);
 
-  return (
-    <Card className={cn("transition-all duration-300", isPending && "opacity-50 pointer-events-none")}>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-            {suggestion.type}
-        </CardTitle>
-        <CardDescription>Source: {suggestion.source}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm font-mono bg-secondary p-3 rounded-md">{suggestion.details}</p>
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => handleAction('rejected')} disabled={isPending}>
-          <X className="mr-2 h-4 w-4" /> Reject
-        </Button>
-        <Button onClick={() => handleAction('approved')} disabled={isPending}>
-          {isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-          Approve
-        </Button>
-      </CardFooter>
-    </Card>
-  );
+// Export a wrapper function to be easily called from client components
+export async function summarizeText(
+  input: SummarizeTextInput
+): Promise<SummarizeTextOutput> {
+  return summarizeTextFlow(input);
 }
