@@ -43,13 +43,27 @@ npm install
 
 This project requires configuration for Firebase and Google APIs to function correctly.
 
-1.  **Firebase Configuration**:
-    *   Create a `.env.local` file in the root of the project.
-    *   Add your Firebase project configuration keys to this file (e.g., `NEXT_PUBLIC_FIREBASE_API_KEY`, etc.). This ensures your client-side code can connect to your Firebase project.
-
-2.  **Enable Google APIs**:
+1.  **Enable Google APIs**:
     *   **Identity Platform API**: This is required for Firebase Authentication. Follow the instructions in `IDENTITY_PLATFORM_SETUP.md` to enable it.
-    *   **Gmail API**: This is required for the Gmail integration feature. Follow the instructions in `GMAIL_API_SETUP.md` to configure the OAuth consent screen and get your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Add these to your `.env.local` file.
+    *   **Gmail API**: This is required for the Gmail integration feature. Follow the instructions in `GMAIL_API_SETUP.md` to configure the OAuth consent screen and get your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+2.  **Environment Variables**:
+    *   This project uses a `.env` file for server-side keys and general configuration, and a `.env.local` file for local development overrides. **Do not commit these files to version control.**
+    *   Create a `.env` file and structure it as follows. You will get the `NEXT_PUBLIC_FIREBASE_*` values from your Firebase project settings. `GEMINI_API_KEY` is obtained from Google AI Studio.
+        ```.env
+        GEMINI_API_KEY=
+        NEXT_PUBLIC_FIREBASE_API_KEY=
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+        NEXT_PUBLIC_FIREBASE_APP_ID=
+        ```
+    *   Create a `.env.local` file. This is used for local development overrides, specifically for the OAuth Redirect URI.
+        ```.env.local
+        OAUTH_REDIRECT_URI=http://localhost:9002/oauth/callback
+        ```
+    *   You will also add your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (from `GMAIL_API_SETUP.md`) to your `.env.local` file for local development.
 
 ### 4. Running the Development Server
 
