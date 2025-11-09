@@ -47,7 +47,7 @@ export type AnalysisOutput = z.infer<typeof AnalysisOutputSchema>;
 
 const analysisPrompt = ai.definePrompt({
   name: 'analyzeEmailContentPrompt',
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-2.0-flash-lite'),
   input: { schema: AnalysisInputSchema },
   output: { schema: AnalysisOutputSchema },
   prompt: `You are a CRM analyst AI. Your task is to analyze an email regarding a deal and suggest updates.
