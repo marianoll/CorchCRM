@@ -143,57 +143,58 @@ const orchestrateInteractionFlow = ai.defineFlow(
       // Filtro defensivo
       const validTypes = new Set(['update_entity','create_ai_draft','create_meeting','create_task']);
       const validTargets = new Set(['companies','contacts','deals','emails','tasks','ai_drafts','meetings']);
-      const concrete = actions.filter(a => validTypes.has(a?.type) && validTargets.has(a?.target));
+      const concrete = actions.filter(a => a && validTypes.has(a?.type) && validTargets.has(a?.target));
 
       if (concrete.length > 0) return { actions: concrete };
 
       // --------- Fallback determinista según direction ---------
-      const dir = input.interaction.direction || 'inbound';
-      const subj = (input.interaction.subject || '').trim();
-      const body = (input.interaction.body || '').trim();
+      const dir   = input.interaction.direction || 'inbound';
+      const subj  = (input.interaction.subject || '').trim();
+      const body  = (input.interaction.body || '').trim();
       const title = (subj || body.slice(0, 60) || 'Follow up').replace(/\s+/g, ' ').trim();
-      const owner = input.related_entities?.deal?.owner_email
-                 || input.related_entities?.contact?.owner_email
-                 || input.interaction.to
-                 || undefined;
       const dealId = input.related_entities?.deal?.id;
+      const owner  = input.related_entities?.deal?.owner_email
+                  || input.related_entities?.contact?.owner_email
+                  || input.interaction.to
+                  || undefined;
 
       const base = input.interaction.timestamp ? new Date(input.interaction.timestamp) : new Date();
       const plusDays = (n:number) => new Date(base.getTime() + n*24*3600*1000).toISOString();
 
       if (dir === 'inbound') {
-        const draft: Action = {
-          type: 'create_ai_draft',
-          target: 'ai_drafts',
-          data: {
-            source_type: 'email',
-            related_id: dealId,
-            draft_text: `Hi — thanks for your message. ${title}. Happy to proceed; let me know the best time to sync.`
-          },
-          reason: 'Draft response to inbound email',
-          confidence: 0.6
+        return {
+          actions: [{
+            type: 'create_ai_draft',
+            target: 'ai_drafts',
+            data: {
+              source_type: 'email',
+              related_id: dealId,
+              draft_text: `Hi — thanks for your message. ${title}. Happy to proceed; let me know a good time to sync.`
+            },
+            reason: 'Draft response to inbound email',
+            confidence: 0.6
+          } as Action]
         };
-        return { actions: [draft] };
       } else {
-        const task: Action = {
-          type: 'create_task',
-          target: 'tasks',
-          data: {
-            deal_id: dealId,
-            title: 'Follow up on outbound email',
-            due_date: plusDays(5),
-            owner_email: owner
-          },
-          reason: 'Schedule follow-up for outbound email',
-          confidence: 0.6
+        return {
+          actions: [{
+            type: 'create_task',
+            target: 'tasks',
+            data: {
+              deal_id: dealId,
+              title: 'Follow up on outbound email',
+              due_date: plusDays(5),
+              owner_email: owner
+            },
+            reason: 'Schedule follow-up for outbound email',
+            confidence: 0.6
+          } as Action]
         };
-        return { actions: [task] };
       }
     } catch (e:any) {
       console.error('[orchestrateInteractionFlow]', e?.message || e);
-      // Fallback mínimo en error grave: tratar como outbound follow-up
-      const base = new Date();
-      const due = new Date(base.getTime() + 5*24*3600*1000).toISOString();
+      // Fallback mínimo en error grave → tratar como outbound follow-up a +5 días
+      const due = new Date(Date.now() + 5*24*3600*1000).toISOString();
       return {
         actions: [{
           type: 'create_task',
@@ -201,11 +202,12 @@ const orchestrateInteractionFlow = ai.defineFlow(
           data: { title: 'Follow up (fallback)', due_date: due },
           reason: 'Schedule follow-up for outbound email',
           confidence: 0.5
-        }]
+        } as Action]
       };
     }
   }
 );
+
 
 /* ---------- Helper ---------- */
 
