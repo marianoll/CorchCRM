@@ -77,14 +77,14 @@ Your task is to deconstruct unstructured text into "infotopes" (atomic, self-con
     *   The 'command' should be a camelCase verb like 'createContact', 'createDeal', 'createTask', 'updateDeal'.
     *   The 'details' field MUST be a JSON STRING containing all extracted data. Differentiate between a person's full name and their email. If a contact works for a company, include the company's name in the contact's details.
     *   Example: "Let's create a deal for Julian at InovaCorp for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: "{\\"contactName\\": \\"Julian\\", \\"companyName\\": \\"InovaCorp\\", \\"amount\\": 25000}" }.
-    *   Example: "Create a contact for julian.l@example.com, his name is Julian Lopez" becomes { command: "createContact", entityName: "Julian Lopez", details: "{\\"fullName\\": \\"Julian Lopez\\", \\"email\\": \\"julian.l@example.com\\"}" }.
+    *   Example: "Create a contact for julian.l@example.com, his name is Julian Lopez who works at InovaCorp" becomes { command: "createContact", entityName: "Julian Lopez", details: "{\\"fullName\\": \\"Julian Lopez\\", \\"email\\": \\"julian.l@example.com\\", \\"companyName\\": \\"InovaCorp\\"}" }.
     *   'sourceText' should contain the original snippet that justifies the command.
-4.  **Link to CRM Entities:**
+4.  **Link to CRM Entities & Handle Dependencies:**
     *   For each infotope, match the entity mentioned (e.g., "Javier Gomez", "Tech Solutions") with an entity from the provided CRM Context Data.
     *   If a match is found, use the entity's name and its ID.
     *   **If you cannot find a match, use the name from the text and "Not Found" as the ID.**
-    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. Example: { command: "createContact", entityName: "Julian Lopez", details: "{\\"email\\": \\"julian.l@example.com\\"}" }.
-5.  **Return JSON:** Format your entire output as a single JSON object that strictly matches the output schema. Do not add any commentary.
+    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. 
+    *   **CRITICAL DEPENDENCY LOGIC**: If a contact (e.g. "Julian Lopez") is associated with a company (e.g. "InovaCorp") and "InovaCorp" is also "Not Found", you MUST generate the 'createCompany' command BEFORE the 'createContact' command in the 'orchestrators' array. The system processes commands in order.
 
 **CRM Context Data:**
 
