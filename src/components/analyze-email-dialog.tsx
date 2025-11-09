@@ -20,6 +20,8 @@ import type { User } from 'firebase/auth';
 import { analyzeEmailContent, type AnalysisOutput } from '@/ai/flows/analyze-email-flow';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Progress } from './ui/progress';
+import { Badge } from './ui/badge';
+import { Label } from './ui/label';
 
 type Email = {
     id: string;
