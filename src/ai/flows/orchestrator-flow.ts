@@ -204,7 +204,7 @@ const orchestratorFlow = ai.defineFlow(
         Current User ID: ${input.userId}
         
         Carefully analyze the instruction and call the appropriate tool with the correct parameters. The user ID must always be passed to the tool.`,
-      model: googleAI.model('gemini-1.5-flash-latest'),
+      model: googleAI.model('gemini-1.5-flash'),
       tools: [createCompanyTool, createContactTool, createDealTool],
       output: {
           format: 'json',

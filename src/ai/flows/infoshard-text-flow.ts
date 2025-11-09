@@ -57,7 +57,7 @@ export type InfoshardTextOutput = z.infer<typeof InfoshardTextOutputSchema>;
 // ---- Prompt ----
 const infoshardTextPrompt = ai.definePrompt({
   name: 'infoshardTextPrompt',
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-1.5-flash'),
   input: { schema: InfoshardTextInputSchema },
   output: { schema: InfoshardTextOutputSchema },
   prompt: `You are an expert text analysis and entity resolution AI for a CRM.
