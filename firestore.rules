@@ -57,15 +57,6 @@ service cloud.firestore {
     /**
      * @description Manages deals associated with a specific user.
      * @path /users/{userId}/deals/{dealId}
-     * @allow (create) Authenticated user can create a deal under their user id.
-     * @allow (get) Authenticated user can read a deal under their user id.
-     * @allow (update) Authenticated user can update a deal under their user id.
-     * @allow (delete) Authenticated user can delete a deal under their user id.
-     * @deny (create) If the user id in the path does not match the authenticated user's id.
-     * @deny (get) If the user id in the path does not match the authenticated user's id.
-     * @deny (update) If the user id in the path does not match the authenticated user's id.
-     * @deny (delete) If the user id in the path does not match the authenticated user's id.
-     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/deals/{dealId} {
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
@@ -74,15 +65,6 @@ service cloud.firestore {
     /**
      * @description Manages contacts associated with a specific user.
      * @path /users/{userId}/contacts/{contactId}
-     * @allow (create) Authenticated user can create a contact under their user id.
-     * @allow (get) Authenticated user can read a contact under their user id.
-     * @allow (update) Authenticated user can update a contact under their user id.
-     * @allow (delete) Authenticated user can delete a contact under their user id.
-     * @deny (create) If the user id in the path does not match the authenticated user's id.
-     * @deny (get) If the user id in the path does not match the authenticated user's id.
-     * @deny (update) If the user id in the path does not match the authenticated user's id.
-     * @deny (delete) If the user id in the path does not match the authenticated user's id.
-     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/contacts/{contactId} {
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
@@ -113,14 +95,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages tasks associated with a specific user. This rule allows individual document access and collection listing.
-     * @path /users/{userId}/tasks/{taskId}
+     * @description Manages tasks for a user. Allows R/W on individual docs and list on the collection.
+     * @path /users/{userId}/tasks
      */
     match /users/{userId}/tasks/{taskId} {
-      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
-    }
-    match /users/{userId}/tasks {
-      allow list: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
+      allow list, read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
     
     /**
@@ -142,8 +121,6 @@ service cloud.firestore {
     /**
      * @description Manages atomic facts (infotopes) for a user.
      * @path /users/{userId}/infotopes/{infotopeId}
-     * @allow (read, write) Authenticated user can manage infotopes under their own user id.
-     * @principle Enforces path-based user ownership.
      */
     match /users/{userId}/infotopes/{infotopeId} {
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
@@ -152,29 +129,17 @@ service cloud.firestore {
     /**
      * @description Manages Gmail integrations for a user.
      * @path /users/{userId}/gmailIntegrations/{gmailIntegrationId}
-     * @allow (create) Authenticated user can create a Gmail integration under their user id.
-     * @allow (get) Authenticated user can read a Gmail integration under their user id.
-     * @allow (update) Authenticated user can update a Gmail integration under their user id.
-     * @allow (delete) Authenticated user can delete a Gmail integration under their user id.
-     * @deny (create) If the user id in the path does not match the authenticated user's id.
-     * @deny (get) If the user id in the path does not match the authenticated user's id.
-     * @deny (update) If the user id in the path does not match the authenticated user's id.
-     * @deny (delete) If the user id in the path does not match the authenticated user's id.
-     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/gmailIntegrations/{gmailIntegrationId} {
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
-     * @description Audit logs are immutable and can only be created by authenticated users. Collection can be listed.
+     * @description Audit logs can be listed and read by any signed-in user, but are immutable (only creatable).
      */
      match /audit_logs/{logId} {
-        allow read, create: if isSignedIn() || isFirebaseAdmin();
+        allow create, read, list: if isSignedIn() || isFirebaseAdmin();
         allow update, delete: if false;
-     }
-     match /audit_logs {
-        allow list: if isSignedIn() || isFirebaseAdmin();
      }
 
      /**
@@ -230,3 +195,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
