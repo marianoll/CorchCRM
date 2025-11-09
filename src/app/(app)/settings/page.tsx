@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -213,8 +214,8 @@ export default function SettingsPage() {
     try {
       const { url } = await getGmailAuthUrl();
       if (url) {
-        // Redirect the user to the Google consent screen
-        window.location.href = url;
+        // Open the Google consent screen in a new window/tab
+        window.open(url, '_blank', 'noopener,noreferrer,width=500,height=600');
       } else {
         throw new Error('Could not get authentication URL.');
       }
@@ -224,7 +225,10 @@ export default function SettingsPage() {
         title: 'Connection Failed',
         description: error.message || 'Could not initiate connection with Google.'
       });
-      setIsConnecting(false);
+    } finally {
+        // Since we are opening a new window, we may not know when it closes.
+        // It's better to reset the connecting state after a short delay
+        setTimeout(() => setIsConnecting(false), 3000);
     }
   };
 
