@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import { PlusCircle, Pencil, Database } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
@@ -82,13 +82,10 @@ type Email = {
 type CrmEntity = Company | Contact | Deal;
 
 
-const stageVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
-  prospect: 'secondary',
-  discovery: 'secondary',
-  proposal: 'default',
-  negotiation: 'default',
-  won: 'default',
-  lost: 'destructive',
+type Stage = { name: string; color: string; };
+
+type Settings = {
+    pipelineStages: Stage[];
 };
 
 const formatCurrency = (amount: number, currency: string = 'USD') => {
@@ -137,6 +134,30 @@ export default function CrmPage() {
 
     const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails')) : null, [firestore, user]);
     const { data: emails } = useCollection<Email>(emailsQuery);
+
+    const settingsRef = useMemoFirebase(() => 
+        firestore && user ? doc(firestore, 'users', user.uid, 'settings', 'user') : null
+    , [firestore, user]);
+    const { data: settings, isLoading: isLoadingSettings } = useDoc<Settings>(settingsRef);
+
+    const stageColorMap = useMemo(() => {
+        if (!settings?.pipelineStages) return {};
+        return settings.pipelineStages.reduce((acc, stage) => {
+            acc[stage.name] = stage.color;
+            return acc;
+        }, {} as Record<string, string>);
+    }, [settings]);
+
+    const getStageBadge = (stageName: string) => {
+        const colorClass = stageColorMap[stageName] || 'bg-gray-400';
+        // We use a Badge here but with custom styling to apply the dynamic color,
+        // as Badge variants are pre-defined in CSS.
+        return (
+            <span className={`px-2.5 py-0.5 text-xs font-semibold text-white rounded-full ${colorClass}`}>
+                {stageName}
+            </span>
+        );
+    };
 
 
     const getContactName = (contactId: string) => {
@@ -337,7 +358,7 @@ export default function CrmPage() {
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {dealsLoading && <TableRow><TableCell colSpan={8}>Loading...</TableCell></TableRow>}
+                    {(dealsLoading || isLoadingSettings) && <TableRow><TableCell colSpan={8}>Loading...</TableCell></TableRow>}
                     {deals?.map(deal => {
                         const company = getCompany(deal.company_id || deal.companyId);
                         return (
@@ -355,7 +376,7 @@ export default function CrmPage() {
                             </TableCell>
                             <TableCell>{formatCurrency(deal.amount, deal.currency)}</TableCell>
                             <TableCell>
-                                <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
+                                {getStageBadge(deal.stage)}
                             </TableCell>
                             <TableCell>{deal.probability ? `${deal.probability}%` : 'N/A'}</TableCell>
                             <TableCell>{deal.close_date ? format(toDate(deal.close_date), 'MMM dd, yyyy') : 'N/A'}</TableCell>
