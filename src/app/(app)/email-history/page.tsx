@@ -721,7 +721,7 @@ export default function EmailHistoryPage() {
             </div>
         </div>
         
-        <div className="my-4 space-y-4 p-4 border rounded-lg bg-muted/30">
+        <div className="my-4 space-y-2 p-4 border rounded-lg bg-muted/30">
             <div className="flex flex-col items-start space-y-2">
                 <div className="flex items-center space-x-2">
                     <Switch id="approve-replies-switch" checked={isApproveRepliesOn} onCheckedChange={setIsApproveRepliesOn} />
@@ -809,7 +809,7 @@ export default function EmailHistoryPage() {
                             </Select>
                         </TableHead>
                         <TableHead>Deal</TableHead>
-                        <TableHead className="w-[35%]">AI Summary</TableHead>
+                        <TableHead className="w-[30%]">AI Summary</TableHead>
                         <TableHead>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -827,12 +827,14 @@ export default function EmailHistoryPage() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>Reply</TableHead>
+                        <TableHead>Analyze</TableHead>
+                        <TableHead>Meeting</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {(emailsLoading || crmDataLoading) && <TableRow><TableCell colSpan={8} className="text-center">Loading emails...</TableCell></TableRow>}
-                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={8} className="text-center">No emails found.</TableCell></TableRow>}
+                    {(emailsLoading || crmDataLoading) && <TableRow><TableCell colSpan={10} className="text-center">Loading emails...</TableCell></TableRow>}
+                    {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={10} className="text-center">No emails found.</TableCell></TableRow>}
                     {filteredEmails.map((email) => {
                         const company = getCompanyName(email.company_id);
                         const deal = getDeal(email.deal_id);
@@ -941,35 +943,37 @@ export default function EmailHistoryPage() {
                                 {email.labels && <div className="flex flex-wrap">{renderLabels(email.labels)}</div>}
                             </TableCell>
                             <TableCell>
-                                <div className="flex items-center gap-1">
-                                     <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)} disabled={isProcessingRow}>
-                                                <MailPlus className={cn("h-4 w-4", getIconClass('reply'))} />
-                                                <span className="sr-only">Generate Reply</span>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Generate Reply</p></TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)} disabled={isProcessingRow}>
-                                                <TrendingUp className={cn("h-4 w-4", getIconClass('analyze'))} />
-                                                <span className="sr-only">Analyze Stage</span>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Analyze Stage</p></TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow}>
-                                                <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
-                                                <span className="sr-only">Schedule Meeting</span>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Schedule Meeting</p></TooltipContent>
-                                    </Tooltip>
-                                </div>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)} disabled={isProcessingRow}>
+                                            <MailPlus className={cn("h-4 w-4", getIconClass('reply'))} />
+                                            <span className="sr-only">Generate Reply</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Generate Reply</p></TooltipContent>
+                                </Tooltip>
+                            </TableCell>
+                            <TableCell>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)} disabled={isProcessingRow}>
+                                            <TrendingUp className={cn("h-4 w-4", getIconClass('analyze'))} />
+                                            <span className="sr-only">Analyze Stage</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Analyze Stage</p></TooltipContent>
+                                </Tooltip>
+                            </TableCell>
+                            <TableCell>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow}>
+                                            <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
+                                            <span className="sr-only">Schedule Meeting</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Schedule Meeting</p></TooltipContent>
+                                </Tooltip>
                             </TableCell>
                         </TableRow>
                     )})}
