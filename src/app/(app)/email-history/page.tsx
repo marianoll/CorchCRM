@@ -8,7 +8,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, addDays } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp, Bot } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp, Bot, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -38,7 +38,7 @@ import { OrchestratorSuggestionDialog } from '@/components/orchestrator-suggesti
 import { orchestrateInteraction, type OrchestratorOutput, type Interaction, type Action } from '@/ai/flows/orchestrator-flow';
 import { EmailReplyDialog } from '@/components/email-reply-dialog';
 import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
-
+import { analyzeEmailContent, type AnalysisOutput } from '@/ai/flows/analyze-email-flow';
 
 type ActionStatus = 'approved' | 'rejected' | 'pending' | null;
 type ActionType = 'reply' | 'analyze' | 'meeting' | 'task';
@@ -86,6 +86,11 @@ export default function EmailHistoryPage() {
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
     const [isSummarizingAll, setIsSummarizingAll] = useState(false);
     const [processingActionsId, setProcessingActionsId] = useState<string | null>(null);
+
+    // Bulk actions loading state
+    const [isApprovingReplies, setIsApprovingReplies] = useState(false);
+    const [isUpgradingDeals, setIsUpgradingDeals] = useState(false);
+    const [isApprovingMeetings, setIsApprovingMeetings] = useState(false);
 
     // Filters state
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -577,6 +582,108 @@ export default function EmailHistoryPage() {
         return keywords.some(keyword => text.toLowerCase().includes(keyword));
     };
 
+    const handleApproveAllReplies = async () => {
+        if (!user || !db || filteredEmails.length === 0) return;
+        setIsApprovingReplies(true);
+        toast({ title: "Approving all replies..." });
+
+        const batch = writeBatch(db);
+        for (const email of filteredEmails) {
+            setActionState(email.id, 'reply', 'approved');
+            const draftRef = doc(collection(db, 'users', user.uid, 'ai_drafts'));
+            const isReplying = email.direction === 'inbound';
+            const subjectPrefix = email.subject.toLowerCase().startsWith('re:') ? '' : 'Re: ';
+            const draftData = {
+                id: draftRef.id,
+                source_type: 'email_reply', related_id: email.id,
+                to: isReplying ? email.from_email : email.to_email,
+                from: user.email, subject: isReplying ? `${subjectPrefix}${email.subject}` : `Following up on: ${email.subject}`,
+                scheduled_at: (isReplying ? addDays(new Date(), 1) : addDays(new Date(), 5)).toISOString(),
+                body: `Auto-generated reply for: ${email.subject}`,
+                status: 'draft', createdAt: new Date().toISOString(), userId: user.uid,
+            };
+            batch.set(draftRef, draftData);
+
+            const logRef = doc(collection(db, 'audit_logs'));
+            batch.set(logRef, { ts: new Date().toISOString(), actor_type: 'user', actor_id: user.uid, action: 'create_ai_draft', entity_type: 'ai_drafts', entity_id: draftRef.id, table: 'ai_drafts', source: 'ui-bulk-approval', after_snapshot: draftData });
+        }
+
+        try {
+            await batch.commit();
+            toast({ title: "All replies approved!", description: `${filteredEmails.length} reply drafts have been created.` });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "Could not approve all replies." });
+        } finally {
+            setIsApprovingReplies(false);
+        }
+    };
+
+    const handleUpgradeHighConfidenceDeals = async () => {
+        if (!user || !db || filteredEmails.length === 0) return;
+        setIsUpgradingDeals(true);
+        toast({ title: "Upgrading high-confidence deals..." });
+
+        const batch = writeBatch(db);
+        let updatedCount = 0;
+
+        for (const email of filteredEmails) {
+            const deal = getDeal(email.deal_id);
+            if (deal) {
+                const analysisResult = await analyzeEmailContent({ emailBody: email.body_excerpt, emailSubject: email.subject, currentDeal: deal });
+                if (analysisResult.stageSuggestion && analysisResult.stageSuggestion.probability > 0.75) {
+                    updatedCount++;
+                    setActionState(email.id, 'analyze', 'approved');
+                    const dealRef = doc(db, 'users', user.uid, 'deals', deal.id);
+                    const changes = { stage: analysisResult.stageSuggestion.newStage };
+                    batch.update(dealRef, changes);
+
+                    const logRef = doc(collection(db, 'audit_logs'));
+                    batch.set(logRef, { ts: new Date().toISOString(), actor_type: 'system_ai', actor_id: user.uid, action: 'update', entity_type: 'deals', entity_id: deal.id, table: 'deals', source: 'ui-bulk-approval', before_snapshot: { stage: deal.stage }, after_snapshot: changes });
+                }
+            }
+        }
+        
+        try {
+            await batch.commit();
+            toast({ title: "Deals updated!", description: `${updatedCount} deals were upgraded based on high-confidence suggestions.` });
+        } catch (error) {
+             toast({ variant: "destructive", title: "Error", description: "Could not upgrade deals." });
+        } finally {
+            setIsUpgradingDeals(false);
+        }
+    };
+
+    const handleApproveAllMeetings = async () => {
+        if (!user || !db) return;
+        
+        const emailsForMeeting = filteredEmails.filter(email => email.direction === 'inbound' && checkKeywords(email.body_excerpt, ['meeting', 'talk', 'chat', 'schedule']));
+        if(emailsForMeeting.length === 0) {
+            toast({title: "No meeting suggestions found."});
+            return;
+        }
+
+        setIsApprovingMeetings(true);
+        toast({ title: "Approving all meetings..." });
+
+        const batch = writeBatch(db);
+        emailsForMeeting.forEach(email => {
+            setActionState(email.id, 'meeting', 'approved');
+            const meetingDate = addDays(new Date(), 3);
+            const meetingLogRef = doc(collection(db, 'audit_logs'));
+            const meetingData = { title: `Meeting re: ${email.subject}`, proposed_time: meetingDate.toISOString(), participants: [email.from_email, email.to_email], deal_id: email.deal_id };
+            batch.set(meetingLogRef, { ts: new Date().toISOString(), actor_type: 'user', actor_id: user.uid, action: 'create_meeting', entity_type: 'meetings', entity_id: `meeting_${email.id}`, table: 'meetings', source: 'ui-bulk-approval', after_snapshot: meetingData });
+        });
+
+        try {
+            await batch.commit();
+            toast({ title: "All meetings approved!", description: `${emailsForMeeting.length} meetings have been logged.` });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "Could not approve all meetings." });
+        } finally {
+            setIsApprovingMeetings(false);
+        }
+    };
+
 
   return (
     <TooltipProvider>
@@ -684,6 +791,21 @@ export default function EmailHistoryPage() {
                     </Button>
                 )}
             </div>
+        </div>
+
+        <div className="my-4 flex flex-wrap gap-2">
+            <Button onClick={handleApproveAllReplies} disabled={isApprovingReplies}>
+                {isApprovingReplies ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <MailPlus className="mr-2 h-4 w-4" />}
+                Approve All Replies
+            </Button>
+            <Button onClick={handleUpgradeHighConfidenceDeals} disabled={isUpgradingDeals}>
+                {isUpgradingDeals ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <TrendingUp className="mr-2 h-4 w-4" />}
+                Upgrade High-Confidence Deals
+            </Button>
+            <Button onClick={handleApproveAllMeetings} disabled={isApprovingMeetings}>
+                {isApprovingMeetings ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />}
+                Approve All Meetings
+            </Button>
         </div>
 
 
@@ -966,5 +1088,3 @@ export default function EmailHistoryPage() {
     </TooltipProvider>
   );
 }
-
-    
