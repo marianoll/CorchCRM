@@ -54,10 +54,7 @@ const TasksCard = () => {
     const { user } = useUser();
     const [hideCompleted, setHideCompleted] = useState(false);
 
-    const tasksQuery = useMemo(() => user 
-        ? query(collection(db, 'users', user.uid, 'tasks'), orderBy('dueDate', 'asc')) 
-        : null
-    , [user]);
+    const tasksQuery = useMemo(() => null, [user]);
     const { data: tasks, loading } = useCollection<Task>(tasksQuery);
     
     const handleToggleDone = async (task: Task) => {
@@ -83,7 +80,7 @@ const TasksCard = () => {
                 </Button>
             </CardHeader>
             <CardContent>
-                {loading ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
+                {true ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
                     <ScrollArea className="h-64 pr-4">
                         <div className="space-y-4">
                             {visibleTasks.length === 0 && <p className="text-sm text-muted-foreground text-center">No tasks found.</p>}
@@ -116,16 +113,7 @@ const TasksCard = () => {
 // --- Data (Audit) Card ---
 const DataCard = () => {
     const { user } = useUser();
-    const logsQuery = useMemo(() => user 
-        ? query(
-            collection(db, 'audit_logs'), 
-            where('actor_id', '==', user.uid),
-            where('action', 'in', ['update', 'create']),
-            orderBy('ts', 'desc'),
-            where('entity_type', 'in', ['company', 'contact', 'deal']),
-            )
-        : null
-    , [user]);
+    const logsQuery = useMemo(() => null, [user]);
     const { data: logs, loading } = useCollection<AuditLog>(logsQuery);
 
     const getEntityName = (log: AuditLog) => {
@@ -141,7 +129,7 @@ const DataCard = () => {
                 <CardDescription>A log of recent data modifications.</CardDescription>
             </CardHeader>
             <CardContent>
-                 {loading ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
+                 {true ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
                      <ScrollArea className="h-64 pr-4">
                         <div className="space-y-4">
                              {logs?.length === 0 && <p className="text-sm text-muted-foreground text-center">No data changes recorded.</p>}
@@ -162,15 +150,7 @@ const DataCard = () => {
 // --- Meetings Card ---
 const MeetingsCard = () => {
     const { user } = useUser();
-     const meetingsQuery = useMemo(() => user 
-        ? query(
-            collection(db, 'audit_logs'), 
-            where('actor_id', '==', user.uid),
-            where('action', '==', 'create_meeting'),
-            orderBy('ts', 'desc'),
-        )
-        : null
-    , [user]);
+     const meetingsQuery = useMemo(() => null, [user]);
     const { data: meetings, loading } = useCollection<AuditLog>(meetingsQuery);
     
     const upcomingMeetings = useMemo(() => {
@@ -187,7 +167,7 @@ const MeetingsCard = () => {
                 <CardDescription>Your next scheduled appointments.</CardDescription>
             </CardHeader>
             <CardContent>
-                {loading ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
+                {true ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
                      <ScrollArea className="h-64 pr-4">
                         <div className="space-y-4">
                             {upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground text-center">No upcoming meetings.</p>}
@@ -210,13 +190,7 @@ const MeetingsCard = () => {
 // --- Email Activity Card ---
 const EmailActivityCard = () => {
      const { user } = useUser();
-    const emailsQuery = useMemo(() => user 
-        ? query(
-            collection(db, 'users', user.uid, 'emails'),
-            orderBy('ts', 'desc'),
-        )
-        : null
-    , [user]);
+    const emailsQuery = useMemo(() => null, [user]);
     const { data: emails, loading } = useCollection<Email>(emailsQuery);
 
     return (
@@ -226,7 +200,7 @@ const EmailActivityCard = () => {
                 <CardDescription>Summary of recent email interactions.</CardDescription>
             </CardHeader>
             <CardContent>
-                 {loading ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
+                 {true ? <div className="flex justify-center items-center h-24"><LoaderCircle className="animate-spin" /></div> : (
                      <ScrollArea className="h-64 pr-4">
                         <div className="space-y-4">
                              {emails?.length === 0 && <p className="text-sm text-muted-foreground text-center">No email activity found.</p>}
