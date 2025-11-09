@@ -104,10 +104,11 @@ ${user.displayName?.split(' ')[0] || ''}`
         };
         batch.set(draftRef, draftData);
         
-        const logRef = doc(collection(db, 'audit_logs'));
-        batch.set(logRef, {
+        // Log Draft Creation
+        const createLogRef = doc(collection(db, 'audit_logs'));
+        batch.set(createLogRef, {
             ts: new Date().toISOString(),
-            actor_type: 'user', // User is initiating this action directly
+            actor_type: 'user', 
             actor_id: user.uid,
             action: 'create_ai_draft',
             entity_type: 'ai_drafts',
@@ -116,19 +117,38 @@ ${user.displayName?.split(' ')[0] || ''}`
             source: 'ui-reply-generator',
             after_snapshot: draftData
         });
+
+        // Log Simulated Email "Send"
+        const sendLogRef = doc(collection(db, 'audit_logs'));
+        batch.set(sendLogRef, {
+            ts: draft.date.toISOString(),
+            actor_type: 'system_ai', 
+            actor_id: user.uid,
+            action: 'send_email',
+            entity_type: 'emails',
+            entity_id: draftRef.id, // Reference the draft that triggered this
+            table: 'emails',
+            source: 'ui-reply-generator',
+            after_snapshot: {
+                to: draft.to,
+                from: draft.from,
+                subject: draft.subject,
+                body: draft.body,
+            }
+        });
         
         await batch.commit();
 
         toast({
             title: 'Draft Saved!',
-            description: `A draft reply has been saved.`
+            description: `A draft reply has been saved and a send action was logged.`
         });
         
         onOpenChange(false);
 
     } catch (error) {
         const contextualError = new FirestorePermissionError({
-            path: 'ai_drafts',
+            path: 'ai_drafts or audit_logs',
             operation: 'create',
             requestResourceData: draft,
         });

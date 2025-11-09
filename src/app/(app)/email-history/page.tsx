@@ -7,8 +7,8 @@ import { db } from '@/firebase/client';
 import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { format, isWithinInterval } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, Gem, MailPlus } from 'lucide-react';
+import { format, isWithinInterval, addDays } from 'date-fns';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, Gem, MailPlus, CalendarPlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +36,7 @@ import { syncGmail } from '@/ai/flows/sync-gmail-flow';
 import { OrchestratorSuggestionDialog } from '@/components/orchestrator-suggestion-dialog';
 import { orchestrateInteraction, type OrchestratorOutput, type Interaction } from '@/ai/flows/orchestrator-flow';
 import { EmailReplyDialog } from '@/components/email-reply-dialog';
+import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 
 
 type Email = {
@@ -91,6 +92,15 @@ export default function EmailHistoryPage() {
     const [isReplyDialogOpen, setIsReplyDialogOpen] = useState(false);
     const [selectedEmailForReply, setSelectedEmailForReply] = useState<Email | null>(null);
 
+    // Analyze Dialog state
+    const [isAnalyzeDialogOpen, setIsAnalyzeDialogOpen] = useState(false);
+    const [selectedEmailForAnalysis, setSelectedEmailForAnalysis] = useState<Email | null>(null);
+
+    // Meeting Dialog state
+    const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
+    const [selectedEmailForMeeting, setSelectedEmailForMeeting] = useState<Email | null>(null);
+    const [meetingDate, setMeetingDate] = useState<Date | undefined>(undefined);
+
 
     // Data fetching
     const emailsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, [user]);
@@ -112,7 +122,7 @@ export default function EmailHistoryPage() {
         return companies.find(c => c.id === companyId);
     }
     
-    const getDealTitle = (dealId?: string) => {
+    const getDeal = (dealId?: string) => {
         if (!dealId || dealsLoading || !deals) return null;
         return deals.find(d => d.id === dealId);
     }
@@ -367,13 +377,72 @@ export default function EmailHistoryPage() {
         setIsReplyDialogOpen(true);
     };
 
+    const handleAnalyzeEmail = (email: Email) => {
+        setSelectedEmailForAnalysis(email);
+        setIsAnalyzeDialogOpen(true);
+    };
+
+    const handleScheduleMeeting = (email: Email) => {
+        // Simple regex to find dates. In a real app, use a proper library.
+        const dateRegex = /(\d{1,2}(st|nd|rd|th)?\s(of\s)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-zA-Z]*)|(tomorrow)|(next\s(week|monday|tuesday|wednesday|thursday|friday))/i;
+        const match = email.body_excerpt.match(dateRegex);
+        let suggestedDate = addDays(new Date(), 3);
+        if (match && match[0]) {
+            try {
+                // This is a very basic parsing attempt.
+                let parsedDate = new Date(match[0]);
+                if (!isNaN(parsedDate.getTime())) {
+                    suggestedDate = parsedDate;
+                }
+            } catch(e) { /* ignore parsing errors */ }
+        }
+
+        setMeetingDate(suggestedDate);
+        setSelectedEmailForMeeting(email);
+        setIsMeetingDialogOpen(true);
+    };
+
+    const confirmMeeting = async () => {
+        if (!user || !selectedEmailForMeeting || !meetingDate) return;
+        
+        const batch = writeBatch(db);
+        const logRef = doc(collection(db, 'audit_logs'));
+
+        const meetingData = {
+            title: `Meeting about: ${selectedEmailForMeeting.subject}`,
+            proposed_time: meetingDate.toISOString(),
+            participants: [selectedEmailForMeeting.from_email, selectedEmailForMeeting.to_email],
+            deal_id: selectedEmailForMeeting.deal_id
+        };
+
+        batch.set(logRef, {
+            ts: new Date().toISOString(),
+            actor_type: 'user',
+            actor_id: user.uid,
+            action: 'create_meeting',
+            entity_type: 'meetings',
+            entity_id: `meeting_${Date.now()}`,
+            table: 'meetings',
+            source: 'ui-suggestion',
+            after_snapshot: meetingData,
+        });
+
+        try {
+            await batch.commit();
+            toast({ title: 'Meeting Scheduled!', description: `A meeting for ${format(meetingDate, 'PPp')} has been logged.` });
+            setIsMeetingDialogOpen(false);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not log the meeting.' });
+            console.error(error);
+        }
+    };
+
     const processOrchestration = useCallback(async (): Promise<OrchestratorOutput | null> => {
       if (!selectedEmailForOrchestrator || crmDataLoading) {
         toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
         return null;
       }
 
-      // Interaction con direction + timestamp ISO
       const interaction: Interaction = {
         source: 'email',
         subject: selectedEmailForOrchestrator.subject,
@@ -381,13 +450,11 @@ export default function EmailHistoryPage() {
         from: selectedEmailForOrchestrator.from_email,
         to: selectedEmailForOrchestrator.to_email,
         timestamp: toDate(selectedEmailForOrchestrator.ts).toISOString(),
-        // IMPORTANTE: dirección del correo para la lógica inbound/outbound
         direction: selectedEmailForOrchestrator.direction,
       };
 
-      // Contexto enriquecido
-      const company = getCompanyName(selectedEmailForOrchestrator.company_id || undefined);
-      const deal    = getDealTitle(selectedEmailForOrchestrator.deal_id || undefined);
+      const company = getCompanyName(selectedEmailForOrchestrator.company_id);
+      const deal    = getDeal(selectedEmailForOrchestrator.deal_id);
       const contact = contacts?.find(c =>
         c.email_primary === selectedEmailForOrchestrator.from_email ||
         c.email_primary === selectedEmailForOrchestrator.to_email
@@ -414,7 +481,6 @@ export default function EmailHistoryPage() {
           return null;
         }
 
-        // Opcional: feedback rápido si vino vacío (no debería por fallback)
         if (result.actions.length === 0) {
           toast({ title: 'No actions', description: 'No concrete actions were generated.' });
         }
@@ -424,8 +490,12 @@ export default function EmailHistoryPage() {
         toast({ variant: 'destructive', title: 'AI Error', description: err?.message || 'Could not orchestrate this email.' });
         return null;
       }
-    }, [selectedEmailForOrchestrator, contacts, companies, deals, crmDataLoading, toast, getCompanyName, getDealTitle]);
+    }, [selectedEmailForOrchestrator, contacts, companies, deals, crmDataLoading, toast, getCompanyName, getDeal]);
 
+    const checkMeetingKeywords = (text: string) => {
+        const keywords = ['meeting', 'talk', 'chat'];
+        return keywords.some(keyword => text.toLowerCase().includes(keyword));
+    };
 
   return (
     <TooltipProvider>
@@ -556,7 +626,9 @@ export default function EmailHistoryPage() {
                     {!emailsLoading && filteredEmails.length === 0 && <TableRow><TableCell colSpan={8} className="text-center">No emails found.</TableCell></TableRow>}
                     {filteredEmails.map((email) => {
                         const company = getCompanyName(email.company_id);
-                        const deal = getDealTitle(email.deal_id);
+                        const deal = getDeal(email.deal_id);
+                        const showMeetingButton = email.direction === 'inbound' && checkMeetingKeywords(email.body_excerpt);
+
                         return (
                         <TableRow key={email.id}>
                             <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
@@ -631,7 +703,7 @@ export default function EmailHistoryPage() {
                                                     disabled={isSummarizingAll}
                                                     className="h-6 w-6 shrink-0"
                                                 >
-                                                    <RefreshCw className="h-4 w-4" />
+                                                    <Sparkles className="h-4 w-4" />
                                                 </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -668,6 +740,26 @@ export default function EmailHistoryPage() {
                                         </TooltipTrigger>
                                         <TooltipContent><p>Orchestrate</p></TooltipContent>
                                     </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                                <span className="sr-only">Analyze</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Analyze with AI</p></TooltipContent>
+                                    </Tooltip>
+                                    {showMeetingButton && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)}>
+                                                    <CalendarPlus className="h-4 w-4 text-amber-500" />
+                                                    <span className="sr-only">Schedule Meeting</span>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Schedule Meeting</p></TooltipContent>
+                                        </Tooltip>
+                                    )}
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -702,6 +794,45 @@ export default function EmailHistoryPage() {
           email={selectedEmailForReply}
           user={user}
         />
+      )}
+      {selectedEmailForAnalysis && user && deals && (
+        <AnalyzeEmailDialog
+            open={isAnalyzeDialogOpen}
+            onOpenChange={setIsAnalyzeDialogOpen}
+            email={selectedEmailForAnalysis}
+            deal={getDeal(selectedEmailForAnalysis.deal_id)}
+            user={user}
+        />
+      )}
+      {selectedEmailForMeeting && (
+        <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Schedule Meeting</DialogTitle>
+                    <DialogDescription>
+                        Confirm the date to schedule a meeting based on the email about "{selectedEmailForMeeting.subject}".
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label>Meeting Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !meetingDate && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {meetingDate ? format(meetingDate, 'PPP') : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={meetingDate} onSelect={setMeetingDate} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsMeetingDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={confirmMeeting}>Confirm & Log Meeting</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       )}
     </main>
     </TooltipProvider>

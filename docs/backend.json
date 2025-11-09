@@ -282,7 +282,8 @@
             "create",
             "update",
             "delete",
-            "restore"
+            "restore",
+            "send_email"
           ],
           "description": "The action that was performed."
         },
