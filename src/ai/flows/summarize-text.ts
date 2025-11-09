@@ -22,7 +22,7 @@ export type SummarizeTextOutput = z.infer<typeof SummarizeTextOutputSchema>;
 // ---- Prompt ----
 const summarizeTextPrompt = ai.definePrompt({
   name: 'summarizeTextPrompt',
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-2.0-flash-lite'),
   input: { schema: SummarizeTextInputSchema },
   output: { schema: SummarizeTextOutputSchema },
   // Reglas para asegurar una sola línea y sin ruido
