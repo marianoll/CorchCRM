@@ -37,7 +37,7 @@ const OrchestratorSchema = z.object({
     command: z.string().describe("The action to be taken, e.g., 'createContact', 'createDeal', 'createTask', 'updateDeal'."),
     entityType: z.string().optional().describe("The type of entity, e.g., 'Contact', 'Deal', 'Task'."),
     entityName: z.string().optional().describe("The name of the entity to be created or updated."),
-    details: z.string().optional().describe("A JSON string representing a structured object of data for the command, e.g., '{ \"email\": \"jane@acme.com\", \"amount\": 50000 }'."),
+    details: z.string().optional().describe("A JSON string representing a structured object of data for the command, e.g., '{\"email\": \"jane@acme.com\", \"amount\": 50000}'. Must contain all relevant extracted data like emails, titles, company names, etc."),
     sourceText: z.string().optional().describe("The original text snippet that led to this command.")
 });
 
@@ -57,7 +57,7 @@ export type InfoshardTextOutput = z.infer<typeof InfoshardTextOutputSchema>;
 // ---- Prompt ----
 const infoshardTextPrompt = ai.definePrompt({
   name: 'infoshardTextPrompt',
-  model: googleAI.model('gemini-2.0-flash-lite-001'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: InfoshardTextInputSchema },
   output: { schema: InfoshardTextOutputSchema },
   prompt: `You are an expert text analysis and entity resolution AI for a CRM.
@@ -75,10 +75,10 @@ Your task is to deconstruct unstructured text into "infotopes" (atomic, self-con
     *   Extract any instruction, next step, or task from the text.
     *   Format it as a structured command object.
     *   The 'command' should be a camelCase verb like 'createContact', 'createDeal', 'createTask', 'updateDeal'.
-    *   The 'details' should be a JSON STRING containing all extracted data (e.g., "{\\"email\\": \\"jane@acme.com\\", \\"amount\\": 50000}").
+    *   The 'details' field MUST be a JSON STRING containing all extracted data. Differentiate between a person's full name and their email. If a contact works for a company, include the company's name in the contact's details.
+    *   Example: "Let's create a deal for Julian at InovaCorp for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: "{\\"contactName\\": \\"Julian\\", \\"companyName\\": \\"InovaCorp\\", \\"amount\\": 25000}" }.
+    *   Example: "Create a contact for julian.l@example.com, his name is Julian Lopez" becomes { command: "createContact", entityName: "Julian Lopez", details: "{\\"fullName\\": \\"Julian Lopez\\", \\"email\\": \\"julian.l@example.com\\"}" }.
     *   'sourceText' should contain the original snippet that justifies the command.
-    *   Example: "Please review the document" becomes { command: "createTask", details: "{\\"description\\": \\"Review the document\\"}" }.
-    *   Example: "Let's create a deal for Julian for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: "{\\"contactName\\": \\"Julian\\", \\"amount\\": 25000}" }.
 4.  **Link to CRM Entities:**
     *   For each infotope, match the entity mentioned (e.g., "Javier Gomez", "Tech Solutions") with an entity from the provided CRM Context Data.
     *   If a match is found, use the entity's name and its ID.
@@ -133,13 +133,28 @@ const infoshardTextFlow = ai.defineFlow(
 
       if (hasNotFound) {
         // If any entity was not found, defer saving infotopes and set up for retry.
-        const creationCommands = output.orchestrators.filter(cmd => cmd.command.toLowerCase().startsWith('create'));
+        
+        // Define creation priority
+        const creationPriority = {
+            'createCompany': 1,
+            'createContact': 2,
+            'createDeal': 3
+        };
+
+        const creationCommands = output.orchestrators
+            .filter(cmd => cmd.command.toLowerCase().startsWith('create'))
+            .sort((a, b) => {
+                const priorityA = creationPriority[a.command as keyof typeof creationPriority] || 99;
+                const priorityB = creationPriority[b.command as keyof typeof creationPriority] || 99;
+                return priorityA - priorityB;
+            });
+
         const otherCommands = output.orchestrators.filter(cmd => !cmd.command.toLowerCase().startsWith('create'));
         
         return {
             infotopes: [], // Do not save any infotopes yet.
             orchestrators: [
-                ...creationCommands, // Prioritize creation commands.
+                ...creationCommands, // Prioritized creation commands.
                 ...otherCommands,
                 { command: 'retryInfoshard', details: `{ "originalText": "${input.text.replace(/"/g, '\\"')}" }`, sourceText: 'An entity was not found, scheduling a retry.' }
             ]
