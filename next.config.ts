@@ -1,7 +1,3 @@
-/**
- * Run `npm install dotenv` to use this configuration
- */
-require('dotenv').config({ path: './.env.local' });
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
