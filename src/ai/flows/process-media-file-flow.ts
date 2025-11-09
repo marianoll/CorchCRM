@@ -21,7 +21,7 @@ export type ProcessMediaOutput = z.infer<typeof ProcessMediaOutputSchema>;
 
 const processMediaPrompt = ai.definePrompt({
     name: 'processMediaFilePrompt',
-    model: googleAI.model('gemini-2.0-flash-lite'),
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: { schema: ProcessMediaInputSchema },
     prompt: `You are a data extraction specialist. Your task is to extract all relevant text from the provided file.
 - For audio or video, transcribe the speech.
