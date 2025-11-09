@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -62,13 +63,15 @@ const TestCard: React.FC<TestCardProps> = ({ title, description, testId, onRun, 
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                {children}
-                {result && (
-                    <div className="p-4 bg-secondary rounded-md text-sm">
-                        <h4 className="font-semibold mb-2">Raw JSON Output:</h4>
-                        <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(result, null, 2)}</pre>
-                    </div>
-                )}
+                <>
+                    {children}
+                    {result && (
+                        <div className="p-4 bg-secondary rounded-md text-sm">
+                            <h4 className="font-semibold mb-2">Raw JSON Output:</h4>
+                            <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    )}
+                </>
             </CardContent>
             <CardFooter>
                 <Button onClick={handleRun} disabled={isPending}>
