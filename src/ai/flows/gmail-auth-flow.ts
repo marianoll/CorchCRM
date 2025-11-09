@@ -98,7 +98,7 @@ export const processGmailAuthCode = ai.defineFlow(
         throw new Error('Failed to retrieve access or refresh token.');
       }
       
-      const { firestore } = initializeFirebaseServer();
+      const { firestore } = await initializeFirebaseServer();
       if (!firestore) throw new Error("Firestore not available");
 
       // We use the user's email as the ID for the integration document for simplicity

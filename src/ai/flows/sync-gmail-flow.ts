@@ -47,7 +47,7 @@ const syncGmailFlow = ai.defineFlow(
     outputSchema: SyncGmailOutputSchema,
   },
   async ({ userId }) => {
-    const { firestore } = initializeFirebaseServer();
+    const { firestore } = await initializeFirebaseServer();
     if (!firestore) throw new Error("Firestore not initialized.");
 
     // 1. Get the user's Gmail integration credentials from Firestore
