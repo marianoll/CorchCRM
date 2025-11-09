@@ -54,13 +54,16 @@ const infoshardTextFlow = ai.defineFlow(
     outputSchema: InfoshardTextOutputSchema,
   },
   async (input) => {
-    if (!input || !input.text || input.text.trim() === '') {
-        console.log("Infoshard flow received empty or invalid input. Aborting.", { input });
+    // Robust validation to prevent crashes, as requested for debugging.
+    if (!input || typeof input.text !== 'string' || input.text.trim() === '') {
+        console.error("Infoshard flow received invalid input. Aborting.", { input });
+        // Return a valid, empty output to prevent downstream errors.
         return { shard: '' };
     }
 
-    const result = await infoshardTextPrompt(input);
+    const { output } = await infoshardTextPrompt(input);
     
-    return result || { shard: '' };
+    // Ensure we always return an object with the correct shape, even if the model returns null.
+    return output || { shard: '' };
   }
 );
