@@ -8,6 +8,7 @@ import { useCollection } from '@/firebase/firestore/use-collection';
 import { useUser } from '@/firebase/auth/use-user';
 import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
+import { FileToCrmProcessor } from '@/components/file-to-crm-processor';
 
 
 // Define types based on new schema
@@ -61,8 +62,9 @@ export default function HomePage() {
           Home Dashboard
         </h1>
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-2 space-y-6">
                 <InfoshardProcessor crmData={crmData} crmDataLoading={crmDataLoading} />
+                <FileToCrmProcessor crmData={crmData} crmDataLoading={crmDataLoading} />
             </div>
             <div className="space-y-6">
                 <RecentActivity />
