@@ -8,7 +8,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp, getDocs
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, addDays } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp, Bot, CheckCircle } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp, Bot, CheckCircle, Filter, FilterX } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,7 @@ import { orchestrateInteraction, type OrchestratorOutput, type Interaction, type
 import { EmailReplyDialog } from '@/components/email-reply-dialog';
 import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 import { analyzeEmailContent, type AnalysisOutput } from '@/ai/flows/analyze-email-flow';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 
 type ActionStatus = 'approved' | 'rejected' | 'pending' | null;
 type ActionType = 'reply' | 'analyze' | 'meeting' | 'task' | 'create_task' | 'stage_change' | 'data_update' | 'create_meeting';
@@ -103,9 +104,8 @@ export default function EmailHistoryPage() {
     // Filters state
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedCompany, setSelectedCompany] = useState<string>('all');
-    const [labelFilter, setLabelFilter] = useState<string>('');
-    const [keywordFilter, setKeywordFilter] = useState<string>('');
-    const [contactFilter, setContactFilter] = useState<string>('');
+    const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+    const [selectedDirections, setSelectedDirections] = useState<string[]>([]);
     
     // Details Dialog state
     const [detailsEntity, setDetailsEntity] = useState<CrmEntity | null>(null);
@@ -142,6 +142,7 @@ export default function EmailHistoryPage() {
             if (!emails) return;
             const emailsWithActions = await Promise.all(
                 emails.map(async (email) => {
+                    if (email.actions) return email; // Actions already fetched
                     const actionsQuery = query(collection(db, 'users', user.uid, 'emails', email.id, 'actions'));
                     const actionsSnapshot = await getDocs(actionsQuery);
                     const actions = actionsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AIAction));
@@ -362,6 +363,17 @@ export default function EmailHistoryPage() {
         return new Date();
     };
 
+    const allLabels = useMemo(() => {
+        if (!emails) return [];
+        const labelSet = new Set<string>();
+        emails.forEach(email => {
+            if (email.labels) {
+                email.labels.split(';').forEach(label => labelSet.add(label.trim()));
+            }
+        });
+        return Array.from(labelSet);
+    }, [emails]);
+
     const filteredEmails = useMemo(() => {
         if (!emails) return [];
         return emails.filter(email => {
@@ -369,13 +381,15 @@ export default function EmailHistoryPage() {
             
             const isDateMatch = dateRange?.from ? isWithinInterval(emailDate, { start: dateRange.from, end: dateRange.to || dateRange.from }) : true;
             const isCompanyMatch = selectedCompany === 'all' || email.company_id === selectedCompany;
-            const isLabelMatch = labelFilter ? (email.labels || '').toLowerCase().includes(labelFilter.toLowerCase()) : true;
-            const isKeywordMatch = keywordFilter ? (email.subject.toLowerCase().includes(keywordFilter.toLowerCase()) || email.body_excerpt.toLowerCase().includes(keywordFilter.toLowerCase())) : true;
-            const isContactMatch = contactFilter ? (email.from_email.toLowerCase().includes(contactFilter.toLowerCase()) || email.to_email.toLowerCase().includes(contactFilter.toLowerCase())) : true;
             
-            return isDateMatch && isCompanyMatch && isLabelMatch && isKeywordMatch && isContactMatch;
+            const emailLabels = email.labels ? email.labels.split(';').map(l => l.trim()) : [];
+            const isLabelMatch = selectedLabels.length === 0 || selectedLabels.every(sl => emailLabels.includes(sl));
+            
+            const isDirectionMatch = selectedDirections.length === 0 || selectedDirections.includes(email.direction);
+            
+            return isDateMatch && isCompanyMatch && isLabelMatch && isDirectionMatch;
         });
-    }, [emails, dateRange, selectedCompany, labelFilter, keywordFilter, contactFilter]);
+    }, [emails, dateRange, selectedCompany, selectedLabels, selectedDirections]);
 
 
     const renderLabels = (labels: string) => {
@@ -388,10 +402,12 @@ export default function EmailHistoryPage() {
     const clearFilters = () => {
         setDateRange(undefined);
         setSelectedCompany('all');
-        setLabelFilter('');
-        setKeywordFilter('');
-        setContactFilter('');
+        setSelectedLabels([]);
+        setSelectedDirections([]);
     }
+
+    const filtersAreActive = dateRange || selectedCompany !== 'all' || selectedLabels.length > 0 || selectedDirections.length > 0;
+
 
     const handleSummarizeOne = async (emailId: string, text: string) => {
         if (!text) {
@@ -659,84 +675,8 @@ export default function EmailHistoryPage() {
                 </Button>
             </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 items-start gap-4 mb-4 p-4 bg-card border rounded-lg">
-            <h3 className="text-sm font-medium lg:col-span-5">Filters:</h3>
-            <Popover>
-                <PopoverTrigger asChild>
-                <Button
-                    id="date"
-                    variant={"outline"}
-                    className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dateRange && "text-muted-foreground"
-                    )}
-                >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange?.from ? (
-                    dateRange.to ? (
-                        <>
-                        {format(dateRange.from, "LLL dd, y")} -{" "}
-                        {format(dateRange.to, "LLL dd, y")}
-                        </>
-                    ) : (
-                        format(dateRange.from, "LLL dd, y")
-                    )
-                    ) : (
-                    <span>Pick a date range</span>
-                    )}
-                </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                />
-                </PopoverContent>
-            </Popover>
-
-            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Filter by company" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Companies</SelectItem>
-                    {companies?.map(company => (
-                        <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-
-            <Input
-                placeholder="Filter by from/to..."
-                value={contactFilter}
-                onChange={(e) => setContactFilter(e.target.value)}
-            />
-            <Input
-                placeholder="Filter by keyword..."
-                value={keywordFilter}
-                onChange={(e) => setKeywordFilter(e.target.value)}
-            />
-             <Input
-                placeholder="Filter by label..."
-                value={labelFilter}
-                onChange={(e) => setLabelFilter(e.target.value)}
-            />
-           
-            <div className="lg:col-span-5 flex flex-wrap gap-2 items-center">
-                 {(dateRange || selectedCompany !== 'all' || labelFilter || keywordFilter || contactFilter) && (
-                    <Button variant="ghost" onClick={clearFilters}>
-                        Clear Filters
-                    </Button>
-                )}
-            </div>
-        </div>
-
-        <div className="my-4 flex flex-wrap gap-2">
+        
+        <div className="my-4 flex flex-wrap gap-2 items-center">
             <Button onClick={handleApproveAllReplies} disabled={isApprovingReplies}>
                 {isApprovingReplies ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <MailPlus className="mr-2 h-4 w-4" />}
                 Approve All Replies
@@ -749,6 +689,12 @@ export default function EmailHistoryPage() {
                 {isApprovingMeetings ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />}
                 Approve All Meetings
             </Button>
+             {filtersAreActive && (
+                <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
+                    <FilterX className="mr-2 h-4 w-4" />
+                    Clear Filters
+                </Button>
+            )}
         </div>
 
 
@@ -761,13 +707,66 @@ export default function EmailHistoryPage() {
                 <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="w-[180px]">Timestamp</TableHead>
+                        <TableHead className="w-[180px]">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" className="px-2 -ml-2 h-8">
+                                        Timestamp
+                                        <Filter className={cn("h-3 w-3 ml-2", dateRange ? 'text-primary' : 'text-muted-foreground/50')} />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                                </PopoverContent>
+                            </Popover>
+                        </TableHead>
                         <TableHead className="w-[20%]">Subject</TableHead>
-                        <TableHead>From/To</TableHead>
-                        <TableHead>Company</TableHead>
+                         <TableHead>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="px-2 -ml-2 h-8">
+                                        Direction
+                                        <Filter className={cn("h-3 w-3 ml-2", selectedDirections.length > 0 ? 'text-primary' : 'text-muted-foreground/50')} />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                    <DropdownMenuLabel>Filter by Direction</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuCheckboxItem checked={selectedDirections.includes('inbound')} onCheckedChange={(checked) => setSelectedDirections(prev => checked ? [...prev, 'inbound'] : prev.filter(d => d !== 'inbound'))}>Inbound</DropdownMenuCheckboxItem>
+                                    <DropdownMenuCheckboxItem checked={selectedDirections.includes('outbound')} onCheckedChange={(checked) => setSelectedDirections(prev => checked ? [...prev, 'outbound'] : prev.filter(d => d !== 'outbound'))}>Outbound</DropdownMenuCheckboxItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                         </TableHead>
+                        <TableHead>
+                            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                                <SelectTrigger className="border-none bg-transparent hover:bg-muted focus:ring-0 focus:ring-offset-0 px-2 -ml-2 h-8 w-auto">
+                                    <SelectValue placeholder="Company" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Companies</SelectItem>
+                                    {companies?.map(company => ( <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem> ))}
+                                </SelectContent>
+                            </Select>
+                        </TableHead>
                         <TableHead>Deal</TableHead>
                         <TableHead className="w-[35%]">AI Summary</TableHead>
-                        <TableHead>Labels</TableHead>
+                        <TableHead>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="px-2 -ml-2 h-8">
+                                        Labels
+                                        <Filter className={cn("h-3 w-3 ml-2", selectedLabels.length > 0 ? 'text-primary' : 'text-muted-foreground/50')} />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Filter by Label</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {allLabels.map(label => (
+                                        <DropdownMenuCheckboxItem key={label} checked={selectedLabels.includes(label)} onCheckedChange={(checked) => setSelectedLabels(prev => checked ? [...prev, label] : prev.filter(l => l !== label))}>{label}</DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableHead>
                         <TableHead>Actions</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -805,7 +804,7 @@ export default function EmailHistoryPage() {
                                         <DialogHeader>
                                             <DialogTitle>{email.subject}</DialogTitle>
                                             <DialogDescription>
-                                                {email.from_email} to {email.to_email}
+                                                From: {email.from_email} To: {email.to_email}
                                             </DialogDescription>
                                         </DialogHeader>
                                         <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto">
