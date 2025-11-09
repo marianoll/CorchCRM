@@ -8,7 +8,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, addDays } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, Gem, MailPlus, CalendarPlus } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, MailPlus, CalendarPlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -59,6 +59,10 @@ type Contact = { id: string; company_id?: string; full_name: string; email_prima
 type Deal = { id: string; company_id?: string; primary_contact_id: string; title: string; amount: number; stage: string; close_date: Date | Timestamp | string; };
 type CrmEntity = Company | Contact | Deal;
 
+type ActionStatus = 'approved' | 'rejected';
+type ActionType = 'reply' | 'analyze' | 'meeting';
+type ActionStates = Record<string, Partial<Record<ActionType, ActionStatus>>>;
+
 
 const directionVariant: { [key: string]: 'default' | 'secondary' } = {
   inbound: 'default',
@@ -84,6 +88,19 @@ export default function EmailHistoryPage() {
     const [detailsEntity, setDetailsEntity] = useState<CrmEntity | null>(null);
     const [detailsEntityType, setDetailsEntityType] = useState<'Company' | 'Contact' | 'Deal' | null>(null);
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+
+    // Action button states
+    const [actionStates, setActionStates] = useState<ActionStates>({});
+
+    const setActionState = (emailId: string, action: ActionType, status: ActionStatus) => {
+        setActionStates(prev => ({
+            ...prev,
+            [emailId]: {
+                ...prev[emailId],
+                [action]: status
+            }
+        }));
+    };
 
     // Orchestrator Dialog state
     const [isOrchestratorDialogOpen, setIsOrchestratorDialogOpen] = useState(false);
@@ -369,11 +386,6 @@ export default function EmailHistoryPage() {
         toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
     };
 
-    const handleOrchestrate = (email: Email) => {
-        setSelectedEmailForOrchestrator(email);
-        setIsOrchestratorDialogOpen(true);
-    };
-
     const handleGenerateReply = (email: Email) => {
         setSelectedEmailForReply(email);
         setIsReplyDialogOpen(true);
@@ -404,9 +416,17 @@ export default function EmailHistoryPage() {
         setIsMeetingDialogOpen(true);
     };
 
-    const confirmMeeting = async () => {
+    const confirmMeeting = async (status: ActionStatus) => {
         if (!user || !selectedEmailForMeeting || !meetingDate) return;
         
+        setIsMeetingDialogOpen(false);
+        setActionState(selectedEmailForMeeting.id, 'meeting', status);
+
+        if (status === 'rejected') {
+            toast({ title: 'Action Rejected', variant: 'default' });
+            return;
+        }
+
         const [hours, minutes] = meetingTime.split(':').map(Number);
         const finalMeetingDate = new Date(meetingDate);
         finalMeetingDate.setHours(hours, minutes);
@@ -458,7 +478,6 @@ export default function EmailHistoryPage() {
         try {
             await batch.commit();
             toast({ title: 'Meeting Scheduled!', description: `A meeting for ${format(finalMeetingDate, 'PPp')} has been logged.` });
-            setIsMeetingDialogOpen(false);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not log the meeting.' });
             console.error(error);
@@ -656,6 +675,13 @@ export default function EmailHistoryPage() {
                         const company = getCompanyName(email.company_id);
                         const deal = getDeal(email.deal_id);
                         const showMeetingButton = email.direction === 'inbound' && checkMeetingKeywords(email.body_excerpt);
+                        const emailActionStates = actionStates[email.id] || {};
+
+                        const getIconClass = (action: ActionType) => {
+                            if (emailActionStates[action] === 'approved') return 'text-green-500';
+                            if (emailActionStates[action] === 'rejected') return 'text-red-500';
+                            return '';
+                        };
 
                         return (
                         <TableRow key={email.id}>
@@ -753,7 +779,7 @@ export default function EmailHistoryPage() {
                                      <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)}>
-                                                <MailPlus className="h-4 w-4" />
+                                                <MailPlus className={cn("h-4 w-4", getIconClass('reply'))} />
                                                 <span className="sr-only">Generate Reply</span>
                                             </Button>
                                         </TooltipTrigger>
@@ -762,7 +788,7 @@ export default function EmailHistoryPage() {
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)}>
-                                                <RefreshCw className="h-4 w-4" />
+                                                <RefreshCw className={cn("h-4 w-4", getIconClass('analyze'))} />
                                                 <span className="sr-only">Analyze</span>
                                             </Button>
                                         </TooltipTrigger>
@@ -772,7 +798,7 @@ export default function EmailHistoryPage() {
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)}>
-                                                    <CalendarPlus className="h-4 w-4" />
+                                                    <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
                                                     <span className="sr-only">Schedule Meeting</span>
                                                 </Button>
                                             </TooltipTrigger>
@@ -810,6 +836,7 @@ export default function EmailHistoryPage() {
         <EmailReplyDialog
           open={isReplyDialogOpen}
           onOpenChange={setIsReplyDialogOpen}
+          onStatusChange={(status) => setActionState(selectedEmailForReply.id, 'reply', status)}
           email={selectedEmailForReply}
           user={user}
         />
@@ -818,6 +845,7 @@ export default function EmailHistoryPage() {
         <AnalyzeEmailDialog
             open={isAnalyzeDialogOpen}
             onOpenChange={setIsAnalyzeDialogOpen}
+            onStatusChange={(status) => setActionState(selectedEmailForAnalysis.id, 'analyze', status)}
             email={selectedEmailForAnalysis}
             deal={getDeal(selectedEmailForAnalysis.deal_id)}
             user={user}
@@ -861,8 +889,9 @@ export default function EmailHistoryPage() {
                     </div>
                 </div>
                 <DialogFooter>
+                    <Button variant="destructive" onClick={() => confirmMeeting('rejected')}>Reject</Button>
                     <Button variant="outline" onClick={() => setIsMeetingDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={confirmMeeting}>Confirm & Log Meeting</Button>
+                    <Button onClick={() => confirmMeeting('approved')} className="bg-green-600 hover:bg-green-700 text-white">Approve & Log Meeting</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

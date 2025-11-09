@@ -36,9 +36,12 @@ type Deal = {
     amount: number;
 };
 
+type ActionStatus = 'approved' | 'rejected';
+
 interface AnalyzeEmailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onStatusChange: (status: ActionStatus) => void;
   email: Email;
   deal: Deal | null;
   user: User;
@@ -47,6 +50,7 @@ interface AnalyzeEmailDialogProps {
 export function AnalyzeEmailDialog({
   open,
   onOpenChange,
+  onStatusChange,
   email,
   deal,
   user,
@@ -80,6 +84,39 @@ export function AnalyzeEmailDialog({
     }
   }, [open, email, deal, toast, onOpenChange]);
   
+  const handleApproval = async () => {
+    if (!analysisResult?.stageSuggestion && (!analysisResult?.dataUpdates || analysisResult.dataUpdates.length === 0)) {
+        toast({ title: 'No actions to approve' });
+        onOpenChange(false);
+        return;
+    }
+    
+    let approvedSomething = false;
+    // We could batch all approved changes, but for simplicity let's handle one by one
+    if (analysisResult.stageSuggestion) {
+        await handleStageUpdate();
+        approvedSomething = true;
+    }
+    if (analysisResult.dataUpdates) {
+        for (const update of analysisResult.dataUpdates) {
+            await handleDataUpdate(update);
+            approvedSomething = true;
+        }
+    }
+    
+    if (approvedSomething) {
+      onStatusChange('approved');
+    }
+    onOpenChange(false);
+  };
+  
+  const handleRejection = () => {
+    onStatusChange('rejected');
+    onOpenChange(false);
+    toast({ title: 'Suggestions Rejected', variant: 'default' });
+  };
+
+
   const handleStageUpdate = async () => {
     if (!db || !user || !deal || !analysisResult?.stageSuggestion) return;
 
@@ -195,13 +232,6 @@ export function AnalyzeEmailDialog({
                         <Label>Confidence: {Math.round(analysisResult.stageSuggestion.probability * 100)}%</Label>
                         <Progress value={analysisResult.stageSuggestion.probability * 100} />
                     </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button variant="ghost" size="sm" onClick={() => setAnalysisResult(prev => prev ? { ...prev, stageSuggestion: undefined } : null)}>Ignore</Button>
-                        <Button size="sm" onClick={handleStageUpdate} disabled={isSaving}>
-                            {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-2 h-4 w-4" />}
-                            Update Stage
-                        </Button>
-                    </div>
                 </AlertDescription>
             </Alert>
           )}
@@ -219,13 +249,6 @@ export function AnalyzeEmailDialog({
                                 <span>→</span>
                                 <span className="text-sm font-semibold">{String(update.suggestedValue)}</span>
                             </div>
-                             <div className="flex justify-end gap-2 mt-4">
-                                <Button variant="ghost" size="sm" onClick={() => setAnalysisResult(prev => prev ? {...prev, dataUpdates: prev.dataUpdates?.filter(u => u !== update)}: null)}>Ignore</Button>
-                                <Button size="sm" onClick={() => handleDataUpdate(update)} disabled={isSaving}>
-                                    {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-2 h-4 w-4" />}
-                                    Update Data
-                                </Button>
-                            </div>
                         </AlertDescription>
                     </Alert>
                 ))}
@@ -235,8 +258,13 @@ export function AnalyzeEmailDialog({
         </div>
 
         <DialogFooter className="flex justify-end gap-2">
+          <Button variant="destructive" onClick={handleRejection}>Reject</Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
+          </Button>
+          <Button onClick={handleApproval} disabled={isSaving || isLoading || !hasSuggestions} className="bg-green-600 hover:bg-green-700 text-white">
+            {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-2 h-4 w-4" />}
+            Approve All
           </Button>
         </DialogFooter>
       </DialogContent>

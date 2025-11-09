@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { LoaderCircle, Send } from 'lucide-react';
+import { LoaderCircle, Send, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/firebase/client';
 import { collection, writeBatch, doc, Timestamp } from 'firebase/firestore';
@@ -32,9 +32,12 @@ type Email = {
     body_excerpt: string;
 };
 
+type ActionStatus = 'approved' | 'rejected';
+
 interface EmailReplyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onStatusChange: (status: ActionStatus) => void;
   email: Email;
   user: User;
 }
@@ -42,6 +45,7 @@ interface EmailReplyDialogProps {
 export function EmailReplyDialog({
   open,
   onOpenChange,
+  onStatusChange,
   email,
   user,
 }: EmailReplyDialogProps) {
@@ -78,7 +82,15 @@ ${user.displayName?.split(' ')[0] || ''}`
     }
   }, [open, email, user]);
   
-  const handleApproveAndSave = async () => {
+  const handleAction = async (status: ActionStatus) => {
+    onStatusChange(status);
+    onOpenChange(false);
+    
+    if (status === 'rejected') {
+        toast({ title: 'Action Rejected', variant: 'default' });
+        return;
+    }
+
     if (!db || !user) {
         toast({ title: 'Error', description: 'User or database not available.' });
         return;
@@ -140,12 +152,10 @@ ${user.displayName?.split(' ')[0] || ''}`
         await batch.commit();
 
         toast({
-            title: 'Draft Saved!',
+            title: 'Draft Approved!',
             description: `A draft reply has been saved and a send action was logged.`
         });
         
-        onOpenChange(false);
-
     } catch (error) {
         const contextualError = new FirestorePermissionError({
             path: 'ai_drafts or audit_logs',
@@ -199,12 +209,16 @@ ${user.displayName?.split(' ')[0] || ''}`
         </div>
 
         <DialogFooter className="flex justify-end gap-2">
+          <Button variant="destructive" onClick={() => handleAction('rejected')} disabled={isSaving}>
+            <X className="mr-2 h-4 w-4" />
+            Reject
+          </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
-           <Button onClick={handleApproveAndSave} disabled={isSaving}>
-            {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Approve & Save Draft
+           <Button onClick={() => handleAction('approved')} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white">
+            {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+            Approve & Save
           </Button>
         </DialogFooter>
       </DialogContent>
