@@ -7,30 +7,35 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { googleAI } from '@genkit-ai/google-genai';
 
-
+// ---------- Schemas ----------
 const SpeechToTextInputSchema = z.object({
-  audioDataUri: z.string().describe("Audio data encoded as a data URI. Expected format: 'data:audio/webm;base64,...'"),
+  audioDataUri: z
+    .string()
+    .min(1, 'audioDataUri is required')
+    .describe("Audio as Data URI. Example: 'data:audio/webm;base64,...'"),
 });
 export type SpeechToTextInput = z.infer<typeof SpeechToTextInputSchema>;
 
-
 const SpeechToTextOutputSchema = z.object({
-  transcript: z.string().describe('The transcribed text from the audio.'),
+  transcript: z.string().describe('Transcribed text from the audio.'),
 });
 export type SpeechToTextOutput = z.infer<typeof SpeechToTextOutputSchema>;
 
-
+// ---------- Prompt ----------
 const transcribePrompt = ai.definePrompt({
-    name: 'transcribeAudioPrompt',
-    model: googleAI.model('gemini-2.0-flash-lite'),
-    input: { schema: SpeechToTextInputSchema },
-    prompt: `Transcribe the following audio recording. Provide only the text content of the speech, without any additional formatting or labels.
+  name: 'transcribeAudioPrompt',
+  // Model con soporte audio multimodal estable
+  model: googleAI.model('gemini-1.5-flash'),
+  input: { schema: SpeechToTextInputSchema },
+  // Nota: {{media url=...}} acepta data URIs
+  prompt: `You are an accurate speech transcriber. 
+Return only the verbatim transcript text (no labels, no timestamps, no extra words).
 
-Audio: {{media url=audioDataUri}}
-`,
+Audio:
+{{media url=audioDataUri}}`,
 });
 
-
+// ---------- Flow ----------
 const speechToTextFlow = ai.defineFlow(
   {
     name: 'speechToTextFlow',
@@ -38,18 +43,29 @@ const speechToTextFlow = ai.defineFlow(
     outputSchema: SpeechToTextOutputSchema,
   },
   async (input) => {
-    const llmResponse = await transcribePrompt(input);
-    const transcript = llmResponse.text;
-    
-    if (!transcript) {
-        throw new Error('Could not transcribe audio.');
+    // Validación mínima del Data URI para evitar llamadas inútiles
+    if (!input.audioDataUri.startsWith('data:audio/')) {
+      throw new Error(
+        'audioDataUri must be a valid audio data URI (e.g., data:audio/webm;base64,...)'
+      );
     }
-    
+
+    // Llamada al prompt
+    const llmResponse = await transcribePrompt(input);
+
+    const transcript = llmResponse.text ?? '';
+
+    if (!transcript.trim()) {
+      throw new Error('Could not transcribe audio (empty response).');
+    }
+
     return { transcript: transcript.trim() };
   }
 );
 
-
-export async function speechToText(input: SpeechToTextInput): Promise<SpeechToTextOutput> {
+// ---------- Export ----------
+export async function speechToText(
+  input: SpeechToTextInput
+): Promise<SpeechToTextOutput> {
   return speechToTextFlow(input);
 }
