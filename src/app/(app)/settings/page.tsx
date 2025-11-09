@@ -440,8 +440,8 @@ export default function SettingsPage() {
           </Card>
 
           <Card className="border-destructive">
-            <CardContent className="p-6">
-                 <Button variant="destructive" onClick={handleLogout}>
+            <CardContent className="p-6 flex justify-center">
+                <Button variant="destructive" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Log Out
                 </Button>
@@ -452,3 +452,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    
