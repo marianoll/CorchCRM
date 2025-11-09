@@ -105,6 +105,7 @@ function MainNav() {
 
 function UserProfile() {
     const { user, isUserLoading } = useUser();
+    const pathname = usePathname();
     
     if (isUserLoading) {
         return (
@@ -119,31 +120,24 @@ function UserProfile() {
     }
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" className="h-auto w-full justify-start p-2 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:justify-center">
-                    <Avatar className="h-8 w-8">
-                        <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'User'} />
-                        <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
-                        <span className="font-medium">{user?.displayName}</span>
-                        <span className="text-sm text-muted-foreground">{user?.email}</span>
-                    </div>
-                    <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
-                </SidebarMenuButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                 <DropdownMenuItem asChild>
-                    <Link href="/settings">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                    </Link>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <SidebarMenuButton
+          asChild
+          size="lg"
+          className="h-auto w-full justify-start p-2 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:justify-center"
+          isActive={pathname === '/settings'}
+          tooltip="Settings"
+        >
+            <Link href="/settings">
+                <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'User'} />
+                    <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
+                    <span className="font-medium">{user?.displayName}</span>
+                    <span className="text-sm text-muted-foreground">{user?.email}</span>
+                </div>
+            </Link>
+        </SidebarMenuButton>
     )
 }
 
