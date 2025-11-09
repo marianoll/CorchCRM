@@ -14,7 +14,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { LoaderCircle, MessageCircle, Send, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { naturalLanguageSearchFlow, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import ReactMarkdown from 'react-markdown';
 
@@ -28,7 +27,7 @@ type SearchChatbotProps = {
 
 export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }: SearchChatbotProps) {
   const [query, setQuery] = useState('');
-  const [result, setResult] = useState<NaturalLanguageSearchOutput | null>(null);
+  const [result, setResult] = useState<any | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -44,36 +43,11 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
 
     setResult(null);
     startTransition(async () => {
-      try {
-        // Data from `useCollection` now has Dates instead of Timestamps.
-        // We still need to serialize them before sending over the network.
-        const serializableDeals = deals?.map(deal => {
-            const newDeal = { ...deal };
-            for (const key in newDeal) {
-                if (newDeal[key] instanceof Date) {
-                    newDeal[key] = newDeal[key].toISOString();
-                }
-            }
-            return newDeal;
-        });
-
-        const res = await naturalLanguageSearchFlow({ 
-            query,
-            context: {
-                contacts: contacts || [],
-                deals: serializableDeals || [],
-                companies: companies || [],
-            }
-        });
-        setResult(res);
-      } catch (error) {
-        console.error(error);
-        toast({
-          variant: 'destructive',
-          title: 'Search Failed',
-          description: 'There was a problem with your search.',
-        });
-      }
+      toast({
+        variant: 'destructive',
+        title: 'Feature Not Available',
+        description: 'AI search is currently disabled.',
+      });
     });
   };
 

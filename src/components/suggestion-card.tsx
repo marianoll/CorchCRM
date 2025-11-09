@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { type Suggestion } from '@/lib/mock-data';
-import { reviewAiSuggestions } from '@/ai/flows/review-ai-suggestions';
 import { Check, X, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,29 +19,19 @@ export function SuggestionCard({ suggestion }: SuggestionCardProps) {
 
   const handleAction = (approvalStatus: 'approved' | 'rejected') => {
     startTransition(async () => {
-      try {
-        await reviewAiSuggestions({
-          suggestionId: suggestion.id,
-          suggestionType: 'contact', // Simplified for demo
-          suggestedUpdates: suggestion.raw,
-          approvalStatus,
-        });
+      toast({
+        variant: 'destructive',
+        title: 'Feature Not Available',
+        description: 'AI functionality is currently disabled.',
+      });
 
-        toast({
-          title: `Suggestion ${approvalStatus}`,
-          description: `The suggestion has been ${approvalStatus}.`,
-        });
+      // Simulate a delay and then hide the card
+      setTimeout(() => {
+          if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
+              setIsGone(true);
+          }
+      }, 500);
 
-        setIsGone(true);
-
-      } catch (error) {
-        console.error(error);
-        toast({
-          variant: 'destructive',
-          title: 'Action Failed',
-          description: 'Could not process your request.',
-        });
-      }
     });
   };
 

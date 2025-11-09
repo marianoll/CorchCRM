@@ -1,59 +1,64 @@
-'use server';
-/**
- * @fileOverview An AI agent that processes raw text into a structured "infoshard".
- *
- * - infoshardText - The primary function to process text.
- * - InfoshardTextInput - The input type for the function.
- * - InfoshardTextOutput - The return type for the function.
- */
+'use client';
 
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { type Suggestion } from '@/lib/mock-data';
+import { Check, X, LoaderCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const InfoshardTextInputSchema = z.object({
-  text: z.string().describe('The raw text to be processed into an infoshard.'),
-});
-export type InfoshardTextInput = z.infer<typeof InfoshardTextInputSchema>;
+interface SuggestionCardProps {
+  suggestion: Suggestion;
+}
 
-const InfoshardTextOutputSchema = z.object({
-  shard: z.string().describe('A concise, structured, and atomic piece of information derived from the original text.'),
-});
-export type InfoshardTextOutput = z.infer<typeof InfoshardTextOutputSchema>;
+export function SuggestionCard({ suggestion }: SuggestionCardProps) {
+  const [isPending, startTransition] = useTransition();
+  const [isGone, setIsGone] = useState(false);
+  const { toast } = useToast();
 
+  const handleAction = (approvalStatus: 'approved' | 'rejected') => {
+    startTransition(async () => {
+      toast({
+        variant: 'destructive',
+        title: 'Feature Not Available',
+        description: 'AI functionality is currently disabled.',
+      });
 
-const infoshardTextPrompt = ai.definePrompt({
-  name: 'infoshardTextPrompt',
-  input: { schema: InfoshardTextInputSchema },
-  output: { schema: InfoshardTextOutputSchema },
-  system: `You are an expert AI assistant. Your task is to extract a single, dense, and verifiable piece of information from the provided text and format it as a concise "infoshard".
+      // Simulate a delay and then hide the card
+      setTimeout(() => {
+          if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
+              setIsGone(true);
+          }
+      }, 500);
 
-An "infoshard" is an atomic fact. It should be self-contained and clearly state one piece of information.
+    });
+  };
 
-Example:
-Input Text: "Just spoke with Jane from Acme. She needs a proposal for the Q3 project by Friday. Budget is roughly $25k."
-Output Shard: "Acme needs a proposal for the Q3 project by Friday, with an approximate budget of $25k."
-
-Now, process the user's text.`,
-  user: `Text to be processed:\n'''\n{{{text}}}\n'''`,
-});
-
-export const infoshardText = ai.defineFlow(
-  {
-    name: 'infoshardText',
-    inputSchema: InfoshardTextInputSchema,
-    outputSchema: InfoshardTextOutputSchema,
-  },
-  async (input) => {
-    // DEBUGGING: Log the input received by the flow.
-    console.log('Infoshard flow received input:', JSON.stringify(input, null, 2));
-
-    if (!input || typeof input.text !== 'string' || input.text.trim() === '') {
-        console.error("Infoshard flow received invalid or empty input. Aborting.");
-        return { shard: '' };
-    }
-
-    const { output } = await infoshardTextPrompt(input);
-    
-    return output || { shard: '' };
+  if (isGone) {
+    return null;
   }
-);
+
+  return (
+    <Card className={cn("transition-all duration-300", isPending && "opacity-50 pointer-events-none")}>
+      <CardHeader>
+        <CardTitle className="flex justify-between items-center">
+            {suggestion.type}
+        </CardTitle>
+        <CardDescription>Source: {suggestion.source}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm font-mono bg-secondary p-3 rounded-md">{suggestion.details}</p>
+      </CardContent>
+      <CardFooter className="flex justify-end gap-2">
+        <Button variant="outline" onClick={() => handleAction('rejected')} disabled={isPending}>
+          <X className="mr-2 h-4 w-4" /> Reject
+        </Button>
+        <Button onClick={() => handleAction('approved')} disabled={isPending}>
+          {isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+          Approve
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}

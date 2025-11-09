@@ -5,7 +5,6 @@ import { LoaderCircle, Sparkles, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { infoshardText, type InfoshardTextOutput } from '@/ai/flows/infoshard-text';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
@@ -13,7 +12,7 @@ const sampleText = `Just had a great call with Javier Gomez from Tech Solutions.
 
 export function InfoshardProcessor() {
   const [inputText, setInputText] = useState(sampleText);
-  const [result, setResult] = useState<InfoshardTextOutput | null>(null);
+  const [result, setResult] = useState<any | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -30,23 +29,11 @@ export function InfoshardProcessor() {
     setResult(null);
 
     startTransition(async () => {
-      try {
-        const res = await infoshardText({ text: inputText });
-
-        setResult(res);
-        
-        toast({
-          title: 'Infoshard Created',
-          description: 'The text has been processed.',
-        });
-      } catch (error) {
-        console.error(error);
         toast({
           variant: 'destructive',
-          title: 'Error Processing Text',
-          description: 'There was a problem creating the infoshard.',
+          title: 'Feature Not Available',
+          description: 'AI functionality is currently disabled.',
         });
-      }
     });
   };
 

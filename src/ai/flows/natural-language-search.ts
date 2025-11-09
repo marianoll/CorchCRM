@@ -1,57 +1,64 @@
+'use client';
 
-'use server';
+import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { type Suggestion } from '@/lib/mock-data';
+import { Check, X, LoaderCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-/**
- * @fileOverview Natural Language Search flow for CRM data.
- *
- * - naturalLanguageSearchFlow - A function that accepts a natural language query and returns relevant CRM data.
- * - NaturalLanguageSearchInput - The input type for the naturalLanguageSearchFlow function.
- * - NaturalLanguageSearchOutput - The return type for the naturalLanguageSearchFlow function.
- */
+interface SuggestionCardProps {
+  suggestion: Suggestion;
+}
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+export function SuggestionCard({ suggestion }: SuggestionCardProps) {
+  const [isPending, startTransition] = useTransition();
+  const [isGone, setIsGone] = useState(false);
+  const { toast } = useToast();
 
-const NaturalLanguageSearchInputSchema = z.object({
-  query: z.string().describe('The natural language query to search CRM data.'),
-  context: z.object({
-    contacts: z.array(z.any()).optional(),
-    deals: z.array(z.any()).optional(),
-    companies: z.array(z.any()).optional(),
-  }).describe('The CRM data context for the query.'),
-});
-export type NaturalLanguageSearchInput = z.infer<typeof NaturalLanguageSearchInputSchema>;
+  const handleAction = (approvalStatus: 'approved' | 'rejected') => {
+    startTransition(async () => {
+      toast({
+        variant: 'destructive',
+        title: 'Feature Not Available',
+        description: 'AI functionality is currently disabled.',
+      });
 
-const NaturalLanguageSearchOutputSchema = z.object({
-  results: z.string().describe('The answer to the query based on the provided CRM data context.'),
-});
-export type NaturalLanguageSearchOutput = z.infer<typeof NaturalLanguageSearchOutputSchema>;
+      // Simulate a delay and then hide the card
+      setTimeout(() => {
+          if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
+              setIsGone(true);
+          }
+      }, 500);
 
-const prompt = ai.definePrompt({
-  name: 'naturalLanguageSearchPrompt',
-  input: {schema: NaturalLanguageSearchInputSchema},
-  output: {schema: NaturalLanguageSearchOutputSchema},
-  system: `You are an expert CRM assistant. Your task is to answer the user's question based *only* on the data provided in the context.
-Do not make up information. If the answer is not in the data, say that you cannot find the information.
-Format your answer in a clear and concise way. You can use markdown for lists or tables if it helps.
+    });
+  };
 
-Here is the data context you have access to:
-- Contacts: {{{json context.contacts}}}
-- Deals: {{{json context.deals}}}
-- Companies: {{{json context.companies}}}
-`,
-  user: `Question: {{{query}}}`,
-});
-
-export const naturalLanguageSearchFlow = ai.defineFlow(
-  {
-    name: 'naturalLanguageSearchFlow',
-    inputSchema: NaturalLanguageSearchInputSchema,
-    outputSchema: NaturalLanguageSearchOutputSchema,
-  },
-  async input => {
-    const response = await prompt(input);
-    const output = response.output;
-    return output || {results: "I could not process the search request."};
+  if (isGone) {
+    return null;
   }
-);
+
+  return (
+    <Card className={cn("transition-all duration-300", isPending && "opacity-50 pointer-events-none")}>
+      <CardHeader>
+        <CardTitle className="flex justify-between items-center">
+            {suggestion.type}
+        </CardTitle>
+        <CardDescription>Source: {suggestion.source}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm font-mono bg-secondary p-3 rounded-md">{suggestion.details}</p>
+      </CardContent>
+      <CardFooter className="flex justify-end gap-2">
+        <Button variant="outline" onClick={() => handleAction('rejected')} disabled={isPending}>
+          <X className="mr-2 h-4 w-4" /> Reject
+        </Button>
+        <Button onClick={() => handleAction('approved')} disabled={isPending}>
+          {isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+          Approve
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
