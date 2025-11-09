@@ -854,6 +854,10 @@ export default function EmailHistoryPage() {
                             
                             return 'text-muted-foreground';
                         };
+                        
+                        const isActionDecided = (actionType: ActionType) => {
+                            return email.actionStates?.[actionType] === 'approved' || email.actionStates?.[actionType] === 'rejected';
+                        };
 
                         return (
                         <TableRow key={email.id} className={cn(isProcessingRow && "opacity-50")}>
@@ -946,7 +950,7 @@ export default function EmailHistoryPage() {
                             <TableCell>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)} disabled={isProcessingRow}>
+                                        <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)} disabled={isProcessingRow || isActionDecided('reply')}>
                                             <MailPlus className={cn("h-4 w-4", getIconClass('reply'))} />
                                             <span className="sr-only">Generate Reply</span>
                                         </Button>
@@ -957,7 +961,7 @@ export default function EmailHistoryPage() {
                             <TableCell>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)} disabled={isProcessingRow}>
+                                        <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)} disabled={isProcessingRow || isActionDecided('analyze')}>
                                             <TrendingUp className={cn("h-4 w-4", getIconClass('analyze'))} />
                                             <span className="sr-only">Analyze Stage</span>
                                         </Button>
@@ -968,7 +972,7 @@ export default function EmailHistoryPage() {
                             <TableCell>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow}>
+                                        <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow || isActionDecided('meeting')}>
                                             <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
                                             <span className="sr-only">Schedule Meeting</span>
                                         </Button>
