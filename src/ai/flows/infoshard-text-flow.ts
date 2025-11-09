@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview A Genkit flow to process unstructured text into structured "infotopes" and "orchestrator" commands,
- * with entity linking against existing CRM data.
+ * with entity linking against existing CRM data. It includes a "create and retry" mechanism for unfound entities.
  *
  * - infoshardText - A function that calls the Genkit flow.
  * - InfoshardTextInput - The input type for the flow.
@@ -53,9 +53,7 @@ const infoshardTextPrompt = ai.definePrompt({
   input: { schema: InfoshardTextInputSchema },
   output: { schema: InfoshardTextOutputSchema },
   prompt: `You are an expert text analysis and entity resolution AI for a CRM.
-Your task is to extract "infotopes" (atomic, self-contained facts) and link them to specific CRM entities.
-
-You will be given unstructured text and lists of existing CRM entities (Contacts, Companies, Deals).
+Your task is to extract "infotopes" (atomic, self-contained facts) and "orchestrators" (plain-text commands) and link them to specific CRM entities.
 
 **Instructions:**
 
@@ -65,7 +63,9 @@ You will be given unstructured text and lists of existing CRM entities (Contacts
     *   If you find a match, use the entity's name and the first 6 characters of its ID.
     *   If you cannot find a match, use the name mentioned in the text and "Not Found" as the ID.
     *   Infotopes can be similar but belong to different entities. For example, a budget fact might apply to both a Contact and a Deal. Create separate infotopes for each.
-4.  **Generate Orchestrators:** Create plain-text, imperative commands for another AI to execute based on the text. Examples: "Create contact: Javier Gomez (Tech Solutions)", "Update deal 'Cloud Migration' with amount $50,000".
+4.  **Generate Orchestrators:**
+    *   **If an entity is "Not Found"**: Create an orchestrator command to create it. Example: "Create contact: Julian Lopez".
+    *   Generate other relevant commands based on the text. Example: "Update deal 'Cloud Migration' with amount $50,000".
 5.  **Return JSON:** Format your entire output as a single JSON object that strictly matches the output schema.
 
 **CRM Context Data:**
@@ -105,16 +105,36 @@ const infoshardTextFlow = ai.defineFlow(
 
     try {
       const res = await infoshardTextPrompt(input);
-      const output = res.output;
+      let output = res.output;
 
       if (!output) {
         throw new Error('No output from AI model.');
       }
+      
+      const hasNotFound = output.infotopes.some(it => it.entityId === 'Not Found');
 
-      return {
-        infotopes: output.infotopes || [],
-        orchestrators: output.orchestrators || [],
-      };
+      if (hasNotFound) {
+        // If any entity was not found, defer saving infotopes and set up for retry.
+        const creationCommands = output.orchestrators.filter(cmd => cmd.toLowerCase().startsWith('create'));
+        const otherCommands = output.orchestrators.filter(cmd => !cmd.toLowerCase().startsWith('create'));
+        
+        return {
+            infotopes: [], // Do not save any infotopes yet.
+            orchestrators: [
+                ...creationCommands, // Prioritize creation commands.
+                ...otherCommands,
+                `Retry infoshard: ${input.text}` // Add retry command with original text.
+            ]
+        };
+
+      } else {
+         // All entities were found, proceed as normal.
+        return {
+            infotopes: output.infotopes || [],
+            orchestrators: output.orchestrators || [],
+        };
+      }
+      
     } catch (err: any) {
       console.error('[infoshardTextFlow] Error:', err);
       throw new Error(err.message || 'Could not process text.');
