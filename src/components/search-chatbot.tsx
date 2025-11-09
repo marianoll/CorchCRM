@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { LoaderCircle, Gem, Send, Sparkles } from 'lucide-react';
+import { LoaderCircle, Bot, Send, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { naturalLanguageSearch, type NaturalLanguageSearchOutput } from '@/ai/flows/natural-language-search';
 import ReactMarkdown from 'react-markdown';
@@ -108,7 +108,7 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
       <DialogContent className="sm:max-w-2xl flex flex-col h-[70vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Gem />
+            <Bot />
             Natural Language Search
           </DialogTitle>
           <DialogDescription>

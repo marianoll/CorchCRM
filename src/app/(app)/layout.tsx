@@ -31,6 +31,7 @@ import {
   ClipboardCheck,
   Upload,
   LayoutDashboard,
+  Bot,
 } from 'lucide-react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -220,7 +221,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
                         className="rounded-full w-14 h-14 shadow-lg"
                         onClick={() => setIsSearchOpen(true)}
                     >
-                        <Gem className="h-6 w-6" />
+                        <Bot className="h-6 w-6" />
                         <span className="sr-only">Open Search Chat</span>
                     </Button>
                 </div>
