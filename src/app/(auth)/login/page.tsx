@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -32,27 +32,28 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isProcessingRedirect, setIsProcessingRedirect] = useState(true);
 
-
   useEffect(() => {
-    // If user is loaded and exists, redirect to home.
+    // If user is already authenticated (and not loading), redirect to home immediately.
     if (!isUserLoading && user) {
       router.replace('/home');
+      return; // Stop further execution in this effect
     }
-  }, [user, isUserLoading, router]);
 
-   useEffect(() => {
-    if (auth && firestore) {
+    // Only process redirect result if auth is available and we're not already logged in.
+    if (auth && firestore && !user) {
       getRedirectResult(auth)
         .then((result) => {
-          if (result) {
-            // User successfully signed in.
-            const user = result.user;
-            const userRef = doc(firestore, 'users', user.uid);
+          if (result && result.user) {
+            // User successfully signed in via redirect.
+            const loggedInUser = result.user;
+            
+            // Now, we can create the user document.
+            const userRef = doc(firestore, 'users', loggedInUser.uid);
             const userData = {
-                id: user.uid,
-                email: user.email,
-                firstName: user.displayName?.split(' ')[0] || '',
-                lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+                id: loggedInUser.uid,
+                email: loggedInUser.email,
+                firstName: loggedInUser.displayName?.split(' ')[0] || '',
+                lastName: loggedInUser.displayName?.split(' ').slice(1).join(' ') || '',
             };
             
             setDoc(userRef, userData, { merge: true }).catch(async (serverError) => {
@@ -65,8 +66,10 @@ export default function LoginPage() {
             });
 
             toast({ title: "Successfully signed in!" });
-            // The main useEffect will handle the redirect to /home
+            // The redirection to '/home' will be handled by the useUser hook updating and
+            // this effect re-running, which is a more reliable flow.
           }
+          // Whether there was a result or not, we are done processing.
           setIsProcessingRedirect(false);
         })
         .catch((error) => {
@@ -78,11 +81,15 @@ export default function LoginPage() {
           });
           setIsProcessingRedirect(false);
         });
+    } else if (!isUserLoading && !user) {
+        // If there's no user and we're not loading, we're done processing.
+        setIsProcessingRedirect(false);
     }
-   }, [auth, firestore, toast]);
+  }, [auth, firestore, toast, router, user, isUserLoading]);
+
 
   const handleSignIn = async () => {
-    if (!auth || !firestore) {
+    if (!auth) {
         toast({ variant: 'destructive', title: 'Authentication service not available.' });
         return;
     }
@@ -91,8 +98,8 @@ export default function LoginPage() {
     await signInWithRedirect(auth, provider);
   };
 
-  // While loading user, or processing redirect, show a loader
-  if (isUserLoading || user || isProcessingRedirect) {
+  // Show a loader while the user session is loading or the redirect is being processed.
+  if (isUserLoading || isProcessingRedirect) {
     return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
             <LoaderCircle className="h-10 w-10 animate-spin text-primary" />
@@ -100,6 +107,7 @@ export default function LoginPage() {
     );
   }
 
+  // If we are done loading and there's no user, show the login page.
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
