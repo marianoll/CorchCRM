@@ -1,9 +1,7 @@
 
 'use server';
 /**
- * CorchCRM Orchestrator — Genkit Flow
- * - Recibe una interacción (email/voz/reunión) + contexto básico (company/contact/deal)
- * - Devuelve "acciones" estructuradas para ejecutar en el backend (CRUD, tasks, drafts, meetings, logs, notifs)
+ * CorchCRM Orchestrator — Genkit Flow (FIXED)
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,14 +11,14 @@ import { z } from 'zod';
 /* ----------------------------- Tipos de Acciones ----------------------------- */
 
 const ActionType = z.enum([
-  'update_entity',     // actualiza algún doc (deals/contacts/companies/emails)
-  'create_entity',     // crea un doc
-  'create_task',       // inserta en tasks
-  'create_ai_draft',   // genera borrador (correo / texto)
-  'create_meeting',    // crea o reagenda reunión
-  'notify_user',       // notificación en app / email / Slack
-  'log_action',        // registro auditable (history)
-  'suggest'            // sugerencia (no ejecutar sin aprobación)
+  'update_entity',
+  'create_entity',
+  'create_task',
+  'create_ai_draft',
+  'create_meeting',
+  'notify_user',
+  'log_action',
+  'suggest'
 ]);
 
 const TargetType = z.enum([
@@ -31,9 +29,9 @@ const TargetType = z.enum([
 const ActionSchema = z.object({
   type: ActionType,
   target: TargetType,
-  id: z.string().optional(),         // para updates
-  data: z.record(z.any()).optional(), // para creates
-  changes: z.record(z.any()).optional(), // para updates
+  id: z.string().optional(),
+  data: z.record(z.any()).optional(),
+  changes: z.record(z.any()).optional(),
   reason: z.string().optional(),
   confidence: z.number().min(0).max(1).optional()
 });
@@ -42,18 +40,16 @@ export type Action = z.infer<typeof ActionSchema>;
 
 /* ------------------------------- Esquemas I/O ------------------------------- */
 
-// Interacción flexible pero tipada en lo esencial
 const InteractionSchema = z.object({
-  source: z.enum(['email','voice','meeting','note']).describe('Origen de la interacción'),
+  source: z.enum(['email','voice','meeting','note']),
   subject: z.string().optional(),
-  body: z.string().optional(),         // transcript o cuerpo de email
+  body: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
-  timestamp: z.string().optional()     // ISO
+  timestamp: z.string().optional() // ISO
 });
 export type Interaction = z.infer<typeof InteractionSchema>;
 
-// Entidades relacionadas mínimas para contexto
 const RelatedEntitiesSchema = z.object({
   company: z.object({
     id: z.string().optional(),
@@ -80,13 +76,15 @@ const RelatedEntitiesSchema = z.object({
 const OrchestratorInputSchema = z.object({
   interaction: InteractionSchema,
   related_entities: RelatedEntitiesSchema.optional(),
-  // Opcional: reglas del usuario para personalizar (umbral IA, business hours, etc.)
   policy: z.object({
-    auto_apply_threshold: z.number().min(0).max(1).optional(), // p.ej., 0.85
-    always_review_fields: z.array(z.string()).optional(),      // p.ej., ["amount","close_date"]
-    followup_days_by_stage: z.record(z.string(), z.number()).optional(), // {"proposal":3, ...}
+    auto_apply_threshold: z.number().min(0).max(1).optional(),
+    always_review_fields: z.array(z.string()).optional(),
+    // Nota: en Zod basta con valueType si la clave es string
+    followup_days_by_stage: z.record(z.number()).optional(), // {"proposal":3, ...}
     business_hours: z.object({
-      start: z.string().optional(), end: z.string().optional(), days: z.array(z.number()).optional()
+      start: z.string().optional(),
+      end: z.string().optional(),
+      days: z.array(z.number()).optional()
     }).optional()
   }).optional()
 });
@@ -100,17 +98,18 @@ export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 
 /* ---------------------------------- Prompt ---------------------------------- */
 
+// FIX 1: modelo vigente
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.0-flash-lite-001'), // <- reverted model
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
+  // Pasa objetos; Genkit serializa. Evita {{{json ...}}}
   prompt: `
 You are CorchCRM's Orchestrator AI.
-Your job: output ONLY a JSON object with an "actions" array that the backend will execute.
-No prefaces, no commentary outside the JSON.
+Output ONLY a JSON object with an "actions" array. No text outside JSON.
 
-Entities you can act on: companies, contacts, deals, emails, tasks, meetings, notifications, ai_drafts, history.
+Entities: companies, contacts, deals, emails, tasks, meetings, notifications, ai_drafts, history.
 Action types: update_entity, create_entity, create_task, create_ai_draft, create_meeting, notify_user, log_action, suggest.
 
 Rules:
@@ -118,21 +117,19 @@ Rules:
 - Include "confidence" (0..1) for decisions.
 - If unsure, use type "suggest".
 - Log all entity changes with a "log_action".
-- Respect user policy when provided (auto_apply_threshold, always_review_fields, followup_days_by_stage, business_hours).
-- Keep times in ISO UTC if you propose due dates.
-- If you update deals.stage, consider adjusting probability.
+- Respect user policy (auto_apply_threshold, always_review_fields, followup_days_by_stage, business_hours).
+- Times in ISO UTC. If updating deals.stage, consider probability.
 
-Input:
 Interaction:
-{{{json interaction}}}
+{{interaction}}
 
 Related entities:
-{{{json related_entities}}}
+{{related_entities}}
 
 Policy:
-{{{json policy}}}
+{{policy}}
 
-Return JSON that matches the output schema strictly.
+Return JSON matching the output schema strictly.
 `
 });
 
@@ -145,25 +142,27 @@ const orchestrateInteractionFlow = ai.defineFlow(
     outputSchema: OrchestratorOutputSchema
   },
   async (input): Promise<OrchestratorOutput> => {
-    // Sanitiza mínimos
     if (!input?.interaction?.source) {
-      return { actions: [{
-        type: 'log_action',
-        target: 'history',
-        data: {
-          action: 'error',
-          explanation: 'Missing interaction.source'
-        },
-        reason: 'Invalid input',
-        confidence: 0.0
-      }]};
+      return {
+        actions: [{
+          type: 'log_action',
+          target: 'history',
+          data: { action: 'error', explanation: 'Missing interaction.source' },
+          reason: 'Invalid input',
+          confidence: 0
+        }]
+      };
     }
 
     try {
       const res = await orchestratePrompt(input);
-      const out = res.output;
 
-      // Normaliza
+      // FIX 2: Genkit suele exponer output como función
+      const out = typeof (res as any)?.output === 'function'
+        ? (res as any).output()
+        : (res as any)?.output;
+
+      // FIX 3: Normalización defensiva
       const actions = Array.isArray(out?.actions) ? out.actions : [];
       return { actions };
     } catch (err) {
@@ -172,12 +171,9 @@ const orchestrateInteractionFlow = ai.defineFlow(
         actions: [{
           type: 'log_action',
           target: 'history',
-          data: {
-            action: 'error',
-            explanation: 'Model call failed'
-          },
+          data: { action: 'error', explanation: 'Model call failed' },
           reason: 'Model error',
-          confidence: 0.0
+          confidence: 0
         }]
       };
     }
@@ -186,7 +182,6 @@ const orchestrateInteractionFlow = ai.defineFlow(
 
 /* ---------------------------------- Helper ---------------------------------- */
 
-// Función sencilla para usar desde server actions o API routes
 export async function orchestrateInteraction(input: OrchestratorInput): Promise<OrchestratorOutput> {
   return orchestrateInteractionFlow(input);
 }
