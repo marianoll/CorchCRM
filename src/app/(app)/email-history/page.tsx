@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection } from '@/firebase/firestore/hooks';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
@@ -61,23 +63,7 @@ const directionVariant: { [key: string]: 'default' | 'secondary' } = {
   outbound: 'secondary',
 };
 
-const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <path d="M19 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
-        <path d="M5 10h14"/>
-        <path d="M8 10v8"/>
-        <path d="M12 10v8"/>
-        <path d="M16 10v8"/>
-        <path d="M6 6h.01"/>
-        <path d="M10 6h.01"/>
-        <path d="M14 6h.01"/>
-        <path d="M18 6h.01"/>
-    </svg>
-);
-
-
 export default function EmailHistoryPage() {
-    const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
@@ -107,16 +93,16 @@ export default function EmailHistoryPage() {
 
 
     // Data fetching
-    const emailsQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, []);
+    const emailsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'emails'), orderBy('ts', 'desc')) : null, [user]);
     const { data: emails, loading: emailsLoading, setData: setEmails } = useCollection<Email>(emailsQuery);
 
-    const companiesQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'companies')) : null, []);
+    const companiesQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'companies')) : null, [user]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
-    const contactsQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'contacts')) : null, []);
+    const contactsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'contacts')) : null, [user]);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
 
-    const dealsQuery = useMemoFirebase((firestore, user) => user ? query(collection(firestore, 'users', user.uid, 'deals')) : null, []);
+    const dealsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'deals')) : null, [user]);
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const crmDataLoading = companiesLoading || contactsLoading || dealsLoading;
@@ -138,7 +124,7 @@ export default function EmailHistoryPage() {
     };
 
     const handleSyncGmail = async () => {
-        if (!firestore || !user) {
+        if (!db || !user) {
             toast({ variant: 'destructive', title: 'Error', description: 'User not logged in.' });
             return;
         }
@@ -149,9 +135,9 @@ export default function EmailHistoryPage() {
             const result = await syncGmail({ userId: user.uid });
 
             if (result.success && result.emails.length > 0) {
-                const batch = writeBatch(firestore);
+                const batch = writeBatch(db);
                 result.emails.forEach(email => {
-                    const emailRef = doc(collection(firestore, 'users', user.uid, 'emails'));
+                    const emailRef = doc(collection(db, 'users', user.uid, 'emails'));
                     batch.set(emailRef, {
                         ...email,
                         id: emailRef.id,
@@ -181,7 +167,7 @@ export default function EmailHistoryPage() {
 
 
     const handleSeedEmails = async () => {
-        if (!firestore || !user) {
+        if (!db || !user) {
             toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
             return;
         }
@@ -189,7 +175,7 @@ export default function EmailHistoryPage() {
         toast({ title: 'Seeding Emails...', description: 'Please wait while we populate your email history.' });
 
         try {
-            const batch = writeBatch(firestore);
+            const batch = writeBatch(db);
 
             const emailsRes = await fetch('/emails_seed.csv');
             const emailsCsv = await emailsRes.text();
@@ -214,7 +200,7 @@ export default function EmailHistoryPage() {
 
             const emailsData = parseCsv(emailsCsv);
             emailsData.forEach(emailObj => {
-                const emailRef = doc(collection(firestore, 'users', user.uid, 'emails'));
+                const emailRef = doc(collection(db, 'users', user.uid, 'emails'));
                 const emailData: any = { ...emailObj, id: emailRef.id };
                 
                 Object.keys(emailData).forEach(key => {
@@ -290,7 +276,7 @@ export default function EmailHistoryPage() {
             toast({ variant: 'destructive', title: 'No Content', description: 'Email body is empty, cannot summarize.' });
             return;
         }
-        if (!firestore || !user) {
+        if (!db || !user) {
             toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
             return;
         }
@@ -299,7 +285,7 @@ export default function EmailHistoryPage() {
         try {
             const result = await summarizeText({ text });
             
-            const emailRef = doc(firestore, 'users', user.uid, 'emails', emailId);
+            const emailRef = doc(db, 'users', user.uid, 'emails', emailId);
             const summaryData = { ai_summary: result.summary };
 
             setDoc(emailRef, summaryData, { merge: true }).catch(error => {
@@ -332,7 +318,7 @@ export default function EmailHistoryPage() {
             toast({ title: 'All Caught Up!', description: 'No emails need summarizing.' });
             return;
         }
-        if (!firestore || !user) {
+        if (!db || !user) {
             toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
             return;
         }
@@ -346,7 +332,7 @@ export default function EmailHistoryPage() {
             setSummarizingId(email.id); // Show loader for current row
             try {
                 const result = await summarizeText({ text: email.body_excerpt });
-                const emailRef = doc(firestore, 'users', user.uid, 'emails', email.id);
+                const emailRef = doc(db, 'users', user.uid, 'emails', email.id);
                 
                 setDoc(emailRef, { ai_summary: result.summary }, { merge: true }).catch(err => {
                     console.warn(`Permission error summarizing email ${email.id}, skipping.`, err);
@@ -709,7 +695,7 @@ export default function EmailHistoryPage() {
             processFunction={processOrchestration}
         />
       )}
-       {selectedEmailForReply && (
+       {selectedEmailForReply && user && (
         <EmailReplyDialog
           open={isReplyDialogOpen}
           onOpenChange={setIsReplyDialogOpen}

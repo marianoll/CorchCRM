@@ -31,7 +31,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useFirestore, useUser } from '@/firebase';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -76,7 +77,6 @@ type CreateContactFormProps = {
 export function CreateContactForm({ open, onOpenChange, contact, companies }: CreateContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
   const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -123,7 +123,7 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
 
-    if (!firestore || !user) {
+    if (!db || !user) {
         toast({
             variant: 'destructive',
             title: 'Authentication Error',
@@ -133,16 +133,16 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
         return;
     }
     
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(db);
     const full_name = `${values.first_name} ${values.last_name}`;
     const contactData = { ...values, full_name };
 
     try {
         if (isEditing && contact) {
-            const contactRef = doc(firestore, 'users', user.uid, 'contacts', contact.id);
+            const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
             batch.update(contactRef, contactData);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(db, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -156,10 +156,10 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
                 after_snapshot: contactData,
             });
         } else {
-            const contactRef = doc(collection(firestore, 'users', user.uid, 'contacts'));
+            const contactRef = doc(collection(db, 'users', user.uid, 'contacts'));
             batch.set(contactRef, contactData);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(db, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',

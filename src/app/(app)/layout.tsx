@@ -1,8 +1,6 @@
-
-
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -28,27 +26,16 @@ import {
   Inbox,
   Briefcase,
   Settings,
-  ChevronDown,
   Gem,
-  History,
   Mail,
-  MessageCircle,
 } from 'lucide-react';
-import {
-  useUser,
-  useCollection,
-  useMemoFirebase,
-} from '@/firebase';
+import { useUser } from '@/firebase/auth/hooks';
+import { useCollection } from '@/firebase/firestore/hooks';
+import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Skeleton } from '@/components/ui/skeleton';
+import { LoaderCircle } from 'lucide-react';
+import { auth } from '@/firebase/client';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
@@ -119,7 +106,7 @@ function MainNav() {
 }
 
 function UserProfile() {
-    const { user, isUserLoading } = useUser();
+    const { user, loading: isUserLoading } = useUser();
     const pathname = usePathname();
     
     if (isUserLoading) {
@@ -157,7 +144,7 @@ function UserProfile() {
 }
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
-    const { user, isUserLoading } = useUser();
+    const { user, loading: isUserLoading } = useUser();
     const router = useRouter();
 
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -168,13 +155,13 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     type Deal = { id: string; title: string; [key: string]: any; };
 
     // Fetch all CRM data needed for the search context
-    const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts')), []);
+    const contactsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'contacts')) : null, [user]);
     const { data: contacts } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals')), []);
+    const dealsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'deals')) : null, [user]);
     const { data: deals } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies')), []);
+    const companiesQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'companies')) : null, [user]);
     const { data: companies } = useCollection<Company>(companiesQuery);
 
 
@@ -187,7 +174,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     if (isUserLoading || !user) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                <LoaderCircle className="h-10 w-10 animate-spin text-primary" />
             </div>
         );
     }
@@ -223,7 +210,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
                         className="rounded-full w-14 h-14 shadow-lg"
                         onClick={() => setIsSearchOpen(true)}
                     >
-                        <MessageCircle className="h-6 w-6" />
+                        <Gem className="h-6 w-6" />
                         <span className="sr-only">Open Search Chat</span>
                     </Button>
                 </div>

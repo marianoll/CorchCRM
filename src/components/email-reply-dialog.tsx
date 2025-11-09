@@ -13,9 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { LoaderCircle, Check, Send } from 'lucide-react';
+import { LoaderCircle, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore } from '@/firebase';
+import { db } from '@/firebase/client';
 import { collection, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -36,7 +36,7 @@ interface EmailReplyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   email: Email;
-  user: User | null;
+  user: User;
 }
 
 export function EmailReplyDialog({
@@ -48,7 +48,6 @@ export function EmailReplyDialog({
   const [draft, setDraft] = useState({ from: '', to: '', subject: '', body: '', date: new Date() });
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
 
   useEffect(() => {
     if (open && email && user) {
@@ -80,16 +79,16 @@ ${user.displayName?.split(' ')[0] || ''}`
   }, [open, email, user]);
   
   const handleApproveAndSave = async () => {
-    if (!firestore || !user) {
+    if (!db || !user) {
         toast({ title: 'Error', description: 'User or database not available.' });
         return;
     }
     
     setIsSaving(true);
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(db);
 
     try {
-        const draftRef = doc(collection(firestore, 'users', user.uid, 'ai_drafts'));
+        const draftRef = doc(collection(db, 'users', user.uid, 'ai_drafts'));
         const draftData = {
             id: draftRef.id,
             source_type: 'email_reply',
@@ -105,7 +104,7 @@ ${user.displayName?.split(' ')[0] || ''}`
         };
         batch.set(draftRef, draftData);
         
-        const logRef = doc(collection(firestore, 'audit_logs'));
+        const logRef = doc(collection(db, 'audit_logs'));
         batch.set(logRef, {
             ts: new Date().toISOString(),
             actor_type: 'user', // User is initiating this action directly

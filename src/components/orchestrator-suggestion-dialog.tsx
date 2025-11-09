@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,9 +10,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { LoaderCircle, Check, X, Bot, FileText } from 'lucide-react';
+import { LoaderCircle, Check, X, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, writeBatch, doc } from 'firebase/firestore';
 import type { OrchestratorOutput, Action } from '@/ai/flows/orchestrator-flow';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -49,7 +49,6 @@ export function OrchestratorSuggestionDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
   const { user } = useUser();
 
   const fetchData = useCallback(() => {
@@ -80,17 +79,17 @@ export function OrchestratorSuggestionDialog({
   }, [fetchData]);
   
   const handleApprove = async (action: Action) => {
-    if (!firestore || !user) {
+    if (!db || !user) {
         toast({ title: 'Error', description: 'User or database not available.' });
         return;
     }
     
     setIsSaving(true);
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(db);
 
     try {
         if (action.type === 'create_ai_draft') {
-            const draftRef = doc(collection(firestore, 'users', user.uid, 'ai_drafts'));
+            const draftRef = doc(collection(db, 'users', user.uid, 'ai_drafts'));
             batch.set(draftRef, {
                 ...action.data,
                 id: draftRef.id,
@@ -101,7 +100,7 @@ export function OrchestratorSuggestionDialog({
         }
         
         // Always log the action that was approved
-        const logRef = doc(collection(firestore, 'audit_logs'));
+        const logRef = doc(collection(db, 'audit_logs'));
         batch.set(logRef, {
             ts: new Date().toISOString(),
             actor_type: 'system_ai',

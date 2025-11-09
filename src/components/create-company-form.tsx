@@ -24,7 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useFirestore, useUser } from '@/firebase';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -56,7 +57,6 @@ type CreateCompanyFormProps = {
 export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompanyFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
   const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -84,7 +84,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    if (!firestore || !user) {
+    if (!db || !user) {
       toast({
           variant: 'destructive',
           title: 'Connection Error',
@@ -94,7 +94,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
       return;
     }
     
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(db);
     const companyData = {
         ...values,
         website: values.domain ? `https://${values.domain}` : ''
@@ -102,10 +102,10 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
 
     try {
         if (isEditing && company) {
-            const companyRef = doc(firestore, 'users', user.uid, 'companies', company.id);
+            const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
             batch.update(companyRef, companyData);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(db, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -120,10 +120,10 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
             });
             
         } else {
-            const companyRef = doc(collection(firestore, 'users', user.uid, 'companies'));
+            const companyRef = doc(collection(db, 'users', user.uid, 'companies'));
             batch.set(companyRef, companyData);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(db, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',

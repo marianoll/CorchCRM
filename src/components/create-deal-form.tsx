@@ -31,7 +31,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, LoaderCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useFirestore, useUser } from '@/firebase';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
@@ -88,7 +89,6 @@ type CreateDealFormProps = {
 export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }: CreateDealFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
   const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -143,7 +143,7 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
 
-    if (!firestore || !user) {
+    if (!db || !user) {
         toast({
             variant: 'destructive',
             title: 'Authentication Error',
@@ -153,14 +153,14 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
        return;
     }
     
-    const batch = writeBatch(firestore);
+    const batch = writeBatch(db);
 
     try {
         if (isEditing && deal) {
-            const dealRef = doc(firestore, 'users', user.uid, 'deals', deal.id);
+            const dealRef = doc(db, 'users', user.uid, 'deals', deal.id);
             batch.update(dealRef, values);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(db, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',
@@ -174,10 +174,10 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 after_snapshot: values,
             });
         } else {
-            const dealRef = doc(collection(firestore, 'users', user.uid, 'deals'));
+            const dealRef = doc(collection(db, 'users', user.uid, 'deals'));
             batch.set(dealRef, values);
 
-            const logRef = doc(collection(firestore, 'audit_logs'));
+            const logRef = doc(collection(db, 'audit_logs'));
             batch.set(logRef, {
                 ts: new Date().toISOString(),
                 actor_type: 'user',

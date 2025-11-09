@@ -1,11 +1,12 @@
-
-
 'use client';
 
+import { useMemo } from 'react';
 import { InfoshardProcessor } from '@/components/infoshard-processor';
 import { RecentActivity } from '@/components/recent-activity';
 import { UpcomingTasks } from '@/components/upcoming-tasks';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection } from '@/firebase/firestore/hooks';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, query } from 'firebase/firestore';
 
 
@@ -31,15 +32,17 @@ type Deal = {
 };
 
 export default function HomePage() {
-  // Fetch all CRM data needed for the infoshard processor context
-  const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts')), []);
-  const { data: contacts, isLoading: contactsLoading } = useCollection<Contact>(contactsQuery);
-  
-  const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals')), []);
-  const { data: deals, isLoading: dealsLoading } = useCollection<Deal>(dealsQuery);
+  const { user } = useUser();
 
-  const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies')), []);
-  const { data: companies, isLoading: companiesLoading } = useCollection<Company>(companiesQuery);
+  // Fetch all CRM data needed for the infoshard processor context
+  const contactsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'contacts')) : null, [user]);
+  const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
+  
+  const dealsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'deals')) : null, [user]);
+  const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
+
+  const companiesQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'companies')) : null, [user]);
+  const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
 
   const crmData = {

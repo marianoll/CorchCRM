@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useUser } from '@/firebase/auth/hooks';
+import { auth, db } from '@/firebase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
@@ -25,9 +26,7 @@ function GoogleIcon() {
 }
 
 export default function LoginPage() {
-  const auth = useAuth();
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { user, loading: isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
   const [isProcessingLogin, setIsProcessingLogin] = useState(false);
@@ -41,7 +40,7 @@ export default function LoginPage() {
 
 
   const handleSignIn = async () => {
-    if (!auth || !firestore) {
+    if (!auth || !db) {
         toast({ variant: 'destructive', title: 'Authentication service not available.' });
         return;
     }
@@ -53,7 +52,7 @@ export default function LoginPage() {
         const loggedInUser = result.user;
 
         // Create user document in Firestore
-        const userRef = doc(firestore, 'users', loggedInUser.uid);
+        const userRef = doc(db, 'users', loggedInUser.uid);
         const userData = {
             id: loggedInUser.uid,
             email: loggedInUser.email,

@@ -1,13 +1,13 @@
-
-
 'use client';
 
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useMemo } from 'react';
+import { useCollection } from '@/firebase/firestore/hooks';
+import { useUser } from '@/firebase/auth/hooks';
+import { db } from '@/firebase/client';
 import { collection, orderBy, query } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { History } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -33,7 +33,7 @@ type AuditLog = {
     entity_type: string;
     entity_id: string;
     table: string;
-    after_snapshot?: { name?: string };
+    after_snapshot?: { name?: string; title?: string; };
 };
 
 const actorVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
@@ -47,18 +47,23 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
     update: 'secondary',
     delete: 'destructive',
     restore: 'default',
+    create_ai_draft: 'default',
+    create_meeting: 'default',
+    create_task: 'default',
 };
 
 export default function OrquestratorPage() {
-    const logsQuery = useMemoFirebase((firestore, user) => 
-        query(collection(firestore, 'audit_logs'), orderBy('ts', 'desc')) 
-    , []);
+    const { user } = useUser();
 
-    const { data: logs, isLoading: logsLoading } = useCollection<AuditLog>(logsQuery);
+    const logsQuery = useMemo(() => 
+        user ? query(collection(db, 'audit_logs'), orderBy('ts', 'desc')) : null
+    , [user]);
+
+    const { data: logs, loading: logsLoading } = useCollection<AuditLog>(logsQuery);
 
     const getEntityName = (log: AuditLog) => {
-        if (log.after_snapshot && log.after_snapshot.name) {
-            return log.after_snapshot.name;
+        if (log.after_snapshot && (log.after_snapshot.name || log.after_snapshot.title)) {
+            return log.after_snapshot.name || log.after_snapshot.title;
         }
         return log.entity_id;
     }
@@ -96,7 +101,7 @@ export default function OrquestratorPage() {
                         <TableCell>{format(new Date(log.ts), "MMM d, yyyy, h:mm a")}</TableCell>
                         <TableCell>
                             <div className='flex flex-col'>
-                                <span className='font-medium'>{log.action} {log.entity_type}</span>
+                                <span className='font-medium'>{log.action.replace(/_/g, ' ')} {log.entity_type}</span>
                                 <span className='text-xs text-muted-foreground'>{getEntityName(log)}</span>
                             </div>
                         </TableCell>

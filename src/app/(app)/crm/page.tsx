@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -12,8 +10,10 @@ import { PlusCircle, Pencil, Database } from 'lucide-react';
 import { CreateContactForm } from '@/components/create-contact-form';
 import { CreateDealForm } from '@/components/create-deal-form';
 import { CreateCompanyForm } from '@/components/create-company-form';
-import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useDoc } from '@/firebase/firestore/hooks';
+import { useUser } from '@/firebase/auth/hooks';
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
+import { db } from '@/firebase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { format } from 'date-fns';
@@ -105,8 +105,7 @@ const toDate = (dateValue: any): Date => {
 
 
 export default function CrmPage() {
-    const firestore = useFirestore();
-    const { user } = useUser();
+    const { user, loading: userLoading } = useUser();
     const { toast } = useToast();
     const [isCreateContactOpen, setCreateContactOpen] = useState(false);
     const [isCreateDealOpen, setCreateDealOpen] = useState(false);
@@ -123,19 +122,19 @@ export default function CrmPage() {
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
 
-    const contactsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')), []);
-    const { data: contacts, isLoading: contactsLoading } = useCollection<Contact>(contactsQuery);
+    const contactsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [user]);
+    const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
-    const dealsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'deals'), orderBy('title')), []);
-    const { data: deals, isLoading: dealsLoading } = useCollection<Deal>(dealsQuery);
+    const dealsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'deals'), orderBy('title')) : null, [user]);
+    const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
-    const companiesQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')), []);
-    const { data: companies, isLoading: companiesLoading } = useCollection<Company>(companiesQuery);
+    const companiesQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'companies'), orderBy('name')) : null, [user]);
+    const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
-    const emailsQuery = useMemoFirebase((firestore, user) => query(collection(firestore, 'users', user.uid, 'emails')), []);
+    const emailsQuery = useMemo(() => user ? query(collection(db, 'users', user.uid, 'emails')) : null, [user]);
     const { data: emails } = useCollection<Email>(emailsQuery);
 
-    const settingsRef = useMemoFirebase((firestore, user) => doc(firestore, 'users', user.uid, 'settings', 'user'), []);
+    const settingsRef = useMemo(() => user ? doc(db, 'users', user.uid, 'settings', 'user') : null, [user]);
     const { data: settings, isLoading: isLoadingSettings } = useDoc<Settings>(settingsRef);
 
     const stageColorMap = useMemo(() => {
@@ -174,7 +173,7 @@ export default function CrmPage() {
     };
 
     const handleSeedDatabase = async () => {
-        if (!firestore || !user) {
+        if (!db || !user) {
             toast({ variant: 'destructive', title: 'Error', description: 'Firestore or user not available.' });
             return;
         }
@@ -182,7 +181,7 @@ export default function CrmPage() {
         toast({ title: 'Seeding Database...', description: 'Please wait while we populate your CRM.' });
 
         try {
-            const batch = writeBatch(firestore);
+            const batch = writeBatch(db);
 
             const [companiesRes, contactsRes, dealsRes, emailsRes] = await Promise.all([
                 fetch('/companies_seed.csv'),
@@ -219,7 +218,7 @@ export default function CrmPage() {
             const companiesData = parseCsv(companiesCsv);
             companiesData.forEach(companyObj => {
                 if (companyObj.id) {
-                    const companyRef = doc(firestore, 'users', user.uid, 'companies', companyObj.id);
+                    const companyRef = doc(db, 'users', user.uid, 'companies', companyObj.id);
                     batch.set(companyRef, { ...companyObj });
                 }
             });
@@ -227,7 +226,7 @@ export default function CrmPage() {
             const contactsData = parseCsv(contactsCsv);
             contactsData.forEach(contactObj => {
                 if (contactObj.id) {
-                    const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactObj.id);
+                    const contactRef = doc(db, 'users', user.uid, 'contacts', contactObj.id);
                     const contactData: {[key: string]: any} = {};
                     for (const key in contactObj) {
                         if (Object.prototype.hasOwnProperty.call(contactObj, key)) {
@@ -243,7 +242,7 @@ export default function CrmPage() {
             const dealsData = parseCsv(dealsCsv);
             dealsData.forEach(dealObj => {
                 if (dealObj.id) {
-                    const dealRef = doc(firestore, 'users', user.uid, 'deals', dealObj.id);
+                    const dealRef = doc(db, 'users', user.uid, 'deals', dealObj.id);
                     const dealData: any = { ...dealObj };
                     if (dealData.amount) dealData.amount = Number(dealData.amount);
                     if (dealData.probability) dealData.probability = Number(dealData.probability);
@@ -256,7 +255,7 @@ export default function CrmPage() {
             const emailsData = parseCsv(emailsCsv);
             emailsData.forEach(emailObj => {
                 if (emailObj.id) {
-                    const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
+                    const emailRef = doc(db, 'users', user.uid, 'emails', emailObj.id);
                     const emailData: any = { ...emailObj };
                     
                     // Validate and convert timestamp

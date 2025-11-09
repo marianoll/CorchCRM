@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,9 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Plus, Palette, LoaderCircle, LogOut, Link as LinkIcon } from "lucide-react";
+import { X, Plus, LoaderCircle, LogOut, Link as LinkIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useAuth } from '@/firebase';
+import { useDoc } from '@/firebase/firestore/hooks';
+import { useUser } from '@/firebase/auth/hooks';
+import { auth, db } from '@/firebase/client';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -156,17 +156,14 @@ function GmailIcon() {
 }
 
 export default function SettingsPage() {
-  const firestore = useFirestore();
   const { user } = useUser();
-  const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  const settingsRef = useMemoFirebase((firestore, user) => doc(firestore, 'users', user.uid, 'settings', 'user'), []);
-
+  const settingsRef = useMemo(() => user ? doc(db, 'users', user.uid, 'settings', 'user') : null, [user]);
   const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<Settings>(settingsRef);
 
   useEffect(() => {
