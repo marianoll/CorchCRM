@@ -1,10 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { auth } from '@/firebase/client';
 
 export const useUser = () => {
-  const auth = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
 
@@ -19,7 +18,7 @@ export const useUser = () => {
       setIsUserLoading(false);
     });
     return () => unsubscribe();
-  }, [auth]);
+  }, []);
 
   return { user, isUserLoading };
 };
