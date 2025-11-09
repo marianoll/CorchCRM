@@ -75,7 +75,7 @@ export default function HomePage() {
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold tracking-tight mb-6 font-headline">
-          Home Dashboard
+          Unstructured Data Input
         </h1>
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
             <div className="xl:col-span-2 space-y-6">

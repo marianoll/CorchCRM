@@ -37,7 +37,7 @@ import { LoaderCircle } from 'lucide-react';
 import { auth } from '@/firebase/client';
 
 const navItems = [
-  { href: '/home', label: 'Home', icon: Home },
+  { href: '/home', label: 'Unstructured Data Input', icon: Home },
   { href: '/crm', label: 'CRM View', icon: Briefcase },
   { href: '/email-history', label: 'Email History', icon: Mail },
   { href: '/upload-history', label: 'Upload History', icon: Upload },
