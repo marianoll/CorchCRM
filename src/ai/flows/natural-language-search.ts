@@ -54,7 +54,8 @@ const naturalLanguageSearchFlow = ai.defineFlow(
     outputSchema: NaturalLanguageSearchOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const response = await prompt(input);
+    const output = response.output;
     return output || {results: "I could not process the search request."};
   }
 );
