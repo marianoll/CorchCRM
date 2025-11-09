@@ -5,8 +5,8 @@ import { UploadCloud, LoaderCircle, FileText, CheckCircle, XCircle } from 'lucid
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { processMediaFile } from '@/ai/flows/process-media-file-flow';
 import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
+import { speechToText } from '@/ai/flows/speech-to-text-flow';
 
 type CrmData = {
     contacts: { id: string; name: string }[];
@@ -23,8 +23,8 @@ type ProcessingState = 'idle' | 'uploading' | 'extracting' | 'orchestrating' | '
 const stateDescriptions: Record<ProcessingState, string> = {
     idle: 'Awaiting file upload.',
     uploading: 'Reading file...',
-    extracting: 'Extracting text from file...',
-    orchestrating: 'Generating CRM actions...',
+    extracting: 'Transcribing audio to text...',
+    orchestrating: 'Generating CRM actions from text...',
     done: 'Processing complete!',
     error: 'An error occurred.',
 };
@@ -42,12 +42,13 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     setResult(null);
     setError(null);
 
-    const supportedTypes = ['audio/', 'video/', 'application/pdf'];
+    // Broader check for audio/video types
+    const supportedTypes = ['audio/', 'video/'];
     if (!supportedTypes.some(type => file.type.startsWith(type))) {
       toast({
         variant: 'destructive',
         title: 'Unsupported File Type',
-        description: 'Please upload an audio, video, or PDF file.',
+        description: 'Please upload an audio or video file.',
       });
       setProcessingState('idle');
       return;
@@ -56,21 +57,21 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
-      const fileDataUri = reader.result as string;
+      const audioDataUri = reader.result as string;
       
       try {
-        // Step 1: Extract text from the file
+        // Step 1: Transcribe audio to text
         setProcessingState('extracting');
-        const { extractedText } = await processMediaFile({ fileDataUri });
+        const { transcript } = await speechToText({ audioDataUri });
 
-        if (!extractedText) {
+        if (!transcript) {
           throw new Error('AI could not extract any text from the file.');
         }
 
         // Step 2: Orchestrate text to generate CRM actions
         setProcessingState('orchestrating');
         const orchestrationResult = await orchestrateText({
-          text: extractedText,
+          text: transcript,
           contacts: crmData.contacts,
           companies: crmData.companies,
           deals: crmData.deals,
@@ -134,7 +135,7 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
     <Card>
       <CardHeader>
         <CardTitle>File-to-CRM</CardTitle>
-        <CardDescription>Upload an audio, video, or PDF file to automatically extract insights and update your CRM.</CardDescription>
+        <CardDescription>Upload an audio or video file to automatically extract insights and update your CRM.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
@@ -154,14 +155,14 @@ export function FileToCrmProcessor({ crmData, crmDataLoading }: FileToCrmProcess
             </label>
             {' '}or drag and drop a file
           </p>
-          <p className="text-xs text-muted-foreground">Audio, Video, or PDF files</p>
+          <p className="text-xs text-muted-foreground">Audio or Video files</p>
           <input
             id="file-upload"
             type="file"
             className="hidden"
             onChange={handleFileChange}
             disabled={isProcessing}
-            accept="audio/*,video/*,application/pdf"
+            accept="audio/*,video/*"
           />
         </div>
 
