@@ -56,6 +56,21 @@ const navItems = [
   { href: '/crm', label: 'CRM View', icon: Briefcase },
 ];
 
+const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M19 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
+        <path d="M5 10h14"/>
+        <path d="M8 10v8"/>
+        <path d="M12 10v8"/>
+        <path d="M16 10v8"/>
+        <path d="M6 6h.01"/>
+        <path d="M10 6h.01"/>
+        <path d="M14 6h.01"/>
+        <path d="M18 6h.01"/>
+    </svg>
+);
+
+
 function MainNav() {
   const pathname = usePathname();
 
@@ -88,8 +103,8 @@ function MainNav() {
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/changes-history'} className="text-muted-foreground">
-                    <Link href="/changes-history"><History /><span>Changes History</span></Link>
+                <SidebarMenuButton asChild isActive={pathname === '/orquestrator'} className="text-muted-foreground">
+                    <Link href="/orquestrator"><PianoIcon /><span>Orquestrator</span></Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>

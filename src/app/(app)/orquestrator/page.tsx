@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
@@ -7,6 +8,21 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { History } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M19 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
+        <path d="M5 10h14"/>
+        <path d="M8 10v8"/>
+        <path d="M12 10v8"/>
+        <path d="M16 10v8"/>
+        <path d="M6 6h.01"/>
+        <path d="M10 6h.01"/>
+        <path d="M14 6h.01"/>
+        <path d="M18 6h.01"/>
+    </svg>
+);
+
 
 type AuditLog = {
     id: string;
@@ -32,7 +48,7 @@ const actionVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
     restore: 'default',
 };
 
-export default function HistoryPage() {
+export default function OrquestratorPage() {
     const firestore = useFirestore();
 
     const logsQuery = useMemoFirebase(() => 
@@ -55,8 +71,8 @@ export default function HistoryPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
-            <History className="h-7 w-7" />
-            Changes History
+            <PianoIcon className="h-7 w-7" />
+            Orquestrator
           </h1>
           <p className="text-muted-foreground">An immutable audit trail of all changes made to the database.</p>
         </div>
