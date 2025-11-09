@@ -15,8 +15,11 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-// Explicitly load environment variables from .env.local
-require('dotenv').config({ path: './.env.local' });
+// Credentials are hardcoded here to ensure availability in the server environment.
+// In a production environment, these should be managed through secure secrets management.
+const GOOGLE_CLIENT_ID = "77290063661-i90gk0dqgnknmvnqiocvaktfmh3atdjj.apps.googleusercontent.com";
+const GOOGLE_CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"; // Replace with your actual secret
+const OAUTH_REDIRECT_URI = "http://localhost:9002/oauth/callback";
 
 
 const GMAIL_SCOPES = [
@@ -41,9 +44,9 @@ export const getGmailAuthUrl = ai.defineFlow(
   async () => {
     // Initialize the OAuth2 client inside the flow to ensure env vars are loaded.
     const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.OAUTH_REDIRECT_URI
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      OAUTH_REDIRECT_URI
     );
 
     const url = oauth2Client.generateAuthUrl({
@@ -83,9 +86,9 @@ export const processGmailAuthCode = ai.defineFlow(
     }
 
     const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.OAUTH_REDIRECT_URI
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      OAUTH_REDIRECT_URI
     );
 
     try {
