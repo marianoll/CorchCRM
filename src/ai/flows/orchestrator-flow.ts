@@ -51,7 +51,7 @@ export type Interaction = z.infer<typeof OrchestratorInputSchema>['interaction']
 
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.5-flash'),
+  model: googleAI.model('gemini-2.0-flash-lite'),
   input:  { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   prompt: `
