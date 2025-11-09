@@ -1,18 +1,19 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { LoaderCircle, Sparkles, Gem } from 'lucide-react';
+import { LoaderCircle, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { infoshardText, type InfoshardTextOutput } from '@/ai/flows/infoshard-text-flow';
 
 const sampleText = `Just had a great call with Javier Gomez from Tech Solutions. He's very interested in our cloud migration package and mentioned their budget is around $50k. He asked for a detailed proposal by end of day Friday.`;
 
 export function InfoshardProcessor() {
   const [inputText, setInputText] = useState(sampleText);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<InfoshardTextOutput | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -29,11 +30,17 @@ export function InfoshardProcessor() {
     setResult(null);
 
     startTransition(async () => {
+      try {
+        const res = await infoshardText({ text: inputText });
+        setResult(res);
+      } catch (error: any) {
+        console.error(error);
         toast({
           variant: 'destructive',
-          title: 'Feature Not Available',
-          description: 'AI functionality is currently disabled.',
+          title: 'Processing Failed',
+          description: error.message || 'There was a problem with the AI.',
         });
+      }
     });
   };
 
@@ -42,7 +49,7 @@ export function InfoshardProcessor() {
     <Card>
       <CardHeader>
         <CardTitle>Infoshard Processor</CardTitle>
-        <CardDescription>Enter any text (notes, email snippets, thoughts) to create a structured Infoshard.</CardDescription>
+        <CardDescription>Enter any text (notes, email snippets, thoughts) to create structured infotopes and orchestrator commands.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Textarea
@@ -52,16 +59,35 @@ export function InfoshardProcessor() {
           rows={8}
           disabled={isPending}
         />
+        {isPending && (
+            <div className="flex items-center justify-center p-8">
+                <LoaderCircle className="mr-2 h-6 w-6 animate-spin" />
+                <span>Processing...</span>
+            </div>
+        )}
         {result && (
-          <Alert>
-            <Sparkles className="h-4 w-4" />
-            <AlertTitle>Generated Infoshard</AlertTitle>
-            <AlertDescription className="space-y-2">
-                <div className='font-mono text-xs bg-slate-100 dark:bg-slate-800 p-3 rounded'>
-                    <pre>{JSON.stringify(result.shard, null, 2)}</pre>
-                </div>
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-4 rounded-lg border bg-secondary/50 p-4">
+            <div>
+              <h4 className="font-semibold text-sm mb-2">Infotopes:</h4>
+              {result.infotopes.length > 0 ? (
+                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                  {result.infotopes.map((item, i) => <li key={`it-${i}`}>{item}</li>)}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No infotopes extracted.</p>
+              )}
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm mb-2">Orchestrate:</h4>
+              {result.orchestrators.length > 0 ? (
+                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                  {result.orchestrators.map((item, i) => <li key={`or-${i}`}>{item}</li>)}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No orchestrator commands generated.</p>
+              )}
+            </div>
+          </div>
         )}
       </CardContent>
       <CardFooter>
