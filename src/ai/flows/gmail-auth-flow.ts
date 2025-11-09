@@ -19,7 +19,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 // In a production environment, these should be managed through secure secrets management.
 const GOOGLE_CLIENT_ID = "77290063661-i90gk0dqgnknmvnqiocvaktfmh3atdjj.apps.googleusercontent.com";
 const GOOGLE_CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"; // Replace with your actual secret
-const OAUTH_REDIRECT_URI = "http://localhost:9002/oauth/callback";
 
 
 const GMAIL_SCOPES = [
@@ -30,6 +29,9 @@ const GMAIL_SCOPES = [
 
 
 // ---- Flow: Get Auth URL ----
+const getAuthUrlInputSchema = z.object({
+  redirectUri: z.string().url(),
+});
 
 const getAuthUrlOutputSchema = z.object({
   url: z.string().url(),
@@ -38,15 +40,15 @@ const getAuthUrlOutputSchema = z.object({
 export const getGmailAuthUrl = ai.defineFlow(
   {
     name: 'getGmailAuthUrl',
-    inputSchema: z.void(),
+    inputSchema: getAuthUrlInputSchema,
     outputSchema: getAuthUrlOutputSchema,
   },
-  async () => {
+  async ({ redirectUri }) => {
     // Initialize the OAuth2 client inside the flow to ensure env vars are loaded.
     const oauth2Client = new google.auth.OAuth2(
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
-      OAUTH_REDIRECT_URI
+      redirectUri
     );
 
     const url = oauth2Client.generateAuthUrl({
@@ -64,6 +66,7 @@ export const getGmailAuthUrl = ai.defineFlow(
 const processAuthCodeInputSchema = z.object({
   code: z.string().describe('The authorization code from Google OAuth redirect.'),
   userId: z.string().describe('The ID of the user to save tokens for.'),
+  redirectUri: z.string().url().describe('The original redirect URI used to get the code.'),
 });
 
 const processAuthCodeOutputSchema = z.object({
@@ -77,7 +80,7 @@ export const processGmailAuthCode = ai.defineFlow(
     inputSchema: processAuthCodeInputSchema,
     outputSchema: processAuthCodeOutputSchema,
   },
-  async ({ code, userId }) => {
+  async ({ code, userId, redirectUri }) => {
     if (!code) {
       return { success: false, message: 'Authorization code is missing.' };
     }
@@ -88,7 +91,7 @@ export const processGmailAuthCode = ai.defineFlow(
     const oauth2Client = new google.auth.OAuth2(
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
-      OAUTH_REDIRECT_URI
+      redirectUri
     );
 
     try {

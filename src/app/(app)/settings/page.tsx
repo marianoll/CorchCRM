@@ -212,7 +212,9 @@ export default function SettingsPage() {
   const handleConnectGmail = async () => {
     setIsConnecting(true);
     try {
-      const { url } = await getGmailAuthUrl();
+      // Dynamically create the redirect URI based on the current window's origin
+      const redirectUri = `${window.location.origin}/oauth/callback`;
+      const { url } = await getGmailAuthUrl({ redirectUri });
       if (url) {
         // Open the Google consent screen in a new window/tab
         window.open(url, '_blank', 'noopener,noreferrer,width=500,height=600');

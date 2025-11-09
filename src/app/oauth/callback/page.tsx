@@ -24,18 +24,30 @@ function AuthCallback() {
         title: 'Authentication Failed',
         description: 'Google authorization was denied or failed.',
       });
-      router.replace('/settings');
+      // Close the popup window
+      if (window.opener) {
+        window.close();
+      } else {
+        router.replace('/settings');
+      }
       return;
     }
 
     if (code && user) {
-      processGmailAuthCode({ code, userId: user.uid })
+      // Get the redirect URI from when the auth process was started
+      const originalRedirectUri = `${window.location.origin}/oauth/callback`;
+      
+      processGmailAuthCode({ code, userId: user.uid, redirectUri: originalRedirectUri })
         .then(result => {
           if (result.success) {
             toast({
               title: 'Success!',
               description: result.message,
             });
+            // You can optionally refresh the opener window if it exists
+            if (window.opener) {
+              window.opener.location.reload();
+            }
           } else {
             throw new Error(result.message);
           }
@@ -48,7 +60,12 @@ function AuthCallback() {
           });
         })
         .finally(() => {
-          router.replace('/settings');
+          // Close the popup window
+          if (window.opener) {
+            window.close();
+          } else {
+            router.replace('/settings');
+          }
         });
     }
 
