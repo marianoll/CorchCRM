@@ -82,6 +82,7 @@ export default function EmailHistoryPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isSeeding, setIsSeeding] = useState(false);
+    const [isSeeded, setIsSeeded] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
     const [isSummarizingAll, setIsSummarizingAll] = useState(false);
@@ -344,6 +345,7 @@ export default function EmailHistoryPage() {
             await batch.commit();
 
             toast({ title: 'Email Database Seeded!', description: 'Your email history has been populated with sample data.' });
+            setIsSeeded(true);
         } catch (error) {
             console.error("Seeding error:", error);
             toast({ variant: 'destructive', title: 'Seeding Failed', description: 'Could not populate the email data. Check console for details.' });
@@ -702,16 +704,8 @@ export default function EmailHistoryPage() {
                     {processingActionsId ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
                     Generate AI Actions
                 </Button>
-                <Button onClick={handleSyncGmail} disabled={isSyncing}>
-                    {isSyncing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <MailPlus className="mr-2 h-4 w-4" />}
-                    Sync Today's Gmail
-                </Button>
-                <Button onClick={handleSummarizeAll} disabled={isSummarizingAll}>
-                    {isSummarizingAll ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Summarize All Missing
-                </Button>
-                <Button onClick={handleSeedEmails} disabled={isSeeding}>
-                    {isSeeding ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                <Button onClick={handleSeedEmails} disabled={isSeeding || isSeeded}>
+                    {isSeeding ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : isSeeded ? <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> : <Database className="mr-2 h-4 w-4" />}
                     Seed Database
                 </Button>
             </div>
