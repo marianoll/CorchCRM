@@ -127,8 +127,10 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/tasks/{taskId} {
-      allow list: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
       allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
+    }
+    match /users/{userId}/tasks {
+      allow list: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
     
     /**
@@ -179,9 +181,11 @@ service cloud.firestore {
      * @path /audit_logs/{logId}
      */
      match /audit_logs/{logId} {
-        allow read: if isSignedIn() || isFirebaseAdmin();
-        allow create: if isSignedIn() || isFirebaseAdmin();
+        allow read, create: if isSignedIn() || isFirebaseAdmin();
         allow update, delete: if false;
+     }
+
+     match /audit_logs {
         allow list: if isSignedIn() || isFirebaseAdmin();
      }
 
