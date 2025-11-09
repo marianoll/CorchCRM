@@ -101,7 +101,7 @@ export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 // FIX 1: modelo vigente
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-2.0-flash-lite'),
   input: { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   // Pasa objetos; Genkit serializa. Evita {{{json ...}}}
