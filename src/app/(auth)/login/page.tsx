@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { LoaderCircle } from 'lucide-react';
 
 function GoogleIcon() {
     return (
@@ -29,6 +30,8 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+  const [isProcessingRedirect, setIsProcessingRedirect] = useState(true);
+
 
   useEffect(() => {
     // If user is loaded and exists, redirect to home.
@@ -37,58 +40,62 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
+   useEffect(() => {
+    if (auth && firestore) {
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result) {
+            // User successfully signed in.
+            const user = result.user;
+            const userRef = doc(firestore, 'users', user.uid);
+            const userData = {
+                id: user.uid,
+                email: user.email,
+                firstName: user.displayName?.split(' ')[0] || '',
+                lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+            };
+            
+            setDoc(userRef, userData, { merge: true }).catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: userRef.path,
+                    operation: 'write',
+                    requestResourceData: userData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+
+            toast({ title: "Successfully signed in!" });
+            // The main useEffect will handle the redirect to /home
+          }
+          setIsProcessingRedirect(false);
+        })
+        .catch((error) => {
+          console.error("Redirect Result Error:", error);
+          toast({
+            variant: 'destructive',
+            title: 'Authentication Failed',
+            description: error.message || 'Could not process sign-in redirect.',
+          });
+          setIsProcessingRedirect(false);
+        });
+    }
+   }, [auth, firestore, toast]);
+
   const handleSignIn = async () => {
     if (!auth || !firestore) {
         toast({ variant: 'destructive', title: 'Authentication service not available.' });
         return;
     }
     const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Create or update user document in Firestore
-      const userRef = doc(firestore, 'users', user.uid);
-      const userData = {
-          id: user.uid,
-          email: user.email,
-          firstName: user.displayName?.split(' ')[0] || '',
-          lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
-      };
-      
-      setDoc(userRef, userData, { merge: true }).catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'write',
-            requestResourceData: userData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
-
-      toast({ title: "Successfully signed in!" });
-    } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
-        toast({
-            variant: 'destructive',
-            title: 'Sign-in cancelled',
-            description: 'You closed the sign-in window. Please try again.',
-        });
-      } else {
-        console.error("Authentication Error:", error);
-        toast({
-            variant: 'destructive',
-            title: 'Authentication Failed',
-            description: error.message || 'Could not sign in with Google. Please try again.',
-        });
-      }
-    }
+    // Use signInWithRedirect instead of signInWithPopup
+    await signInWithRedirect(auth, provider);
   };
 
-  // While loading, or if user is already logged in, show a loader
-  if (isUserLoading || user) {
+  // While loading user, or processing redirect, show a loader
+  if (isUserLoading || user || isProcessingRedirect) {
     return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <LoaderCircle className="h-10 w-10 animate-spin text-primary" />
         </div>
     );
   }
