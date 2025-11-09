@@ -177,7 +177,7 @@ service cloud.firestore {
      * @path /audit_logs/{logId}
      */
      match /audit_logs/{logId} {
-        allow read: if isSignedIn() || isFirebaseAdmin();
+        allow list, read: if isSignedIn() || isFirebaseAdmin();
         allow create: if isSignedIn() || isFirebaseAdmin();
         allow update, delete: if false;
      }
@@ -230,5 +230,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
