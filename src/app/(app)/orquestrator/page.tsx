@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Mail, Calendar, Database } from 'lucide-react';
 
 const PianoIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -33,7 +34,7 @@ type AuditLog = {
     entity_type: string;
     entity_id: string;
     table: string;
-    after_snapshot?: { name?: string; title?: string; };
+    after_snapshot?: any;
 };
 
 const actorVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
@@ -61,6 +62,11 @@ export default function OrquestratorPage() {
     , [user]);
 
     const { data: logs, loading: logsLoading } = useCollection<AuditLog>(logsQuery);
+    
+    const scheduledEmails = useMemo(() => logs?.filter(log => log.action === 'send_email') || [], [logs]);
+    const scheduledMeetings = useMemo(() => logs?.filter(log => log.action === 'create_meeting') || [], [logs]);
+    const generalLogs = useMemo(() => logs?.filter(log => log.action !== 'send_email' && log.action !== 'create_meeting') || [], [logs]);
+
 
     const getEntityName = (log: AuditLog) => {
         if (log.after_snapshot && (log.after_snapshot.name || log.after_snapshot.title)) {
@@ -71,18 +77,84 @@ export default function OrquestratorPage() {
 
   return (
     <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight font-headline flex items-center gap-2">
             <PianoIcon className="h-7 w-7" />
-            Orquestrator
+            Orchestrator
           </h1>
-          <p className="text-muted-foreground">An immutable audit trail of all changes made to the database.</p>
+          <p className="text-muted-foreground">An immutable audit trail of all automated and manual actions.</p>
         </div>
+
+        {/* Scheduled Emails Card */}
         <Card>
             <CardHeader>
-                <CardTitle>Audit Logs</CardTitle>
-                <CardDescription>All create, update, and delete actions are recorded here.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Mail /> Scheduled Emails</CardTitle>
+                <CardDescription>Emails drafted or scheduled by the system or user.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Scheduled At</TableHead>
+                        <TableHead>To</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Actor</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
+                    {!logsLoading && scheduledEmails.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No scheduled emails found.</TableCell></TableRow>}
+                    {scheduledEmails.map((log) => (
+                    <TableRow key={log.id}>
+                        <TableCell>{format(new Date(log.ts), "MMM d, yyyy, h:mm a")}</TableCell>
+                        <TableCell>{log.after_snapshot?.to}</TableCell>
+                        <TableCell className="font-medium">{log.after_snapshot?.subject}</TableCell>
+                        <TableCell><Badge variant={actorVariant[log.actor_type] || 'secondary'}>{log.actor_type}</Badge></TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+
+        {/* Scheduled Meetings Card */}
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Calendar /> Scheduled Meetings</CardTitle>
+                <CardDescription>Meetings created by the system or user.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Proposed Time</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Participants</TableHead>
+                        <TableHead>Related Deal</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
+                    {!logsLoading && scheduledMeetings.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No scheduled meetings found.</TableCell></TableRow>}
+                    {scheduledMeetings.map((log) => (
+                    <TableRow key={log.id}>
+                        <TableCell>{format(new Date(log.after_snapshot?.proposed_time), "MMM d, yyyy, h:mm a")}</TableCell>
+                        <TableCell className="font-medium">{log.after_snapshot?.title}</TableCell>
+                        <TableCell className="text-xs">{log.after_snapshot?.participants?.join(', ')}</TableCell>
+                        <TableCell>{log.after_snapshot?.deal_id || 'N/A'}</TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+
+        {/* General Data Changes Card */}
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Database /> General Data Changes</CardTitle>
+                <CardDescription>All other create, update, and delete actions are recorded here.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -96,8 +168,8 @@ export default function OrquestratorPage() {
                 </TableHeader>
                 <TableBody>
                     {logsLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>}
-                    {!logsLoading && logs?.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No history found.</TableCell></TableRow>}
-                    {logs?.map((log) => (
+                    {!logsLoading && generalLogs.length === 0 && <TableRow><TableCell colSpan={4} className="text-center">No other activity found.</TableCell></TableRow>}
+                    {generalLogs.map((log) => (
                     <TableRow key={log.id}>
                         <TableCell>{format(new Date(log.ts), "MMM d, yyyy, h:mm a")}</TableCell>
                         <TableCell>
