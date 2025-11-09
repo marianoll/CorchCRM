@@ -18,6 +18,7 @@ import ReactMarkdown from 'react-markdown';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 
 type CrmData = {
   contacts: any[] | null;
@@ -30,9 +31,14 @@ type SearchChatbotProps = {
   onOpenChange: (open: boolean) => void;
 } & CrmData;
 
+type TableData = {
+    headers: string[];
+    rows: any[][];
+};
+
 type Message = {
     role: 'user' | 'assistant';
-    content: string;
+    content: string | TableData;
 };
 
 const inspirationChips = [
@@ -43,6 +49,44 @@ const inspirationChips = [
     "All emails tagged as important or follow-up",
     "Average deal size by industry",
 ];
+
+function AssistantMessage({ content }: { content: string | TableData }) {
+    if (typeof content === 'string') {
+        return (
+            <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                {content}
+            </ReactMarkdown>
+        );
+    }
+    
+    if (typeof content === 'object' && content.headers && content.rows) {
+        return (
+            <div className="overflow-x-auto">
+                <Table className="min-w-full">
+                    <TableHeader>
+                        <TableRow>
+                            {content.headers.map((header, i) => (
+                                <TableHead key={i}>{header}</TableHead>
+                            ))}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {content.rows.map((row, i) => (
+                            <TableRow key={i}>
+                                {row.map((cell, j) => (
+                                    <TableCell key={j}>{String(cell)}</TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+        );
+    }
+
+    return null;
+}
+
 
 export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }: SearchChatbotProps) {
   const [query, setQuery] = useState('');
@@ -81,7 +125,7 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
             deals: deals || [],
             companies: companies || []
         });
-        setMessages(prev => [...prev, { role: 'assistant', content: res.results }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: res.response }]);
       } catch (error: any) {
         console.error(error);
         const errorMessage = "Sorry, I couldn't perform that search. Please try again.";
@@ -150,10 +194,12 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
                     <AvatarFallback><Sparkles className="h-4 w-4" /></AvatarFallback>
                   </Avatar>
                 )}
-                <div className={cn("rounded-lg px-3 py-2 max-w-sm", message.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                   <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
-                        {message.content}
-                    </ReactMarkdown>
+                <div className={cn("rounded-lg px-3 py-2 max-w-full overflow-x-auto", message.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                   {message.role === 'user' ? (
+                       <p>{message.content}</p>
+                   ) : (
+                       <AssistantMessage content={message.content} />
+                   )}
                 </div>
               </div>
             ))}
