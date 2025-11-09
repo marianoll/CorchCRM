@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useRef, useEffect } from 'react';
-import { LoaderCircle, Gem, Mic, Square, FileAudio } from 'lucide-react';
+import { LoaderCircle, Gem, Mic, Square, FileAudio, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +32,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
   const [result, setResult] = useState<OrchestrateTextOutput | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [sampleAudioUsed, setSampleAudioUsed] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { user } = useUser();
@@ -81,7 +82,9 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
         description: error.message || 'There was a problem with the AI.',
       });
     } finally {
-        setIsProcessing(false);
+        if (!sampleAudioUsed) {
+            setIsProcessing(false);
+        }
     }
   };
 
@@ -134,6 +137,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
 
   const handleProcessSampleAudio = async () => {
       setIsProcessing(true);
+      setSampleAudioUsed(true);
       setResult(null);
       setInputText('');
       toast({ title: 'Processing Sample Audio...', description: 'Fetching, transcribing, and analyzing the sample.' });
@@ -169,7 +173,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
               title: 'Sample Processing Failed',
               description: error.message || 'Could not process the sample audio file.',
           });
-          setIsProcessing(false);
+          // Do not set isProcessing to false to keep the loader infinite
       }
   };
   
@@ -227,7 +231,7 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
       </CardContent>
       <CardFooter className="grid grid-cols-1 md:grid-cols-3 gap-2">
          <Button onClick={() => handleProcess(inputText)} disabled={isProcessing || crmDataLoading || isRecording}>
-          {isProcessing ? (
+          {isProcessing && !sampleAudioUsed ? (
             <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Gem className="mr-2 h-4 w-4" />
@@ -253,7 +257,11 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
           )}
         </Button>
         <Button onClick={handleProcessSampleAudio} disabled={isProcessing || crmDataLoading || isRecording} variant="secondary">
-            <FileAudio className="mr-2 h-4 w-4" />
+            {sampleAudioUsed ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+            )}
             Use Sample Audio
         </Button>
       </CardFooter>
