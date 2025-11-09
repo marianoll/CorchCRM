@@ -8,7 +8,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, addDays } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, RefreshCw, FileText, Sparkles, MailPlus, CalendarPlus } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,10 @@ import { orchestrateInteraction, type OrchestratorOutput, type Interaction } fro
 import { EmailReplyDialog } from '@/components/email-reply-dialog';
 import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 
+type ActionStatus = 'approved' | 'rejected' | null;
+type ActionType = 'reply' | 'analyze' | 'meeting' | 'task';
+type ActionStates = Partial<Record<ActionType, ActionStatus>>;
+
 
 type Email = {
     id: string;
@@ -52,16 +56,13 @@ type Email = {
     company_id?: string;
     deal_id?: string;
     ai_summary?: string;
+    actionStates?: ActionStates;
 };
 
 type Company = { id: string; name: string; domain?: string; industry?: string; };
 type Contact = { id: string; company_id?: string; full_name: string; email_primary: string; phone?: string; title?: string; };
 type Deal = { id: string; company_id?: string; primary_contact_id: string; title: string; amount: number; stage: string; close_date: Date | Timestamp | string; };
 type CrmEntity = Company | Contact | Deal;
-
-type ActionStatus = 'approved' | 'rejected';
-type ActionType = 'reply' | 'analyze' | 'meeting';
-type ActionStates = Record<string, Partial<Record<ActionType, ActionStatus>>>;
 
 
 const directionVariant: { [key: string]: 'default' | 'secondary' } = {
@@ -88,23 +89,6 @@ export default function EmailHistoryPage() {
     const [detailsEntity, setDetailsEntity] = useState<CrmEntity | null>(null);
     const [detailsEntityType, setDetailsEntityType] = useState<'Company' | 'Contact' | 'Deal' | null>(null);
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-
-    // Action button states
-    const [actionStates, setActionStates] = useState<ActionStates>({});
-
-    const setActionState = (emailId: string, action: ActionType, status: ActionStatus) => {
-        setActionStates(prev => ({
-            ...prev,
-            [emailId]: {
-                ...prev[emailId],
-                [action]: status
-            }
-        }));
-    };
-
-    // Orchestrator Dialog state
-    const [isOrchestratorDialogOpen, setIsOrchestratorDialogOpen] = useState(false);
-    const [selectedEmailForOrchestrator, setSelectedEmailForOrchestrator] = useState<Email | null>(null);
 
     // Reply Dialog state
     const [isReplyDialogOpen, setIsReplyDialogOpen] = useState(false);
@@ -135,6 +119,30 @@ export default function EmailHistoryPage() {
     const { data: deals, loading: dealsLoading } = useCollection<Deal>(dealsQuery);
 
     const crmDataLoading = companiesLoading || contactsLoading || dealsLoading;
+    
+    const setActionState = (emailId: string, action: ActionType, status: ActionStatus) => {
+        if (!db || !user) return;
+        const emailRef = doc(db, 'users', user.uid, 'emails', emailId);
+        const updateData = { [`actionStates.${action}`]: status };
+
+        setDoc(emailRef, updateData, { merge: true }).catch(error => {
+            console.error("Failed to update action state", error);
+            // Optionally emit a global error or show a toast
+        });
+        
+        // Optimistic UI update
+        if (setEmails) {
+            setEmails(prevEmails => {
+                if (!prevEmails) return null;
+                return prevEmails.map(e => {
+                    if (e.id === emailId) {
+                        return { ...e, actionStates: { ...e.actionStates, [action]: status } };
+                    }
+                    return e;
+                });
+            });
+        }
+    };
 
     const getCompanyName = (companyId?: string) => {
         if (!companyId || companiesLoading || !companies) return null;
@@ -483,66 +491,11 @@ export default function EmailHistoryPage() {
             console.error(error);
         }
     };
-
-    const processOrchestration = useCallback(async (): Promise<OrchestratorOutput | null> => {
-      if (!selectedEmailForOrchestrator || crmDataLoading) {
-        toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
-        return null;
-      }
-
-      const interaction: Interaction = {
-        source: 'email',
-        subject: selectedEmailForOrchestrator.subject,
-        body: selectedEmailForOrchestrator.body_excerpt,
-        from: selectedEmailForOrchestrator.from_email,
-        to: selectedEmailForOrchestrator.to_email,
-        timestamp: toDate(selectedEmailForOrchestrator.ts).toISOString(),
-        direction: selectedEmailForOrchestrator.direction,
-      };
-
-      const company = getCompanyName(selectedEmailForOrchestrator.company_id);
-      const deal    = getDeal(selectedEmailForOrchestrator.deal_id);
-      const contact = contacts?.find(c =>
-        c.email_primary === selectedEmailForOrchestrator.from_email ||
-        c.email_primary === selectedEmailForOrchestrator.to_email
-      );
-
-      const related_entities: Record<string, any> = {
-        company: company ? {
-          id: company.id, name: company.name, domain: (company as any).domain, industry: (company as any).industry
-        } : undefined,
-        contact: contact ? {
-          id: contact.id, full_name: contact.full_name, email: contact.email_primary, title: contact.title
-        } : undefined,
-        deal: deal ? {
-          id: deal.id, title: deal.title, stage: deal.stage,
-          amount: (deal as any).amount, probability: (deal as any).probability,
-          owner_email: (deal as any).owner_email, close_date: (deal as any).close_date
-        } : undefined
-      };
-
-      try {
-        const result = await orchestrateInteraction({ interaction, related_entities });
-        if (!result || !Array.isArray(result.actions)) {
-          toast({ variant: 'destructive', title: 'Orchestrator error', description: 'No actions returned.' });
-          return null;
-        }
-
-        if (result.actions.length === 0) {
-          toast({ title: 'No actions', description: 'No concrete actions were generated.' });
-        }
-        return result;
-      } catch (err:any) {
-        console.error('processOrchestration error', err);
-        toast({ variant: 'destructive', title: 'AI Error', description: err?.message || 'Could not orchestrate this email.' });
-        return null;
-      }
-    }, [selectedEmailForOrchestrator, contacts, companies, deals, crmDataLoading, toast, getCompanyName, getDeal]);
-
-    const checkMeetingKeywords = (text: string) => {
-        const keywords = ['meeting', 'talk', 'chat'];
+    
+    const checkKeywords = (text: string, keywords: string[]) => {
         return keywords.some(keyword => text.toLowerCase().includes(keyword));
     };
+
 
   return (
     <TooltipProvider>
@@ -674,8 +627,10 @@ export default function EmailHistoryPage() {
                     {filteredEmails.map((email) => {
                         const company = getCompanyName(email.company_id);
                         const deal = getDeal(email.deal_id);
-                        const showMeetingButton = email.direction === 'inbound' && checkMeetingKeywords(email.body_excerpt);
-                        const emailActionStates = actionStates[email.id] || {};
+                        const showMeetingButton = email.direction === 'inbound' && checkKeywords(email.body_excerpt, ['meeting', 'talk', 'chat', 'schedule']);
+                        const showTaskButton = checkKeywords(email.body_excerpt, ['POC', 'SLA terms', 'align', 'scope']);
+                        
+                        const emailActionStates = email.actionStates || {};
 
                         const getIconClass = (action: ActionType) => {
                             if (emailActionStates[action] === 'approved') return 'text-green-500';
@@ -788,11 +743,11 @@ export default function EmailHistoryPage() {
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)}>
-                                                <RefreshCw className={cn("h-4 w-4", getIconClass('analyze'))} />
-                                                <span className="sr-only">Analyze</span>
+                                                <TrendingUp className={cn("h-4 w-4", getIconClass('analyze'))} />
+                                                <span className="sr-only">Stage Status</span>
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent><p>Analyze with AI</p></TooltipContent>
+                                        <TooltipContent><p>Stage Status</p></TooltipContent>
                                     </Tooltip>
                                     {showMeetingButton && (
                                         <Tooltip>
@@ -803,6 +758,17 @@ export default function EmailHistoryPage() {
                                                 </Button>
                                             </TooltipTrigger>
                                             <TooltipContent><p>Schedule Meeting</p></TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                     {showTaskButton && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for task dialog */ toast({title: 'Not Implemented'})}}>
+                                                    <FileText className={cn("h-4 w-4", getIconClass('task'))} />
+                                                    <span className="sr-only">Create Task</span>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Create Task</p></TooltipContent>
                                         </Tooltip>
                                     )}
                                 </div>
@@ -824,14 +790,6 @@ export default function EmailHistoryPage() {
         deals={deals || []}
         emails={emails || []}
       />
-       {selectedEmailForOrchestrator && (
-        <OrchestratorSuggestionDialog
-            open={isOrchestratorDialogOpen}
-            onOpenChange={setIsOrchestratorDialogOpen}
-            email={selectedEmailForOrchestrator}
-            processFunction={processOrchestration}
-        />
-      )}
        {selectedEmailForReply && user && (
         <EmailReplyDialog
           open={isReplyDialogOpen}

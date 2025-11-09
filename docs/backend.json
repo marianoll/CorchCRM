@@ -472,6 +472,16 @@
         "labels": {
           "type": "string",
           "description": "AI/manual labels (e.g., 'proposal;followup;pricing')."
+        },
+        "actionStates": {
+            "type": "object",
+            "description": "Stores the approval state of UI actions for this email.",
+            "properties": {
+                "reply": { "type": "string", "enum": ["approved", "rejected"] },
+                "analyze": { "type": "string", "enum": ["approved", "rejected"] },
+                "meeting": { "type": "string", "enum": ["approved", "rejected"] },
+                "task": { "type": "string", "enum": ["approved", "rejected"] }
+            }
         }
       },
       "required": ["id", "thread_id", "from_email", "to_email", "direction", "subject", "ts"]
