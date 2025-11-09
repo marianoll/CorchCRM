@@ -1,246 +1,191 @@
 'use server';
 /**
- * @fileOverview The AI Orchestrator flow.
- * This flow receives natural language instructions, interprets them, and uses
- * a set of tools to perform actions on the CRM database, such as creating
- * entities (Companies, Contacts, Deals).
- *
- * - orchestrate - The main function to call the orchestrator flow.
- * - OrchestratorInput - The input type for the flow.
- * - OrchestratorOutput - The output type for the flow.
+ * CorchCRM Orchestrator — Genkit Flow
+ * - Recibe una interacción (email/voz/reunión) + contexto básico (company/contact/deal)
+ * - Devuelve "acciones" estructuradas para ejecutar en el backend (CRUD, tasks, drafts, meetings, logs, notifs)
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import { getFirestore, doc, collection, writeBatch, Timestamp } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
 import { googleAI } from '@genkit-ai/google-genai';
+import { z } from 'zod';
 
-// ---- Schemas ----
+/* ----------------------------- Tipos de Acciones ----------------------------- */
+
+const ActionType = z.enum([
+  'update_entity',     // actualiza algún doc (deals/contacts/companies/emails)
+  'create_entity',     // crea un doc
+  'create_task',       // inserta en tasks
+  'create_ai_draft',   // genera borrador (correo / texto)
+  'create_meeting',    // crea o reagenda reunión
+  'notify_user',       // notificación en app / email / Slack
+  'log_action',        // registro auditable (history)
+  'suggest'            // sugerencia (no ejecutar sin aprobación)
+]);
+
+const TargetType = z.enum([
+  'companies', 'contacts', 'deals', 'emails',
+  'tasks', 'ai_drafts', 'meetings', 'notifications', 'history'
+]);
+
+const ActionSchema = z.object({
+  type: ActionType,
+  target: TargetType,
+  id: z.string().optional(),         // para updates
+  data: z.record(z.any()).optional(), // para creates
+  changes: z.record(z.any()).optional(), // para updates
+  reason: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional()
+});
+
+export type Action = z.infer<typeof ActionSchema>;
+
+/* ------------------------------- Esquemas I/O ------------------------------- */
+
+// Interacción flexible pero tipada en lo esencial
+export const InteractionSchema = z.object({
+  source: z.enum(['email','voice','meeting','note']).describe('Origen de la interacción'),
+  subject: z.string().optional(),
+  body: z.string().optional(),         // transcript o cuerpo de email
+  from: z.string().optional(),
+  to: z.string().optional(),
+  timestamp: z.string().optional()     // ISO
+});
+export type Interaction = z.infer<typeof InteractionSchema>;
+
+// Entidades relacionadas mínimas para contexto
+const RelatedEntitiesSchema = z.object({
+  company: z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    domain: z.string().optional(),
+    stage: z.string().optional()
+  }).optional(),
+  contact: z.object({
+    id: z.string().optional(),
+    full_name: z.string().optional(),
+    email: z.string().optional(),
+    title: z.string().optional()
+  }).optional(),
+  deal: z.object({
+    id: z.string().optional(),
+    title: z.string().optional(),
+    stage: z.string().optional(),
+    probability: z.number().optional(),
+    owner_email: z.string().optional(),
+    close_date: z.string().optional()
+  }).optional()
+});
 
 export const OrchestratorInputSchema = z.object({
-  instruction: z.string().describe('The natural language instruction for the orchestrator to execute.'),
-  userId: z.string().describe('The ID of the user performing the action.'),
+  interaction: InteractionSchema,
+  related_entities: RelatedEntitiesSchema.optional(),
+  // Opcional: reglas del usuario para personalizar (umbral IA, business hours, etc.)
+  policy: z.object({
+    auto_apply_threshold: z.number().min(0).max(1).optional(), // p.ej., 0.85
+    always_review_fields: z.array(z.string()).optional(),      // p.ej., ["amount","close_date"]
+    followup_days_by_stage: z.record(z.string(), z.number()).optional(), // {"proposal":3, ...}
+    business_hours: z.object({
+      start: z.string().optional(), end: z.string().optional(), days: z.array(z.number()).optional()
+    }).optional()
+  }).optional()
 });
+
 export type OrchestratorInput = z.infer<typeof OrchestratorInputSchema>;
 
 export const OrchestratorOutputSchema = z.object({
-  success: z.boolean(),
-  message: z.string().describe('A summary of the action taken or an error message.'),
-  createdEntityId: z.string().optional().describe('The ID of the entity that was created.'),
+  actions: z.array(ActionSchema).default([])
 });
 export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 
+/* ---------------------------------- Prompt ---------------------------------- */
 
-// ---- Tools ----
+const orchestratePrompt = ai.definePrompt({
+  name: 'orchestrateInteraction',
+  model: googleAI.model('gemini-1.5-flash-latest'), // <- modelo vigente
+  input: { schema: OrchestratorInputSchema },
+  output: { schema: OrchestratorOutputSchema },
+  prompt: `
+You are CorchCRM's Orchestrator AI.
+Your job: output ONLY a JSON object with an "actions" array that the backend will execute.
+No prefaces, no commentary outside the JSON.
 
-/**
- * Gets the Firestore database instance.
- * This is a helper function to be used inside tools.
- */
-function getDb() {
-    const { firestore } = initializeFirebase();
-    if (!firestore) {
-        throw new Error("Firestore is not initialized.");
-    }
-    return firestore;
-}
+Entities you can act on: companies, contacts, deals, emails, tasks, meetings, notifications, ai_drafts, history.
+Action types: update_entity, create_entity, create_task, create_ai_draft, create_meeting, notify_user, log_action, suggest.
 
-const createCompanyTool = ai.defineTool(
+Rules:
+- Prefer small, atomic actions.
+- Include "confidence" (0..1) for decisions.
+- If unsure, use type "suggest".
+- Log all entity changes with a "log_action".
+- Respect user policy when provided (auto_apply_threshold, always_review_fields, followup_days_by_stage, business_hours).
+- Keep times in ISO UTC if you propose due dates.
+- If you update deals.stage, consider adjusting probability.
+
+Input:
+Interaction:
+{{{json interaction}}}
+
+Related entities:
+{{{json related_entities}}}
+
+Policy:
+{{{json policy}}}
+
+Return JSON that matches the output schema strictly.
+`
+});
+
+/* ----------------------------------- Flow ----------------------------------- */
+
+export const orchestrateInteractionFlow = ai.defineFlow(
   {
-    name: 'createCompany',
-    description: 'Creates a new company record in the CRM.',
-    inputSchema: z.object({
-      name: z.string().describe('The name of the company.'),
-      userId: z.string().describe('The ID of the user who owns this company.'),
-      domain: z.string().optional().describe('The company\'s website domain.'),
-      industry: z.string().optional().describe('The industry the company belongs to.'),
-    }),
-    outputSchema: OrchestratorOutputSchema,
-  },
-  async (input) => {
-    const db = getDb();
-    const batch = writeBatch(db);
-
-    const companyRef = doc(collection(db, 'users', input.userId, 'companies'));
-    const companyData = {
-      id: companyRef.id,
-      name: input.name,
-      domain: input.domain,
-      industry: input.industry,
-    };
-    batch.set(companyRef, companyData);
-
-    const logRef = doc(collection(db, 'audit_logs'));
-    batch.set(logRef, {
-        ts: new Date().toISOString(),
-        actor_type: 'system_ai',
-        actor_id: 'orchestrator',
-        action: 'create',
-        entity_type: 'company',
-        entity_id: companyRef.id,
-        table: 'companies',
-        source: 'orchestrator',
-        after_snapshot: companyData,
-    });
-    
-    await batch.commit();
-    return { success: true, message: `Company '${input.name}' created successfully.`, createdEntityId: companyRef.id };
-  }
-);
-
-
-const createContactTool = ai.defineTool(
-    {
-        name: 'createContact',
-        description: 'Creates a new contact record in the CRM.',
-        inputSchema: z.object({
-            userId: z.string().describe('The ID of the user who owns this contact.'),
-            firstName: z.string().describe("The contact's first name."),
-            lastName: z.string().describe("The contact's last name."),
-            email: z.string().email().describe("The contact's primary email address."),
-            companyId: z.string().optional().describe('The ID of the company this contact is associated with.'),
-            title: z.string().optional().describe("The contact's job title."),
-        }),
-        outputSchema: OrchestratorOutputSchema,
-    },
-    async (input) => {
-        const db = getDb();
-        const batch = writeBatch(db);
-
-        const contactRef = doc(collection(db, 'users', input.userId, 'contacts'));
-        const contactData = {
-            id: contactRef.id,
-            first_name: input.firstName,
-            last_name: input.lastName,
-            full_name: `${input.firstName} ${input.lastName}`,
-            email_primary: input.email,
-            company_id: input.companyId,
-            title: input.title,
-        };
-        batch.set(contactRef, contactData);
-        
-        const logRef = doc(collection(db, 'audit_logs'));
-        batch.set(logRef, {
-            ts: new Date().toISOString(),
-            actor_type: 'system_ai',
-            actor_id: 'orchestrator',
-            action: 'create',
-            entity_type: 'contact',
-            entity_id: contactRef.id,
-            table: 'contacts',
-            source: 'orchestrator',
-            after_snapshot: contactData,
-        });
-
-        await batch.commit();
-        return { success: true, message: `Contact '${contactData.full_name}' created.`, createdEntityId: contactRef.id };
-    }
-)
-
-const createDealTool = ai.defineTool(
-    {
-        name: 'createDeal',
-        description: 'Creates a new deal or opportunity in the CRM.',
-        inputSchema: z.object({
-            userId: z.string().describe('The ID of the user who owns this deal.'),
-            title: z.string().describe('The title or name of the deal.'),
-            primaryContactId: z.string().describe('The ID of the primary contact for this deal.'),
-            companyId: z.string().optional().describe('The ID of the company associated with this deal.'),
-            amount: z.number().optional().describe('The potential value of the deal.'),
-            stage: z.enum(['prospect', 'discovery', 'proposal', 'negotiation', 'won', 'lost']).default('prospect').describe('The current stage of the deal.'),
-        }),
-        outputSchema: OrchestratorOutputSchema,
-    },
-    async (input) => {
-        const db = getDb();
-        const batch = writeBatch(db);
-
-        const dealRef = doc(collection(db, 'users', input.userId, 'deals'));
-        const dealData = {
-            id: dealRef.id,
-            title: input.title,
-            primary_contact_id: input.primaryContactId,
-            company_id: input.companyId,
-            amount: input.amount || 0,
-            stage: input.stage,
-            close_date: Timestamp.fromDate(new Date()), // Default to today
-        };
-        batch.set(dealRef, dealData);
-
-        const logRef = doc(collection(db, 'audit_logs'));
-        batch.set(logRef, {
-            ts: new Date().toISOString(),
-            actor_type: 'system_ai',
-            actor_id: 'orchestrator',
-            action: 'create',
-            entity_type: 'deal',
-            entity_id: dealRef.id,
-            table: 'deals',
-            source: 'orchestrator',
-            after_snapshot: dealData,
-        });
-
-        await batch.commit();
-        return { success: true, message: `Deal '${input.title}' created.`, createdEntityId: dealRef.id };
-    }
-)
-
-
-// ---- Main Prompt & Flow ----
-
-const orchestratorFlow = ai.defineFlow(
-  {
-    name: 'orchestratorFlow',
+    name: 'orchestrateInteractionFlow',
     inputSchema: OrchestratorInputSchema,
-    outputSchema: OrchestratorOutputSchema,
+    outputSchema: OrchestratorOutputSchema
   },
-  async (input) => {
-    const llmResponse = await ai.generate({
-      prompt: `You are a CRM orchestrator. Your job is to understand the user's instruction and use the available tools to perform the requested action.
-        
-        Instruction: "${input.instruction}"
-        
-        Current User ID: ${input.userId}
-        
-        Carefully analyze the instruction and call the appropriate tool with the correct parameters. The user ID must always be passed to the tool.`,
-      model: googleAI.model('gemini-2.0-flash-lite-001'),
-      tools: [createCompanyTool, createContactTool, createDealTool],
-      output: {
-          format: 'json',
-          schema: OrchestratorOutputSchema
-      }
-    });
-
-    const toolRequest = llmResponse.toolRequest();
-    if (!toolRequest) {
-        return { success: false, message: "I could not determine which action to take. Please be more specific." };
+  async (input): Promise<OrchestratorOutput> => {
+    // Sanitiza mínimos
+    if (!input?.interaction?.source) {
+      return { actions: [{
+        type: 'log_action',
+        target: 'history',
+        data: {
+          action: 'error',
+          explanation: 'Missing interaction.source'
+        },
+        reason: 'Invalid input',
+        confidence: 0.0
+      }]};
     }
 
-    // Call the tool and return its output directly.
-    const toolResponse = await toolRequest.invoke();
-    
-    // The tool's output schema matches the flow's output schema.
-    return toolResponse.output as OrchestratorOutput;
+    try {
+      const res = await orchestratePrompt(input);
+      const out = res.output;
+
+      // Normaliza
+      const actions = Array.isArray(out?.actions) ? out.actions : [];
+      return { actions };
+    } catch (err) {
+      console.error('[orchestrateInteractionFlow] Error:', err);
+      return {
+        actions: [{
+          type: 'log_action',
+          target: 'history',
+          data: {
+            action: 'error',
+            explanation: 'Model call failed'
+          },
+          reason: 'Model error',
+          confidence: 0.0
+        }]
+      };
+    }
   }
 );
 
+/* ---------------------------------- Helper ---------------------------------- */
 
-// ---- API ----
-
-/**
- * Executes an instruction through the AI orchestrator.
- * @param input The natural language instruction and user context.
- * @returns A promise that resolves to the result of the operation.
- */
-export async function orchestrate(input: OrchestratorInput): Promise<OrchestratorOutput> {
-  try {
-    return await orchestratorFlow(input);
-  } catch (error: any) {
-    console.error('[Orchestrator] Error executing flow:', error);
-    return {
-      success: false,
-      message: error.message || 'An unexpected error occurred in the orchestrator flow.',
-    };
-  }
+// Función sencilla para usar desde server actions o API routes
+export async function orchestrateInteraction(input: OrchestratorInput): Promise<OrchestratorOutput> {
+  return orchestrateInteractionFlow(input);
 }

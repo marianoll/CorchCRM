@@ -14,18 +14,18 @@ import { LoaderCircle, Check, X, Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, writeBatch, Timestamp, doc } from 'firebase/firestore';
-import type { InfoshardTextOutput } from '@/ai/flows/infoshard-text-flow';
+import type { OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-type Infotope = InfoshardTextOutput['infotopes'][0];
+type Action = OrchestrateTextOutput['actions'][0];
 
 interface CrystalsSuggestionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   emailBody: string;
   emailSourceIdentifier: string;
-  processFunction: () => Promise<InfoshardTextOutput | null>;
+  processFunction: () => Promise<OrchestrateTextOutput | null>;
 }
 
 export function CrystalsSuggestionDialog({
@@ -35,7 +35,7 @@ export function CrystalsSuggestionDialog({
   emailSourceIdentifier,
   processFunction,
 }: CrystalsSuggestionDialogProps) {
-  const [result, setResult] = useState<InfoshardTextOutput | null>(null);
+  const [result, setResult] = useState<OrchestrateTextOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -75,12 +75,20 @@ export function CrystalsSuggestionDialog({
     setIsSaving(true);
     const batch = writeBatch(firestore);
 
-    // Save each infotope as a "crystal"
-    result.infotopes.forEach(infotope => {
+    // Filter for actions that are suggestions or create new entities that can be crystallized.
+    const crystalsToSave = result.actions.filter(action => 
+        action.type === 'create_entity' || 
+        action.type === 'suggest' || 
+        action.type === 'create_task'
+    );
+
+
+    crystalsToSave.forEach(action => {
         const crystalRef = doc(collection(firestore, 'crystals'));
+        const fact = action.reason || `${action.type} for ${action.target}`;
         
         batch.set(crystalRef, {
-            fact: `(${infotope.entityName}) ${infotope.fact}`,
+            fact: fact,
             source: 'email',
             sourceIdentifier: emailSourceIdentifier,
             status: 'active',
@@ -88,16 +96,19 @@ export function CrystalsSuggestionDialog({
         });
     });
 
-    // TODO: Process orchestrator commands in a real application
-    // For now, we just log them. In a real app, this would trigger
-    // other flows to create contacts, update deals, etc.
-
     try {
-        await batch.commit();
-        toast({
-            title: 'Crystals Approved!',
-            description: `${result.infotopes.length} facts have been saved.`
-        });
+        if (crystalsToSave.length > 0) {
+            await batch.commit();
+            toast({
+                title: 'Crystals Approved!',
+                description: `${crystalsToSave.length} facts have been saved.`
+            });
+        } else {
+             toast({
+                title: 'No Crystals to Save',
+                description: `No new facts were extracted this time.`
+            });
+        }
         onOpenChange(false);
     } catch (error) {
          if (error instanceof FirestorePermissionError) {
@@ -114,9 +125,11 @@ export function CrystalsSuggestionDialog({
     }
   };
   
-  const parseDetails = (details: string | undefined) => {
+  const parseDetails = (details: Record<string, any> | undefined) => {
     if (!details) return {};
     try {
+        // If details is already an object, just return it
+        if (typeof details === 'object') return details;
         return JSON.parse(details);
     } catch (e) {
         return { raw: details };
@@ -148,32 +161,14 @@ export function CrystalsSuggestionDialog({
           {result && (
             <div className="space-y-4 rounded-lg border bg-secondary/50 p-4">
               <div>
-                <h4 className="font-semibold text-sm mb-2">Infotopes (Crystals):</h4>
-                {result.infotopes.length > 0 ? (
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                    {result.infotopes.map((item, i) => (
-                      <li key={`it-${i}`}>
-                        ({item.entityName}
-                        <span className="font-mono text-xs bg-background/50 px-1 py-0.5 rounded-sm mx-1">
-                          {item.entityId || 'Not Found'}
-                        </span>
-                        , {item.fact})
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">No facts extracted.</p>
-                )}
-              </div>
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Orchestrate Commands:</h4>
-                {result.orchestrators.length > 0 ? (
+                <h4 className="font-semibold text-sm mb-2">Orchestration Actions:</h4>
+                {result.actions.length > 0 ? (
                  <div className="space-y-2">
-                    {result.orchestrators.map((item, i) => (
+                    {result.actions.map((item, i) => (
                         <div key={`or-${i}`} className="text-sm text-muted-foreground bg-background/50 p-2 rounded-md">
-                            <p className="font-semibold text-foreground">{item.command}</p>
-                            <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(parseDetails(item.details), null, 2)}</pre>
-                            {item.sourceText && <p className="text-xs italic mt-2 border-t pt-1">Source: "{item.sourceText}"</p>}
+                            <p className="font-semibold text-foreground">{item.type} on {item.target}</p>
+                            <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(item.data || item.changes, null, 2)}</pre>
+                            {item.reason && <p className="text-xs italic mt-2 border-t pt-1">Reason: "{item.reason}"</p>}
                         </div>
                     ))}
                 </div>
@@ -189,9 +184,9 @@ export function CrystalsSuggestionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isSaving}>
             <X className="mr-2 h-4 w-4" /> Reject
           </Button>
-          <Button onClick={handleApprove} disabled={isLoading || isSaving || !result || result.infotopes.length === 0}>
+          <Button onClick={handleApprove} disabled={isLoading || isSaving || !result || result.actions.length === 0}>
             {isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            Approve
+            Approve & Save
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -30,9 +30,11 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { infoshardText, type InfoshardTextOutput } from '@/ai/flows/infoshard-text-flow';
+import { orchestrateText, type OrchestrateTextOutput } from '@/ai/flows/infoshard-text-flow';
 import { CrystalsSuggestionDialog } from '@/components/crystals-suggestion-dialog';
 import { syncGmail } from '@/ai/flows/sync-gmail-flow';
+import { OrchestratorSuggestionDialog } from '@/components/orchestrator-suggestion-dialog';
+import { orchestrateInteraction, type OrchestratorOutput, type Interaction } from '@/ai/flows/orchestrator-flow';
 
 
 type Email = {
@@ -99,6 +101,10 @@ export default function EmailHistoryPage() {
     // Crystals Dialog state
     const [isCrystalsDialogOpen, setIsCrystalsDialogOpen] = useState(false);
     const [selectedEmailForCrystals, setSelectedEmailForCrystals] = useState<Email | null>(null);
+
+    // Orchestrator Dialog state
+    const [isOrchestratorDialogOpen, setIsOrchestratorDialogOpen] = useState(false);
+    const [selectedEmailForOrchestrator, setSelectedEmailForOrchestrator] = useState<Email | null>(null);
 
 
     // Data fetching
@@ -371,7 +377,12 @@ export default function EmailHistoryPage() {
         setIsCrystalsDialogOpen(true);
     };
 
-    const processCrystals = useCallback(async (): Promise<InfoshardTextOutput | null> => {
+    const handleOrchestrate = (email: Email) => {
+        setSelectedEmailForOrchestrator(email);
+        setIsOrchestratorDialogOpen(true);
+    };
+
+    const processCrystals = useCallback(async (): Promise<OrchestrateTextOutput | null> => {
         if (!selectedEmailForCrystals || crmDataLoading) {
             toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
             return null;
@@ -384,8 +395,37 @@ export default function EmailHistoryPage() {
             deals: deals?.map(d => ({ id: d.id, name: d.title })) || [],
         };
         
-        return await infoshardText({ text: inputText, ...crmContext });
+        return await orchestrateText({ text: inputText, ...crmContext });
     }, [selectedEmailForCrystals, contacts, companies, deals, crmDataLoading, toast]);
+
+    const processOrchestration = useCallback(async (): Promise<OrchestratorOutput | null> => {
+        if (!selectedEmailForOrchestrator || crmDataLoading) {
+            toast({ variant: 'destructive', title: 'Data not ready', description: 'CRM data is still loading.' });
+            return null;
+        }
+
+        const interaction: Interaction = {
+            source: 'email',
+            subject: selectedEmailForOrchestrator.subject,
+            body: selectedEmailForOrchestrator.body_excerpt,
+            from: selectedEmailForOrchestrator.from_email,
+            to: selectedEmailForOrchestrator.to_email,
+            timestamp: toDate(selectedEmailForOrchestrator.ts).toISOString(),
+        };
+
+        const company = getCompanyName(selectedEmailForOrchestrator.company_id);
+        const deal = getDealTitle(selectedEmailForOrchestrator.deal_id);
+        const contact = contacts?.find(c => c.email_primary === selectedEmailForOrchestrator.from_email || c.email_primary === selectedEmailForOrchestrator.to_email);
+
+        return await orchestrateInteraction({
+            interaction,
+            related_entities: {
+                company: company ? { id: company.id, name: company.name, domain: company.domain } : undefined,
+                contact: contact ? { id: contact.id, full_name: contact.full_name, email: contact.email_primary, title: contact.title } : undefined,
+                deal: deal ? { id: deal.id, title: deal.title, stage: deal.stage } : undefined,
+            }
+        });
+    }, [selectedEmailForOrchestrator, contacts, companies, deals, crmDataLoading, toast]);
 
 
   return (
@@ -622,7 +662,7 @@ export default function EmailHistoryPage() {
                                     </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon">
+                                            <Button variant="ghost" size="icon" onClick={() => handleOrchestrate(email)}>
                                                 <PianoIcon className="h-4 w-4" />
                                                 <span className="sr-only">Orchestrate</span>
                                             </Button>
@@ -655,6 +695,13 @@ export default function EmailHistoryPage() {
             emailBody={`Subject: ${selectedEmailForCrystals.subject}\n\n${selectedEmailForCrystals.body_excerpt}`}
             emailSourceIdentifier={selectedEmailForCrystals.id}
             processFunction={processCrystals}
+        />
+      )}
+       {selectedEmailForOrchestrator && (
+        <OrchestratorSuggestionDialog
+            open={isOrchestratorDialogOpen}
+            onOpenChange={setIsOrchestratorDialogOpen}
+            processFunction={processOrchestration}
         />
       )}
     </main>
