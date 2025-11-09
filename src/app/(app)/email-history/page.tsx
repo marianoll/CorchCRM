@@ -357,22 +357,30 @@ export default function EmailHistoryPage() {
                             </div>
                         </TableCell>
                         <TableCell>{getCompanyName(email.company_id)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground italic">
+                        <TableCell>
                             <div className="flex items-center gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
-                                    disabled={summarizingId === email.id}
-                                    className="h-6 w-6"
-                                >
-                                    {summarizingId === email.id ? (
-                                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="h-4 w-4" />
-                                    )}
-                                </Button>
-                                <span className="line-clamp-2">{summaries[email.id] || email.body_excerpt}</span>
+                                {summaries[email.id] ? (
+                                    <span className="line-clamp-2">{summaries[email.id]}</span>
+                                ) : (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleSummarizeOne(email.id, email.body_excerpt)}
+                                            disabled={summarizingId === email.id}
+                                            className="h-6 w-6 shrink-0"
+                                        >
+                                            {summarizingId === email.id ? (
+                                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <RefreshCw className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        <span className="text-xs text-muted-foreground italic line-clamp-2">
+                                            {email.body_excerpt}
+                                        </span>
+                                    </>
+                                )}
                             </div>
                         </TableCell>
                         <TableCell>
