@@ -33,14 +33,22 @@ const InfotopeSchema = z.object({
     fact: z.string().describe("The atomic fact extracted from the text (e.g., 'He works at Tech Solutions', 'Budget is around $50k').")
 });
 
+const OrchestratorSchema = z.object({
+    command: z.string().describe("The action to be taken, e.g., 'createContact', 'createDeal', 'createTask', 'updateDeal'."),
+    entityType: z.string().optional().describe("The type of entity, e.g., 'Contact', 'Deal', 'Task'."),
+    entityName: z.string().optional().describe("The name of the entity to be created or updated."),
+    details: z.record(z.any()).optional().describe("A structured object of data for the command, e.g., { email: 'jane@acme.com', amount: 50000 }."),
+    sourceText: z.string().optional().describe("The original text snippet that led to this command.")
+});
+
 const InfoshardTextOutputSchema = z.object({
   infotopes: z
     .array(InfotopeSchema)
     .describe('A list of atomic facts, each linked to a specific entity.'),
   orchestrators: z
-    .array(z.string())
+    .array(OrchestratorSchema)
     .describe(
-      'A list of plain-text instructions for the AI orchestrator based on the text.'
+      'A list of structured command objects for the AI orchestrator based on the text.'
     ),
 });
 export type InfoshardTextOutput = z.infer<typeof InfoshardTextOutputSchema>;
@@ -53,7 +61,7 @@ const infoshardTextPrompt = ai.definePrompt({
   input: { schema: InfoshardTextInputSchema },
   output: { schema: InfoshardTextOutputSchema },
   prompt: `You are an expert text analysis and entity resolution AI for a CRM.
-Your task is to deconstruct unstructured text into "infotopes" (atomic, self-contained facts) and "orchestrators" (plain-text, actionable commands for the system) and link them to specific CRM entities.
+Your task is to deconstruct unstructured text into "infotopes" (atomic, self-contained facts) and "orchestrators" (structured, actionable command objects for the system) and link them to specific CRM entities.
 
 **Instructions:**
 
@@ -65,14 +73,17 @@ Your task is to deconstruct unstructured text into "infotopes" (atomic, self-con
     *   Example: "He is interested in the Pro plan and his budget is $50k" becomes two infotopes: 1) "is interested in the Pro plan" (linked to the contact) and 2) "budget is $50k" (linked to the deal).
 3.  **Identify Actionable Commands (Orchestrators):**
     *   Extract any instruction, next step, or task from the text.
-    *   Format it as a clear command for the system.
-    *   Example: "Please review the document" becomes "Task: Review the document".
-    *   Example: "I'll send the action items" becomes "Task: Document and send action items".
+    *   Format it as a structured command object.
+    *   The 'command' should be a camelCase verb like 'createContact', 'createDeal', 'createTask', 'updateDeal'.
+    *   The 'details' should be an object containing all extracted data (e.g., email, phone, amount, stage).
+    *   'sourceText' should contain the original snippet that justifies the command.
+    *   Example: "Please review the document" becomes { command: "createTask", details: { description: "Review the document" } }.
+    *   Example: "Let's create a deal for Julian for $25k" becomes { command: "createDeal", entityName: "Julian's Deal", details: { contactName: "Julian", amount: 25000 } }.
 4.  **Link to CRM Entities:**
-    *   For each infotope and orchestrator, match the entity mentioned (e.g., "Javier Gomez", "Tech Solutions") with an entity from the provided CRM Context Data.
+    *   For each infotope, match the entity mentioned (e.g., "Javier Gomez", "Tech Solutions") with an entity from the provided CRM Context Data.
     *   If a match is found, use the entity's name and its ID.
     *   **If you cannot find a match, use the name from the text and "Not Found" as the ID.**
-    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. Example: "Create contact: Julian Lopez".
+    *   **If an entity is "Not Found"**: You MUST create an orchestrator command to create it. Example: { command: "createContact", entityName: "Julian Lopez", details: { email: "julian.l@example.com" } }.
 5.  **Return JSON:** Format your entire output as a single JSON object that strictly matches the output schema. Do not add any commentary.
 
 **CRM Context Data:**
@@ -107,7 +118,7 @@ const infoshardTextFlow = ai.defineFlow(
   },
   async (input) => {
     if (!input.text || input.text.trim().length < 10) {
-      return { infotopes: [], orchestrators: ['Input text is too short.'] };
+      return { infotopes: [], orchestrators: [{ command: 'error', details: { message: 'Input text is too short.' } }] };
     }
 
     try {
@@ -122,15 +133,15 @@ const infoshardTextFlow = ai.defineFlow(
 
       if (hasNotFound) {
         // If any entity was not found, defer saving infotopes and set up for retry.
-        const creationCommands = output.orchestrators.filter(cmd => cmd.toLowerCase().startsWith('create'));
-        const otherCommands = output.orchestrators.filter(cmd => !cmd.toLowerCase().startsWith('create'));
+        const creationCommands = output.orchestrators.filter(cmd => cmd.command.toLowerCase().startsWith('create'));
+        const otherCommands = output.orchestrators.filter(cmd => !cmd.command.toLowerCase().startsWith('create'));
         
         return {
             infotopes: [], // Do not save any infotopes yet.
             orchestrators: [
                 ...creationCommands, // Prioritize creation commands.
                 ...otherCommands,
-                `Retry infoshard: ${input.text}` // Add retry command with original text.
+                { command: 'retryInfoshard', details: { originalText: input.text }, sourceText: 'An entity was not found, scheduling a retry.' }
             ]
         };
 

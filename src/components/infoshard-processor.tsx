@@ -103,9 +103,15 @@ export function InfoshardProcessor({ crmData, crmDataLoading }: InfoshardProcess
             <div>
               <h4 className="font-semibold text-sm mb-2">Orchestrate:</h4>
               {result.orchestrators.length > 0 ? (
-                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                  {result.orchestrators.map((item, i) => <li key={`or-${i}`}>{item}</li>)}
-                </ul>
+                 <div className="space-y-2">
+                    {result.orchestrators.map((item, i) => (
+                        <div key={`or-${i}`} className="text-sm text-muted-foreground bg-background/50 p-2 rounded-md">
+                            <p className="font-semibold text-foreground">{item.command}</p>
+                            <pre className="mt-1 text-xs whitespace-pre-wrap font-mono">{JSON.stringify(item.details || {}, null, 2)}</pre>
+                            {item.sourceText && <p className="text-xs italic mt-2 border-t pt-1">Source: "{item.sourceText}"</p>}
+                        </div>
+                    ))}
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground italic">No orchestrator commands generated.</p>
               )}
