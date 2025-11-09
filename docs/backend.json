@@ -520,6 +520,27 @@
         }
       },
       "required": ["id", "fact", "source", "sourceIdentifier", "status", "createdAt"]
+    },
+    "AIAction": {
+        "title": "AI Action",
+        "description": "An AI-generated action suggestion for a CRM entity.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier for the action." },
+            "type": {
+                "type": "string",
+                "enum": ["reply", "stage_change", "create_task", "data_update"],
+                "description": "The type of action suggested."
+            },
+            "description": { "type": "string", "description": "A short, AI-generated summary of the action." },
+            "details": { "type": "object", "description": "A JSON object with the specific data for the action (e.g., new stage, task details)." },
+            "status": {
+                "type": "string",
+                "enum": ["pending", "accepted", "rejected"],
+                "description": "The current status of the suggestion."
+            }
+        },
+        "required": ["id", "type", "description", "details", "status"]
     }
   },
   "auth": {
@@ -642,6 +663,21 @@
               "name": "emailId",
               "description": "The unique identifier for the email."
             }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/emails/{emailId}/actions/{actionId}",
+        "definition": {
+          "entityName": "AIAction",
+          "schema": {
+            "$ref": "#/backend/entities/AIAction"
+          },
+          "description": "AI-generated actions for a specific email.",
+          "params": [
+            { "name": "userId", "description": "The user ID." },
+            { "name": "emailId", "description": "The email ID." },
+            { "name": "actionId", "description": "The action ID." }
           ]
         }
       },

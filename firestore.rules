@@ -105,6 +105,14 @@ service cloud.firestore {
     }
     
     /**
+     * @description Manages AI-generated actions for an email.
+     * @path /users/{userId}/emails/{emailId}/actions/{actionId}
+     */
+    match /users/{userId}/emails/{emailId}/actions/{actionId} {
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
+    }
+
+    /**
      * @description Manages tasks associated with a specific user.
      * @path /users/{userId}/tasks/{taskId}
      * @allow (create) Authenticated user can create a task under their user id.

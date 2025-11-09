@@ -8,7 +8,7 @@ import { collection, orderBy, query, doc, setDoc, writeBatch, Timestamp } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, addDays } from 'date-fns';
-import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp } from 'lucide-react';
+import { Mail, Database, LoaderCircle, Calendar as CalendarIcon, FileText, Sparkles, MailPlus, CalendarPlus, TrendingUp, Bot } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -35,14 +35,21 @@ import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { syncGmail } from '@/ai/flows/sync-gmail-flow';
 import { OrchestratorSuggestionDialog } from '@/components/orchestrator-suggestion-dialog';
-import { orchestrateInteraction, type OrchestratorOutput, type Interaction } from '@/ai/flows/orchestrator-flow';
+import { orchestrateInteraction, type OrchestratorOutput, type Interaction, type Action } from '@/ai/flows/orchestrator-flow';
 import { EmailReplyDialog } from '@/components/email-reply-dialog';
 import { AnalyzeEmailDialog } from '@/components/analyze-email-dialog';
 
-type ActionStatus = 'approved' | 'rejected' | null;
-type ActionType = 'reply' | 'analyze' | 'meeting' | 'task';
-type ActionStates = Partial<Record<ActionType, ActionStatus>>;
 
+type ActionStatus = 'approved' | 'rejected' | 'pending' | null;
+type ActionType = 'reply' | 'analyze' | 'meeting' | 'task';
+
+type AIAction = {
+    id: string;
+    type: ActionType;
+    description: string;
+    details: any; // JSON blob
+    status: ActionStatus;
+}
 
 type Email = {
     id: string;
@@ -56,7 +63,8 @@ type Email = {
     company_id?: string;
     deal_id?: string;
     ai_summary?: string;
-    actionStates?: ActionStates;
+    actionStates?: Partial<Record<ActionType, ActionStatus>>;
+    actions?: AIAction[];
 };
 
 type Company = { id: string; name: string; domain?: string; industry?: string; };
@@ -77,6 +85,7 @@ export default function EmailHistoryPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
     const [isSummarizingAll, setIsSummarizingAll] = useState(false);
+    const [processingActionsId, setProcessingActionsId] = useState<string | null>(null);
 
     // Filters state
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -103,6 +112,10 @@ export default function EmailHistoryPage() {
     const [selectedEmailForMeeting, setSelectedEmailForMeeting] = useState<Email | null>(null);
     const [meetingDate, setMeetingDate] = useState<Date | undefined>(undefined);
     const [meetingTime, setMeetingTime] = useState<string>('10:00');
+
+    // Orchestrator Dialog State
+    const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
+    const [selectedEmailForOrchestration, setSelectedEmailForOrchestration] = useState<Email | null>(null);
 
 
     // Data fetching
@@ -200,6 +213,59 @@ export default function EmailHistoryPage() {
         } finally {
             setIsSyncing(false);
         }
+    };
+
+    const handleGenerateAiActions = async () => {
+        if (!user || !filteredEmails || filteredEmails.length === 0) {
+            toast({ title: 'No emails to process.' });
+            return;
+        }
+
+        toast({ title: 'Generating AI Actions...', description: `Processing ${filteredEmails.length} emails.`});
+
+        for (const email of filteredEmails) {
+            setProcessingActionsId(email.id);
+            try {
+                const interaction: Interaction = {
+                    source: 'email',
+                    direction: email.direction,
+                    subject: email.subject,
+                    body: email.body_excerpt,
+                    from: email.from_email,
+                    to: email.to_email,
+                    timestamp: email.ts ? toDate(email.ts).toISOString() : undefined,
+                };
+                
+                const deal = getDeal(email.deal_id);
+                const contact = contacts?.find(c => c.email_primary === email.from_email || c.email_primary === email.to_email);
+                const company = getCompanyName(email.company_id || deal?.company_id || contact?.company_id);
+
+                const result = await orchestrateInteraction({
+                    interaction,
+                    related_entities: { deal, contact, company },
+                });
+                
+                if (result.actions.length > 0 && db) {
+                    const batch = writeBatch(db);
+                    result.actions.forEach((action: Action) => {
+                         const actionRef = doc(collection(db, 'users', user.uid, 'emails', email.id, 'actions'));
+                         batch.set(actionRef, {
+                            id: actionRef.id,
+                            type: action.type,
+                            description: action.reason,
+                            details: action.data || action.changes,
+                            status: 'pending'
+                         });
+                    });
+                    await batch.commit();
+                }
+
+            } catch (error: any) {
+                console.error(`Failed to process actions for email ${email.id}`, error);
+            }
+        }
+        setProcessingActionsId(null);
+        toast({ title: 'AI Actions Generated!', description: 'Review the suggestions in each row.'});
     };
 
 
@@ -394,9 +460,9 @@ export default function EmailHistoryPage() {
         toast({ title: 'Summaries Complete!', description: `${successCount} of ${emailsToSummarize.length} emails were summarized.` });
     };
 
-    const handleGenerateReply = (email: Email) => {
-        setSelectedEmailForReply(email);
-        setIsReplyDialogOpen(true);
+    const handleOrchestrationClick = (email: Email) => {
+        setSelectedEmailForOrchestration(email);
+        setIsOrchestratorOpen(true);
     };
 
     const handleAnalyzeEmail = (email: Email) => {
@@ -510,6 +576,10 @@ export default function EmailHistoryPage() {
                 <p className="text-muted-foreground">A log of all emails processed by the system.</p>
             </div>
             <div className="flex gap-2">
+                 <Button onClick={handleGenerateAiActions} disabled={!!processingActionsId}>
+                    {processingActionsId ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+                    Generate AI Actions
+                </Button>
                 <Button onClick={handleSyncGmail} disabled={isSyncing}>
                     {isSyncing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <MailPlus className="mr-2 h-4 w-4" />}
                     Sync Today's Gmail
@@ -630,16 +700,20 @@ export default function EmailHistoryPage() {
                         const showMeetingButton = email.direction === 'inbound' && checkKeywords(email.body_excerpt, ['meeting', 'talk', 'chat', 'schedule']);
                         const showTaskButton = checkKeywords(email.body_excerpt, ['POC', 'SLA terms', 'align', 'scope']);
                         
-                        const emailActionStates = email.actionStates || {};
+                        const isProcessingRow = processingActionsId === email.id;
+                        const actionIconsColor = isProcessingRow ? 'text-muted-foreground/30' : 'text-current';
 
                         const getIconClass = (action: ActionType) => {
-                            if (emailActionStates[action] === 'approved') return 'text-green-500';
-                            if (emailActionStates[action] === 'rejected') return 'text-red-500';
+                            if (isProcessingRow) return 'text-muted-foreground/30';
+
+                            const status = email.actionStates?.[action];
+                            if (status === 'approved') return 'text-green-500';
+                            if (status === 'rejected') return 'text-red-500';
                             return '';
                         };
 
                         return (
-                        <TableRow key={email.id}>
+                        <TableRow key={email.id} className={cn(isProcessingRow && "opacity-50")}>
                             <TableCell>{email.ts ? format(toDate(email.ts), "MMM d, yyyy, h:mm a") : 'No date'}</TableCell>
                             <TableCell className="font-medium">
                             <Dialog>
@@ -733,7 +807,7 @@ export default function EmailHistoryPage() {
                                 <div className="flex items-center gap-1">
                                      <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleGenerateReply(email)}>
+                                            <Button variant="ghost" size="icon" onClick={() => handleOrchestrationClick(email)} disabled={isProcessingRow}>
                                                 <MailPlus className={cn("h-4 w-4", getIconClass('reply'))} />
                                                 <span className="sr-only">Generate Reply</span>
                                             </Button>
@@ -742,7 +816,7 @@ export default function EmailHistoryPage() {
                                     </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)}>
+                                            <Button variant="ghost" size="icon" onClick={() => handleAnalyzeEmail(email)} disabled={isProcessingRow}>
                                                 <TrendingUp className={cn("h-4 w-4", getIconClass('analyze'))} />
                                                 <span className="sr-only">Stage Status</span>
                                             </Button>
@@ -752,7 +826,7 @@ export default function EmailHistoryPage() {
                                     {showMeetingButton && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)}>
+                                                <Button variant="ghost" size="icon" onClick={() => handleScheduleMeeting(email)} disabled={isProcessingRow}>
                                                     <CalendarPlus className={cn("h-4 w-4", getIconClass('meeting'))} />
                                                     <span className="sr-only">Schedule Meeting</span>
                                                 </Button>
@@ -763,7 +837,7 @@ export default function EmailHistoryPage() {
                                      {showTaskButton && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for task dialog */ toast({title: 'Not Implemented'})}}>
+                                                <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for task dialog */ toast({title: 'Not Implemented'})}} disabled={isProcessingRow}>
                                                     <FileText className={cn("h-4 w-4", getIconClass('task'))} />
                                                     <span className="sr-only">Create Task</span>
                                                 </Button>
@@ -790,15 +864,26 @@ export default function EmailHistoryPage() {
         deals={deals || []}
         emails={emails || []}
       />
-       {selectedEmailForReply && user && (
-        <EmailReplyDialog
-          open={isReplyDialogOpen}
-          onOpenChange={setIsReplyDialogOpen}
-          onStatusChange={(status) => setActionState(selectedEmailForReply.id, 'reply', status)}
-          email={selectedEmailForReply}
-          user={user}
+       {selectedEmailForOrchestration && user && (
+        <OrchestratorSuggestionDialog
+            open={isOrchestratorOpen}
+            onOpenChange={setIsOrchestratorOpen}
+            email={selectedEmailForOrchestration}
+            processFunction={async () => {
+                const interaction: Interaction = {
+                    source: 'email',
+                    direction: selectedEmailForOrchestration.direction,
+                    subject: selectedEmailForOrchestration.subject,
+                    body: selectedEmailForOrchestration.body_excerpt,
+                    from: selectedEmailForOrchestration.from_email,
+                    to: selectedEmailForOrchestration.to_email,
+                    timestamp: toDate(selectedEmailForOrchestration.ts).toISOString(),
+                };
+                const deal = getDeal(selectedEmailForOrchestration.deal_id);
+                return orchestrateInteraction({ interaction, related_entities: { deal }});
+            }}
         />
-      )}
+       )}
       {selectedEmailForAnalysis && user && deals && (
         <AnalyzeEmailDialog
             open={isAnalyzeDialogOpen}
