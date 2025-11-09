@@ -62,8 +62,8 @@ const TestCard: React.FC<TestCardProps> = ({ title, description, testId, onRun, 
                     <TestStatusIndicator status={status} />
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <>
+            <CardContent>
+                <div className="space-y-4">
                     {children}
                     {result && (
                         <div className="p-4 bg-secondary rounded-md text-sm">
@@ -71,7 +71,7 @@ const TestCard: React.FC<TestCardProps> = ({ title, description, testId, onRun, 
                             <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(result, null, 2)}</pre>
                         </div>
                     )}
-                </>
+                </div>
             </CardContent>
             <CardFooter>
                 <Button onClick={handleRun} disabled={isPending}>
