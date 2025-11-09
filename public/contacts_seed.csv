@@ -1,4 +1,4 @@
-tualiid,company_id,first_name,last_name,full_name,email_primary,phone,title,seniority,linkedin_url,owner_email
+id,company_id,first_name,last_name,full_name,email_primary,phone,title,seniority,linkedin_url,owner_email
 cont_64dd1155,comp_cf618185,María,Gómez,María Gómez,maría.gómez@bluefinch.ai,+34 600 000 00,CTO,Senior,https://www.linkedin.com/in/maríagómez,sales@corchcrm.com
 cont_f605d1c6,comp_20397e6f,Luis,Pérez,Luis Pérez,luis.pérez@acmerobotics.com,+34 600 000 01,Head of Ops,Manager,https://www.linkedin.com/in/luispérez,jo@corchcrm.com
 cont_e9a04cda,comp_3058ac72,Ana,Silva,Ana Silva,ana.silva@helioshealth.io,+34 600 000 02,CFO,Director,https://www.linkedin.com/in/anasilva,sales@corchcrm.com

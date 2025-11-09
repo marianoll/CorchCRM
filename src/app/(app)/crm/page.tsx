@@ -15,6 +15,7 @@ import { CreateCompanyForm } from '@/components/create-company-form';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { CrmDetailsDialog } from '@/components/crm-details-dialog';
 
 // Define types based on new schema
 type Company = {
@@ -63,6 +64,22 @@ type Deal = {
     companyId?: string; // For compatibility
 };
 
+type Email = {
+    id: string;
+    ts: string | Timestamp;
+    from_email: string;
+    to_email: string;
+    direction: 'inbound' | 'outbound';
+    subject: string;
+    body_excerpt: string;
+    labels: string;
+    company_id?: string;
+    deal_id?: string;
+    ai_summary?: string;
+};
+
+type CrmEntity = Company | Contact | Deal;
+
 
 const stageVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
   prospect: 'secondary',
@@ -90,6 +107,12 @@ export default function CrmPage() {
     const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
+    // Details Dialog state
+    const [detailsEntity, setDetailsEntity] = useState<CrmEntity | null>(null);
+    const [detailsEntityType, setDetailsEntityType] = useState<'Company' | 'Contact' | 'Deal' | null>(null);
+    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+
+
     const contactsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('full_name')) : null, [firestore, user]);
     const { data: contacts, loading: contactsLoading } = useCollection<Contact>(contactsQuery);
     
@@ -99,15 +122,24 @@ export default function CrmPage() {
     const companiesQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'companies'), orderBy('name')) : null, [firestore, user]);
     const { data: companies, loading: companiesLoading } = useCollection<Company>(companiesQuery);
 
+    const emailsQuery = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users', user.uid, 'emails')) : null, [firestore, user]);
+    const { data: emails } = useCollection<Email>(emailsQuery);
+
 
     const getContactName = (contactId: string) => {
         return contacts?.find(c => c.id === contactId)?.full_name || 'Unknown Contact';
     }
     
-    const getCompanyName = (companyId?: string) => {
-        if (!companyId) return 'N/A';
-        return companies?.find(c => c.id === companyId)?.name || 'Unknown Company';
+    const getCompany = (companyId?: string) => {
+        if (!companyId) return null;
+        return companies?.find(c => c.id === companyId) || null;
     }
+
+    const handleEntityClick = (entity: CrmEntity, type: 'Company' | 'Contact' | 'Deal') => {
+        setDetailsEntity(entity);
+        setDetailsEntityType(type);
+        setIsDetailsDialogOpen(true);
+    };
 
     const handleSeedDatabase = async () => {
         if (!firestore || !user) {
@@ -295,7 +327,7 @@ export default function CrmPage() {
                         <TableRow key={deal.id}>
                             <TableCell className="font-medium">{deal.title || deal.name}</TableCell>
                             <TableCell>{getContactName(deal.primary_contact_id || deal.contactId!)}</TableCell>
-                            <TableCell>{getCompanyName(deal.company_id || deal.companyId)}</TableCell>
+                            <TableCell>{getCompany(deal.company_id || deal.companyId)?.name || 'N/A'}</TableCell>
                             <TableCell className="text-right">{formatCurrency(deal.amount, deal.currency)}</TableCell>
                             <TableCell>
                                 <Badge variant={stageVariant[deal.stage] || 'secondary'}>{deal.stage}</Badge>
@@ -325,26 +357,37 @@ export default function CrmPage() {
                     </TableHeader>
                     <TableBody>
                     {contactsLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
-                    {contacts?.map(contact => (
-                        <TableRow key={contact.id}>
-                            <TableCell>
-                                <div className="flex items-center gap-3">
-                                    <Avatar>
-                                        <AvatarFallback>{(contact.full_name || contact.name || 'U').charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <span className="font-medium">{contact.full_name || contact.name}</span>
-                                </div>
-                            </TableCell>
-                            <TableCell>{contact.email_primary || contact.email}</TableCell>
-                            <TableCell>{contact.phone}</TableCell>
-                            <TableCell>{getCompanyName(contact.company_id || contact.companyId)}</TableCell>
-                            <TableCell>
-                                <Button variant="ghost" size="icon" onClick={() => handleEditContact(contact)}>
-                                    <Pencil className="h-4 w-4" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
+                    {contacts?.map(contact => {
+                        const company = getCompany(contact.company_id || contact.companyId);
+                        return (
+                            <TableRow key={contact.id}>
+                                <TableCell>
+                                    <div className="flex items-center gap-3">
+                                        <Avatar>
+                                            <AvatarFallback>{(contact.full_name || contact.name || 'U').charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <span className="font-medium">{contact.full_name || contact.name}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>{contact.email_primary || contact.email}</TableCell>
+                                <TableCell>{contact.phone}</TableCell>
+                                <TableCell>
+                                    {company ? (
+                                        <Button variant="link" className="p-0 h-auto" onClick={() => handleEntityClick(company, 'Company')}>
+                                            {company.name}
+                                        </Button>
+                                    ) : (
+                                        'N/A'
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    <Button variant="ghost" size="icon" onClick={() => handleEditContact(contact)}>
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        )
+                    })}
                     </TableBody>
                 </Table>
             </div>
@@ -385,6 +428,16 @@ export default function CrmPage() {
     <CreateContactForm open={isCreateContactOpen} onOpenChange={closeContactForm} contact={editingContact} companies={companies || []}/>
     <CreateDealForm open={isCreateDealOpen} onOpenChange={closeDealForm} contacts={contacts || []} companies={companies || []} deal={editingDeal} />
     <CreateCompanyForm open={isCreateCompanyOpen} onOpenChange={closeCompanyForm} company={editingCompany} />
+    <CrmDetailsDialog
+        entity={detailsEntity}
+        entityType={detailsEntityType}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        onEntityClick={handleEntityClick}
+        contacts={contacts || []}
+        deals={deals || []}
+        emails={emails || []}
+    />
     </>
   );
 }
