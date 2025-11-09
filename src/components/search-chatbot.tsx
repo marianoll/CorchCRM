@@ -156,18 +156,10 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl flex flex-col h-[70vh]">
         <DialogHeader>
-          <div className="flex justify-between items-center">
-            <DialogTitle className="flex items-center gap-2">
-              <Bot />
-              Natural Language Search
-            </DialogTitle>
-            {messages.length > 0 && (
-                <Button variant="ghost" size="icon" onClick={handleNewConversation}>
-                    <RefreshCw className="h-4 w-4" />
-                    <span className="sr-only">New Conversation</span>
-                </Button>
-            )}
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <Bot />
+            Natural Language Search
+          </DialogTitle>
           <DialogDescription>
             Ask a question about your CRM data in plain English. The AI will interpret your query.
           </DialogDescription>
@@ -218,6 +210,12 @@ export function SearchChatbot({ open, onOpenChange, contacts, deals, companies }
 
         <DialogFooter className="border-t pt-4">
           <div className="flex w-full items-center space-x-2">
+             {messages.length > 0 && (
+                <Button variant="destructive" size="icon" onClick={handleNewConversation}>
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="sr-only">New Conversation</span>
+                </Button>
+            )}
             <Input
               type="text"
               placeholder="e.g., 'deals over 50k for Acme Corp'"
