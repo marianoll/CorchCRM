@@ -49,6 +49,14 @@ service cloud.firestore {
     }
 
     /**
+     * @description Manages user-specific settings.
+     * @path /users/{userId}/settings/{settingsId}
+     */
+    match /users/{userId}/settings/{settingsId} {
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    /**
      * @description Manages deals associated with a specific user.
      * @path /users/{userId}/deals/{dealId}
      * @allow (create) Authenticated user can create a deal under their user id.

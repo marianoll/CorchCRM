@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,39 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Plus, Palette } from "lucide-react";
+import { X, Plus, Palette, LoaderCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const StageEditor = () => {
-    const [stages, setStages] = useState([
+type Stage = { name: string; color: string; };
+
+type Settings = {
+    pipelineStages: Stage[];
+    defaultDealSorting: string;
+    darkMode: boolean;
+    autoApplyConfidenceThreshold: number;
+    autoCreateEntities: boolean;
+    dealStageAutoMove: boolean;
+    amountChange: boolean;
+    dateChange: boolean;
+    followUpDelay: { prospect: number; negotiation: number; };
+    taskExpiryHours: number;
+    emailCheckFrequency: string;
+    dealInactivityAlertDays: number;
+    autoReminderWindow: string;
+    businessHours: { start: string; end: string; };
+    activeDays: string[];
+    emailSignature: string;
+    language: string;
+    tone: string;
+    timezone: string;
+};
+
+const defaultSettings: Settings = {
+    pipelineStages: [
         { name: 'Prospect', color: 'bg-blue-500' },
         { name: 'Discovery', color: 'bg-sky-500' },
         { name: 'Proposal', color: 'bg-amber-500' },
@@ -22,22 +50,43 @@ const StageEditor = () => {
         { name: 'Closed Won', color: 'bg-green-500' },
         { name: 'Closed Lost', color: 'bg-red-500' },
         { name: 'Retention', color: 'bg-purple-500' },
-    ]);
+    ],
+    defaultDealSorting: 'probability',
+    darkMode: false,
+    autoApplyConfidenceThreshold: 80,
+    autoCreateEntities: true,
+    dealStageAutoMove: true,
+    amountChange: false,
+    dateChange: false,
+    followUpDelay: { prospect: 3, negotiation: 5 },
+    taskExpiryHours: 48,
+    emailCheckFrequency: '6h',
+    dealInactivityAlertDays: 10,
+    autoReminderWindow: '24h',
+    businessHours: { start: '09:00', end: '18:00' },
+    activeDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    emailSignature: '',
+    language: 'en',
+    tone: 'neutral',
+    timezone: 'America/New_York',
+};
+
+const StageEditor = ({ stages, onStagesChange }: { stages: Stage[], onStagesChange: (stages: Stage[]) => void }) => {
     const [newStage, setNewStage] = useState('');
 
     const addStage = () => {
         if (newStage.trim() !== '' && !stages.some(s => s.name === newStage)) {
-            setStages([...stages, { name: newStage, color: 'bg-gray-400' }]);
+            onStagesChange([...stages, { name: newStage, color: 'bg-gray-400' }]);
             setNewStage('');
         }
     };
 
     const removeStage = (name: string) => {
-        setStages(stages.filter(s => s.name !== name));
+        onStagesChange(stages.filter(s => s.name !== name));
     };
 
     const updateStageColor = (name: string, color: string) => {
-        setStages(stages.map(s => s.name === name ? { ...s, color } : s));
+        onStagesChange(stages.map(s => s.name === name ? { ...s, color } : s));
     }
 
     const colors = ['bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500', 'bg-rose-500', 'bg-gray-400'];
@@ -85,7 +134,84 @@ const StageEditor = () => {
 }
 
 export default function SettingsPage() {
-  const [confidence, setConfidence] = useState(80);
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const settingsRef = useMemoFirebase(() => 
+    firestore && user ? doc(firestore, 'users', user.uid, 'settings', 'user') : null
+  , [firestore, user]);
+
+  const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<Settings>(settingsRef);
+
+  useEffect(() => {
+    if (savedSettings) {
+        setSettings(savedSettings);
+    } else if (!isLoadingSettings) {
+        setSettings(defaultSettings);
+    }
+  }, [savedSettings, isLoadingSettings]);
+
+  const handleSettingsChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
+      setSettings(prev => prev ? { ...prev, [key]: value } : null);
+  };
+  
+  const handleNestedChange = <K extends keyof Settings, NK extends keyof Settings[K]>(key: K, nestedKey: NK, value: Settings[K][NK]) => {
+    setSettings(prev => prev ? {
+        ...prev,
+        [key]: {
+            ...(prev[key] as object),
+            [nestedKey]: value
+        }
+    } : null);
+  };
+
+  const handleSave = async () => {
+    if (!settingsRef || !settings) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not save settings.' });
+        return;
+    }
+    setIsSaving(true);
+    try {
+        await setDoc(settingsRef, settings, { merge: true });
+        toast({ title: 'Success!', description: 'Your settings have been saved.' });
+    } catch (error) {
+        console.error("Error saving settings:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while saving your settings.' });
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  if (isLoadingSettings || !settings) {
+    return (
+        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto space-y-8">
+                 <div>
+                    <h1 className="text-3xl font-bold tracking-tight font-headline">Settings</h1>
+                    <p className="text-muted-foreground">Manage your integrations and application settings.</p>
+                </div>
+                <Card>
+                    <CardHeader><CardTitle><Skeleton className="h-6 w-1/4" /></CardTitle><CardDescription><Skeleton className="h-4 w-1/2" /></CardDescription></CardHeader>
+                    <CardContent className="space-y-6">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader><CardTitle><Skeleton className="h-6 w-1/4" /></CardTitle><CardDescription><Skeleton className="h-4 w-1/2" /></CardDescription></CardHeader>
+                    <CardContent className="space-y-6">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </CardContent>
+                </Card>
+            </div>
+        </main>
+    )
+  }
 
   return (
     <>
@@ -103,24 +229,24 @@ export default function SettingsPage() {
               <CardDescription>Customize stages, sorting, and appearance.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <StageEditor />
+                <StageEditor stages={settings.pipelineStages} onStagesChange={(stages) => handleSettingsChange('pipelineStages', stages)} />
                 <div className="flex items-center justify-between">
                     <Label htmlFor="default-sort">Default Deal Sorting</Label>
-                    <Select defaultValue="probability">
-                    <SelectTrigger id="default-sort" className="w-[200px]">
-                        <SelectValue placeholder="Select sorting" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="probability">Probability</SelectItem>
-                        <SelectItem value="amount">Amount</SelectItem>
-                        <SelectItem value="stage">Stage</SelectItem>
-                        <SelectItem value="last_contact">Last Contact</SelectItem>
-                    </SelectContent>
+                    <Select value={settings.defaultDealSorting} onValueChange={(value) => handleSettingsChange('defaultDealSorting', value)}>
+                        <SelectTrigger id="default-sort" className="w-[200px]">
+                            <SelectValue placeholder="Select sorting" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="probability">Probability</SelectItem>
+                            <SelectItem value="amount">Amount</SelectItem>
+                            <SelectItem value="stage">Stage</SelectItem>
+                            <SelectItem value="last_contact">Last Contact</SelectItem>
+                        </SelectContent>
                     </Select>
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="ui-mode">Dark Mode</Label>
-                    <Switch id="ui-mode" />
+                    <Switch id="ui-mode" checked={settings.darkMode} onCheckedChange={(checked) => handleSettingsChange('darkMode', checked)} />
                 </div>
             </CardContent>
           </Card>
@@ -135,31 +261,31 @@ export default function SettingsPage() {
                <div className="space-y-3">
                     <div className='flex justify-between items-center'>
                          <Label htmlFor="confidence-threshold">Auto-Apply Confidence Threshold</Label>
-                         <span className="text-sm font-medium text-muted-foreground">{confidence}%</span>
+                         <span className="text-sm font-medium text-muted-foreground">{settings.autoApplyConfidenceThreshold}%</span>
                     </div>
                     <Slider
                         id="confidence-threshold"
-                        defaultValue={[confidence]}
-                        onValueChange={(value) => setConfidence(value[0])}
+                        value={[settings.autoApplyConfidenceThreshold]}
+                        onValueChange={(value) => handleSettingsChange('autoApplyConfidenceThreshold', value[0])}
                         max={100}
                         step={5}
                     />
                </div>
                <div className="flex items-center justify-between">
                     <Label htmlFor="auto-create-entities">Auto-Create Entities (Contacts, Companies)</Label>
-                    <Switch id="auto-create-entities" defaultChecked />
+                    <Switch id="auto-create-entities" checked={settings.autoCreateEntities} onCheckedChange={(checked) => handleSettingsChange('autoCreateEntities', checked)} />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="deal-stage-auto-move">Allow AI to Move Deal Stage</Label>
-                    <Switch id="deal-stage-auto-move" defaultChecked />
+                    <Switch id="deal-stage-auto-move" checked={settings.dealStageAutoMove} onCheckedChange={(checked) => handleSettingsChange('dealStageAutoMove', checked)} />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="amount-change">Allow AI to Change Deal Amount</Label>
-                    <Switch id="amount-change" />
+                    <Switch id="amount-change" checked={settings.amountChange} onCheckedChange={(checked) => handleSettingsChange('amountChange', checked)} />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="date-change">Allow AI to Change Close Date & Win/Loss Status</Label>
-                    <Switch id="date-change" />
+                    <Switch id="date-change" checked={settings.dateChange} onCheckedChange={(checked) => handleSettingsChange('dateChange', checked)} />
                 </div>
             </CardContent>
           </Card>
@@ -174,17 +300,17 @@ export default function SettingsPage() {
                 <div className="space-y-3">
                     <Label>Follow-up Delay (per stage)</Label>
                     <div className="grid grid-cols-2 gap-4">
-                         <div className='space-y-2'><Label htmlFor='delay-prospect' className='text-xs font-normal'>Prospect</Label><Input id='delay-prospect' type="number" defaultValue={3} placeholder="Days"/></div>
-                         <div className='space-y-2'><Label htmlFor='delay-negotiation' className='text-xs font-normal'>Negotiation</Label><Input id='delay-negotiation' type="number" defaultValue={5} placeholder="Days"/></div>
+                         <div className='space-y-2'><Label htmlFor='delay-prospect' className='text-xs font-normal'>Prospect</Label><Input id='delay-prospect' type="number" value={settings.followUpDelay.prospect} onChange={(e) => handleNestedChange('followUpDelay', 'prospect', parseInt(e.target.value))} placeholder="Days"/></div>
+                         <div className='space-y-2'><Label htmlFor='delay-negotiation' className='text-xs font-normal'>Negotiation</Label><Input id='delay-negotiation' type="number" value={settings.followUpDelay.negotiation} onChange={(e) => handleNestedChange('followUpDelay', 'negotiation', parseInt(e.target.value))} placeholder="Days"/></div>
                     </div>
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="task-expiry">Task Expiry (hours after due date)</Label>
-                    <Input id="task-expiry" type="number" defaultValue={48} className="w-[120px]" />
+                    <Input id="task-expiry" type="number" value={settings.taskExpiryHours} onChange={(e) => handleSettingsChange('taskExpiryHours', parseInt(e.target.value))} className="w-[120px]" />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="email-check-freq">Email Check-in Frequency</Label>
-                    <Select defaultValue="6h">
+                    <Select value={settings.emailCheckFrequency} onValueChange={(value) => handleSettingsChange('emailCheckFrequency', value)}>
                         <SelectTrigger id="email-check-freq" className="w-[180px]">
                             <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
@@ -197,11 +323,11 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="inactivity-alert">Deal Inactivity Alert (days)</Label>
-                    <Input id="inactivity-alert" type="number" defaultValue={10} className="w-[120px]" />
+                    <Input id="inactivity-alert" type="number" value={settings.dealInactivityAlertDays} onChange={(e) => handleSettingsChange('dealInactivityAlertDays', parseInt(e.target.value))} className="w-[120px]" />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="auto-reminder">Auto-Reminder Window (before meeting)</Label>
-                     <Select defaultValue="24h">
+                     <Select value={settings.autoReminderWindow} onValueChange={(value) => handleSettingsChange('autoReminderWindow', value)}>
                         <SelectTrigger id="auto-reminder" className="w-[180px]">
                             <SelectValue placeholder="Select window" />
                         </SelectTrigger>
@@ -225,16 +351,25 @@ export default function SettingsPage() {
                 <div className="space-y-3">
                     <Label>Business Hours</Label>
                     <div className="grid grid-cols-2 gap-4">
-                         <div className='space-y-2'><Label htmlFor='business-start' className='text-xs font-normal'>Start</Label><Input id='business-start' type="time" defaultValue="09:00"/></div>
-                         <div className='space-y-2'><Label htmlFor='business-end' className='text-xs font-normal'>End</Label><Input id='business-end' type="time" defaultValue="18:00"/></div>
+                         <div className='space-y-2'><Label htmlFor='business-start' className='text-xs font-normal'>Start</Label><Input id='business-start' type="time" value={settings.businessHours.start} onChange={(e) => handleNestedChange('businessHours', 'start', e.target.value)} /></div>
+                         <div className='space-y-2'><Label htmlFor='business-end' className='text-xs font-normal'>End</Label><Input id='business-end' type="time" value={settings.businessHours.end} onChange={(e) => handleNestedChange('businessHours', 'end', e.target.value)} /></div>
                     </div>
                 </div>
                  <div className="space-y-3">
                     <Label>Active Days</Label>
                     <div className="flex items-center space-x-4">
-                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                             <div key={day} className="flex items-center gap-2">
-                                <Switch id={`day-${day}`} defaultChecked={!['Sat', 'Sun'].includes(day)} />
+                                <Switch 
+                                    id={`day-${day}`} 
+                                    checked={settings.activeDays.includes(day)} 
+                                    onCheckedChange={(checked) => {
+                                        const newDays = checked 
+                                            ? [...settings.activeDays, day]
+                                            : settings.activeDays.filter(d => d !== day);
+                                        handleSettingsChange('activeDays', newDays);
+                                    }}
+                                />
                                 <Label htmlFor={`day-${day}`}>{day}</Label>
                             </div>
                         ))}
@@ -242,11 +377,11 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                     <Label htmlFor="email-signature">Email Signature</Label>
-                    <Textarea id="email-signature" placeholder="Best,\nYour Name" rows={4} />
+                    <Textarea id="email-signature" placeholder="Best,\nYour Name" rows={4} value={settings.emailSignature} onChange={(e) => handleSettingsChange('emailSignature', e.target.value)} />
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="language">Language / Locale</Label>
-                    <Select defaultValue="en">
+                    <Select value={settings.language} onValueChange={(value) => handleSettingsChange('language', value)}>
                         <SelectTrigger id="language" className="w-[180px]">
                             <SelectValue placeholder="Select language" />
                         </SelectTrigger>
@@ -259,7 +394,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="tone">AI Tone of Communication</Label>
-                    <Select defaultValue="neutral">
+                    <Select value={settings.tone} onValueChange={(value) => handleSettingsChange('tone', value)}>
                         <SelectTrigger id="tone" className="w-[180px]">
                             <SelectValue placeholder="Select tone" />
                         </SelectTrigger>
@@ -272,7 +407,7 @@ export default function SettingsPage() {
                 </div>
                  <div className="flex items-center justify-between">
                     <Label htmlFor="timezone">Time Zone</Label>
-                    <Select defaultValue="America/New_York">
+                    <Select value={settings.timezone} onValueChange={(value) => handleSettingsChange('timezone', value)}>
                         <SelectTrigger id="timezone" className="w-[240px]">
                             <SelectValue placeholder="Select time zone" />
                         </SelectTrigger>
@@ -286,7 +421,10 @@ export default function SettingsPage() {
                 </div>
             </CardContent>
             <CardFooter>
-                <Button>Save All Settings</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
+                    Save All Settings
+                </Button>
             </CardFooter>
           </Card>
         </div>
@@ -294,5 +432,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
