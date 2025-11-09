@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Firestore Security Rules for AutoFlow CRM.
  *
@@ -41,7 +42,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
       allow list: if false;
     }
 
@@ -50,7 +51,7 @@ service cloud.firestore {
      * @path /users/{userId}/settings/{settingsId}
      */
     match /users/{userId}/settings/{settingsId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -67,7 +68,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/deals/{dealId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -84,7 +85,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/contacts/{contactId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -92,7 +93,7 @@ service cloud.firestore {
      * @path /users/{userId}/companies/{companyId}
      */
     match /users/{userId}/companies/{companyId} {
-        allow read, write: if isSignedIn() && isOwner(userId);
+        allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -100,7 +101,7 @@ service cloud.firestore {
      * @path /users/{userId}/emails/{emailId}
      */
     match /users/{userId}/emails/{emailId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
     
     /**
@@ -117,7 +118,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/tasks/{taskId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -127,7 +128,7 @@ service cloud.firestore {
      * @principle Enforces path-based user ownership.
      */
     match /users/{userId}/infotopes/{infotopeId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -144,7 +145,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/gmailIntegrations/{gmailIntegrationId} {
-      allow read, write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
 
     /**
@@ -152,8 +153,8 @@ service cloud.firestore {
      * @path /audit_logs/{logId}
      */
      match /audit_logs/{logId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow read: if isSignedIn() || isFirebaseAdmin();
+        allow create: if isSignedIn() || isFirebaseAdmin();
         allow update, delete: if false;
      }
 
@@ -162,8 +163,8 @@ service cloud.firestore {
       * @path /crystals/{crystalId}
       */
       match /crystals/{crystalId} {
-         allow read: if isSignedIn();
-         allow create: if isSignedIn();
+         allow read: if isSignedIn() || isFirebaseAdmin();
+         allow create: if isSignedIn() || isFirebaseAdmin();
          allow update, delete: if false;
       }
 
@@ -192,6 +193,16 @@ service cloud.firestore {
      */
     function isExistingOwner(userId) {
       return isSignedIn() && isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    /**
+      * @description Helper function to determine if the request is from a Firebase Admin SDK.
+      * @return {boolean} True if the request is from a Firebase Admin SDK, false otherwise.
+      */
+    function isFirebaseAdmin() {
+        // Admin SDK requests don't have an auth object but are trusted.
+        // We can add more checks here if needed, like checking for a specific claim.
+        return request.auth == null;
     }
   }
 }

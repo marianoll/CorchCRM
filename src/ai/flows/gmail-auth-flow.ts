@@ -10,7 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebaseServer } from '@/firebase/server-init';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -102,7 +102,7 @@ export const processGmailAuthCode = ai.defineFlow(
         throw new Error('Failed to retrieve access or refresh token.');
       }
       
-      const { firestore } = initializeFirebase();
+      const { firestore } = initializeFirebaseServer();
       if (!firestore) throw new Error("Firestore not available");
 
       // We use the user's email as the ID for the integration document for simplicity
@@ -127,15 +127,8 @@ export const processGmailAuthCode = ai.defineFlow(
           expiryDate: expiry_date,
       };
 
-      setDoc(integrationRef, integrationData, { merge: true }).catch(err => {
-         const permissionError = new FirestorePermissionError({
-            path: integrationRef.path,
-            operation: 'write',
-            requestResourceData: integrationData,
-         });
-         errorEmitter.emit('permission-error', permissionError);
-         throw err;
-      });
+      // Server-side write does not need the custom error handling for security rules
+      await setDoc(integrationRef, integrationData, { merge: true });
 
       return {
         success: true,

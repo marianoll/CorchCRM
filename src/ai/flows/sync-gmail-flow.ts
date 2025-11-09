@@ -8,7 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebaseServer } from '@/firebase/server-init';
 import { collection, query, getDocs, limit } from 'firebase/firestore';
 import { google } from 'googleapis';
 
@@ -47,7 +47,7 @@ const syncGmailFlow = ai.defineFlow(
     outputSchema: SyncGmailOutputSchema,
   },
   async ({ userId }) => {
-    const { firestore } = initializeFirebase();
+    const { firestore } = initializeFirebaseServer();
     if (!firestore) throw new Error("Firestore not initialized.");
 
     // 1. Get the user's Gmail integration credentials from Firestore
