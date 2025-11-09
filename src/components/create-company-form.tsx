@@ -34,6 +34,8 @@ const formSchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters.'),
   domain: z.string().optional(),
   industry: z.string().optional(),
+  size: z.string().optional(),
+  region: z.string().optional(),
 });
 
 type Company = {
@@ -41,6 +43,8 @@ type Company = {
     name: string;
     domain?: string;
     industry?: string;
+    size?: string;
+    region?: string;
 };
 
 type CreateCompanyFormProps = {
@@ -61,6 +65,8 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
       name: '',
       domain: '',
       industry: '',
+      size: '',
+      region: '',
     },
   });
 
@@ -70,7 +76,7 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
     if (isEditing && company) {
         form.reset(company);
     } else {
-        form.reset({ name: '', domain: '', industry: '' });
+        form.reset({ name: '', domain: '', industry: '', size: '', region: '' });
     }
   }, [company, isEditing, form, open]);
 
@@ -200,6 +206,32 @@ export function CreateCompanyForm({ open, onOpenChange, company }: CreateCompany
                   <FormLabel>Industry</FormLabel>
                   <FormControl>
                     <Input placeholder="SaaS" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="size"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Size</FormLabel>
+                  <FormControl>
+                    <Input placeholder="11-50 employees" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="region"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Region</FormLabel>
+                  <FormControl>
+                    <Input placeholder="North America" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -45,7 +45,9 @@ const formSchema = z.object({
   company_id: z.string().optional(),
   primary_contact_id: z.string().min(1, 'Please select a contact.'),
   amount: z.coerce.number().positive('Amount must be a positive number.'),
+  currency: z.string().optional(),
   stage: z.enum(['prospect', 'discovery', 'proposal', 'negotiation', 'won', 'lost']),
+  probability: z.coerce.number().min(0).max(100).optional(),
   close_date: z.date({
     required_error: 'A close date is required.',
   }),
@@ -94,7 +96,9 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
     defaultValues: {
       title: '',
       amount: 0,
+      currency: 'USD',
       stage: 'prospect',
+      probability: undefined,
       close_date: new Date(),
     },
   });
@@ -117,6 +121,8 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
         if (isEditing && deal) {
             form.reset({
                  ...deal,
+                 probability: deal.probability || undefined,
+                 currency: deal.currency || 'USD',
                  close_date: toDate(deal.close_date)
             });
         } else {
@@ -124,6 +130,8 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 title: '',
                 amount: 0,
                 stage: 'prospect',
+                probability: undefined,
+                currency: 'USD',
                 close_date: new Date(),
                 primary_contact_id: undefined,
                 company_id: undefined,
@@ -313,19 +321,34 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="5000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="5000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                 <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Currency</FormLabel>
+                    <FormControl>
+                        <Input placeholder="USD" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
             <FormField
               control={form.control}
               name="stage"
@@ -347,6 +370,19 @@ export function CreateDealForm({ open, onOpenChange, contacts, companies, deal }
                       <SelectItem value="lost">Lost</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="probability"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Probability (%)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" max="100" placeholder="e.g., 90" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

@@ -43,6 +43,7 @@ const formSchema = z.object({
   phone: z.string().optional(),
   company_id: z.string().optional(),
   title: z.string().optional(),
+  seniority: z.string().optional(),
 });
 
 type Contact = {
@@ -86,7 +87,8 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
       email_primary: '',
       phone: '',
       company_id: '',
-      title: ''
+      title: '',
+      seniority: ''
     },
   });
 
@@ -102,6 +104,7 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
                 phone: contact.phone || '',
                 company_id: contact.company_id || '',
                 title: contact.title || '',
+                seniority: contact.seniority || '',
             });
         } else {
             form.reset({
@@ -110,7 +113,8 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
               email_primary: '',
               phone: '',
               company_id: '',
-              title: ''
+              title: '',
+              seniority: '',
             });
         }
     }
@@ -288,6 +292,19 @@ export function CreateContactForm({ open, onOpenChange, contact, companies }: Cr
                   <FormLabel>Title</FormLabel>
                   <FormControl>
                     <Input placeholder="CEO, Marketing Director..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="seniority"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Seniority</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Director, C-Level..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
