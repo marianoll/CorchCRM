@@ -10,9 +10,9 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { format } from 'date-fns';
 
-// ---- Schemas ----
+// ---- Schemas (local variables, not exported) ----
 
-export const SyncGmailInputSchema = z.object({
+const SyncGmailInputSchema = z.object({
   userId: z.string().describe('The ID of the user for whom to sync emails.'),
 });
 export type SyncGmailInput = z.infer<typeof SyncGmailInputSchema>;
@@ -28,7 +28,7 @@ const EmailSchema = z.object({
     ts: z.string().datetime(), // ISO 8601 string
 });
 
-export const SyncGmailOutputSchema = z.object({
+const SyncGmailOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   emails: z.array(EmailSchema),
@@ -91,7 +91,7 @@ const syncGmailFlow = ai.defineFlow(
 );
 
 
-// ---- API ----
+// ---- API (The only async function export) ----
 
 export async function syncGmail(input: SyncGmailInput): Promise<SyncGmailOutput> {
   try {
