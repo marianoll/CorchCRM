@@ -99,7 +99,7 @@ service cloud.firestore {
      * @path /users/{userId}/tasks
      */
     match /users/{userId}/tasks/{taskId} {
-      allow read, write, list: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
+      allow list, read, write: if isSignedIn() && isOwner(userId) || isFirebaseAdmin();
     }
     
     /**
