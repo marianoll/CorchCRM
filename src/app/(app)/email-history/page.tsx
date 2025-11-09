@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useTransition } from 'react';
@@ -122,11 +123,19 @@ export default function EmailHistoryPage() {
                 if (emailObj.id) {
                     const emailRef = doc(firestore, 'users', user.uid, 'emails', emailObj.id);
                     const emailData: any = { ...emailObj };
+                    
+                    Object.keys(emailData).forEach(key => {
+                        if (emailData[key] === undefined || emailData[key] === null || emailData[key] === '') {
+                            delete emailData[key];
+                        }
+                    });
+
                     if (emailData.ts && !isNaN(new Date(emailData.ts).getTime())) {
                       emailData.ts = new Date(emailData.ts);
                     } else {
                       delete emailData.ts; // Remove invalid date
                     }
+
                     batch.set(emailRef, emailData);
                 }
             });
