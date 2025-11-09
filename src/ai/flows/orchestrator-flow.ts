@@ -29,9 +29,9 @@ const ActionSchema = z.object({
   type: ActionType,
   target: TargetType,
   id: z.string().optional(),
-  data: z.record(z.any()).optional().describe('An object containing the full data for a new entity when type is create_entity.'),
-  changes: z.record(z.any()).optional().describe('An object containing only the fields to be modified when type is update_entity.'),
-  reason: z.string().optional(),
+  data: z.record(z.any()).describe("An object containing the full data for a new entity when type is create_entity.").optional(),
+  changes: z.record(z.any()).describe("An object containing only the fields to be modified when type is update_entity.").optional(),
+  reason: z.string().describe("A concise, one-line summary of the specific action to be taken. E.g., 'Update deal amount to $50,000' or 'Create task to send follow-up email'.").optional(),
   confidence: z.number().min(0).max(1).optional(),
   date: z.string().optional().describe('Optional date for the action, in ISO format. Default is now.'),
 });
@@ -101,7 +101,7 @@ export type OrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 // FIX 1: modelo vigente
 const orchestratePrompt = ai.definePrompt({
   name: 'orchestrateInteraction',
-  model: googleAI.model('gemini-2.0-flash-lite'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: OrchestratorInputSchema },
   output: { schema: OrchestratorOutputSchema },
   // Pasa objetos; Genkit serializa. Evita {{{json ...}}}
@@ -109,11 +109,12 @@ const orchestratePrompt = ai.definePrompt({
 You are CorchCRM's Orchestrator AI.
 Output ONLY a JSON object with an "actions" array. No text outside JSON.
 
-Entities: companies, contacts, deals, emails, tasks, meetings, notifications, ai_drafts, history.
+Entities: companies, contacts, deals, emails, tasks, meetings, notifications, history.
 Action types: update_entity, create_entity, create_task, create_ai_draft, create_meeting, notify_user, log_action, suggest.
 
 Rules:
 - Prefer small, atomic actions.
+- For each action, you MUST provide a "reason" field with a concise, one-line summary of the specific action. For example: "Update deal amount to $50,000" or "Create task to send follow-up email".
 - Include "confidence" (0..1) for decisions.
 - If unsure, use type "suggest".
 - Log all entity changes with a "log_action".

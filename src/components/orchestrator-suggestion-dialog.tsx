@@ -153,9 +153,11 @@ export function OrchestratorSuggestionDialog({
                         <TableRow key={i}>
                             <TableCell>
                                 <div className="font-medium">{action.reason || 'N/A'}</div>
-                                <pre className="mt-1 text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded-md">{JSON.stringify(action.data || action.changes, null, 2)}</pre>
+                                {(action.data || action.changes) && (
+                                    <pre className="mt-1 text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded-md">{JSON.stringify(action.data || action.changes, null, 2)}</pre>
+                                )}
                             </TableCell>
-                            <TableCell><Badge variant="outline">{action.target}</Badge></TableCell>
+                            <TableCell><Badge variant="outline">{action.type}</Badge></TableCell>
                             <TableCell>{action.date ? format(new Date(action.date), 'PP') : 'Now'}</TableCell>
                             <TableCell className="text-right">
                                 <div className="flex gap-2 justify-end">
